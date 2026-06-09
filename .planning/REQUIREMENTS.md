@@ -20,6 +20,16 @@
 
 Requirements for the initial self-host release. Each maps to a roadmap phase (Traceability below).
 
+### Day-0 Setup & Priming (SETUP)
+
+One-time, operator-run bootstrap of the Proxmox host — the prerequisite for every real-infra path. See `.planning/research/PROXMOX-PRIMING.md`.
+
+- [ ] **SETUP-01**: A re-runnable `cc-worker-config/lxc/host-prime/` kit primes a bare Proxmox host (least-privilege `burrow@pve` user + `BurrowProvisioner` role + privsep token, scoped ACLs, CT template download, golden-template creation, control-plane provisioning), each step check→act idempotent with reversal notes
+- [ ] **SETUP-02**: The Proxmox role is the verified minimal privilege set (`VM.Audit VM.Clone VM.Allocate VM.Config.Network VM.Config.Options VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit Sys.Audit`, + conditional `SDN.Use`), scoped to `/pool/burrow-workers` + `/storage/<rootfs>` + `/nodes/<node>` (resolves Pitfall 14)
+- [ ] **SETUP-03**: The API token is `privsep=1` and the role is granted to **both** the user and the token at every scoped path (effective = user∩token); the token value is captured once into the gitignored `.env`, never committed, echoed, logged, or passed as a CLI arg
+- [ ] **SETUP-04**: A `PRIMING.md` Day-0 runbook orders the steps (identity → network decision → golden template → control plane → first-workspace smoke) with a per-step gate, ending in the five-step create→live→stop→start→destroy acceptance gate
+- [ ] **SETUP-05**: The static-IP-from-VMID scheme + off-host DHCP-range exclusion is recorded in `30-network-notes.md` (placeholders only) as the single source of truth for `pct set net0` and the control plane's IP computation
+
 ### Platform & API (PLAT)
 
 - [ ] **PLAT-01**: All API routes are served under `/api/v1` (resolves spec §5.2 un-versioned examples)
@@ -69,7 +79,7 @@ Requirements for the initial self-host release. Each maps to a roadmap phase (Tr
 
 - [ ] **WORK-01**: A golden template LXC spec provisions all worker software reproducibly (Ubuntu 24.04, Node 22, `@anthropic-ai/claude-code`, ttyd, configured plugins)
 - [ ] **WORK-02**: Each worker boots via `burrow-boot.sh`: pulls CLAUDE.md + plugin manifest from `cc-worker-config`, clones the project repo, launches ttyd shelling into Claude Code
-- [ ] **WORK-03**: Boot config (config/project repo + branch) is injected via the `ComputeProvider` using `pct exec`/`pct push` to write `/etc/burrow/worker.env`, not QEMU cloud-init (SC-4)
+- [ ] **WORK-03**: Boot config (config/project repo + branch) reaches the worker via a non-cloud-init, non-`pct`-over-API mechanism — **pull-at-boot recommended**: `injectBootConfig` persists intent to the DB and the worker fetches its non-secret config + a short-lived git credential from an internal control-plane endpoint at boot, since `pct exec`/`pct push` are node-CLI-only and absent from the HTTPS API (SC-4); final mechanism locked by an ADR in Phase 0
 - [ ] **WORK-04**: ttyd is reachable by the control-plane proxy over the worker's network address (not `lo`-only), resolving the spec §9.3↔§6.4 contradiction (SC-7)
 - [ ] **WORK-05**: The worker plugin set is defined by a versioned manifest; `claude-plugin` types are pulled fresh at boot, `binary`/`npm-global` types are baked into the template
 
@@ -136,6 +146,11 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
+| SETUP-01 | Phase 0 | Pending |
+| SETUP-02 | Phase 0 | Pending |
+| SETUP-03 | Phase 0 | Pending |
+| SETUP-04 | Phase 0 | Pending |
+| SETUP-05 | Phase 0 | Pending |
 | PLAT-01 | Phase 1 | Pending |
 | PLAT-02 | Phase 0 | Pending |
 | PLAT-03 | Phase 1 | Pending |
@@ -186,10 +201,10 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | CICD-06 | Phase 0 | Pending |
 
 **Coverage:**
-- v1 requirements: 48 total
-- Mapped to phases: 48
+- v1 requirements: 53 total
+- Mapped to phases: 53
 - Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-09*
-*Last updated: 2026-06-09 after roadmap creation (traceability populated)*
+*Last updated: 2026-06-09 after Proxmox priming gap analysis (added SETUP-01..05; reframed WORK-03 to pull-at-boot)*

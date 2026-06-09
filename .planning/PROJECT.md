@@ -74,7 +74,9 @@ Active requirements are hypotheses until shipped and validated.)
   phases should honor these.
 - **Open questions to resolve before the relevant phase (surface, do not silently
   implement around — per project convention):**
-  - LXC IP assignment: static pool aligned to VMID range vs DHCP + Proxmox API poll (spec recommends static).
+  - LXC IP assignment: **RESOLVED → static IP computed from VMID**, worker range excluded from DHCP (DHCP discovery is unreliable for unprivileged LXC; ADR pending in Phase 0).
+  - Boot-config injection mechanism: `pct exec`/`pct push` are **not** in the Proxmox HTTPS API, so the spec's push approach is impossible — pull-at-boot (worker fetches config from an internal endpoint) is recommended vs SSH-push to the node; ADR in Phase 0. See `research/PROXMOX-PRIMING.md`.
+  - Proxmox ACL scoping for the `burrow@pve` token: `/pool/burrow-workers` (tight) vs `/vms` (simpler, broader) — resolve before Phase 1.
   - ttyd `--once`: closing the browser tab terminates the Claude session — decide detach-vs-terminate UX.
   - Worker node selection: manual pick in the create modal first, auto-select later.
   - Plugin update cadence: pull `cc-worker-config` at boot (latest) vs snapshot at create (reproducible).
@@ -108,6 +110,8 @@ Active requirements are hypotheses until shipped and validated.)
 | Ephemeral workers cloned from a golden template LXC | No snowflake state; reproducible workspaces; plugin drift impossible | — Pending |
 | v1 LAN-only, no auth | Self-host single-user target; auth is hosted-path scope | — Pending |
 | CI proves builds + inter-app behavior, not live infra (FakeComputeProvider) | Hermetic, deterministic CI; real Proxmox validated in dev | — Pending |
+| Proxmox priming is a Phase-0 operator kit (`cc-worker-config/lxc/host-prime/` + `PRIMING.md`), not runtime | The one-time bootstrap (least-priv user/role/privsep token, CT template, control-plane box) must exist before any create; idempotent, operator-run | — Pending |
+| Boot config delivered pull-at-boot (recommended), not `pct`-over-API or cloud-init | `pct exec`/`pct push` are absent from the HTTPS API; pull-at-boot keeps the `ComputeProvider` seam HTTPS-only and secrets off worker env; final lock via Phase 0 ADR | — Pending |
 | Planning profile = Quality (Opus), standard granularity, parallel plans | Real greenfield build warrants depth; matches spec's ~5-phase shape | — Pending |
 | Setup pauses at ROADMAP (no autonomous build this session) | Operator reviews the phase plan before any code is built | — Pending |
 
@@ -129,4 +133,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-09 after initialization*
+*Last updated: 2026-06-09 after initialization + Proxmox priming gap analysis*
