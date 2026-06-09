@@ -136,13 +136,60 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| (filled by roadmapper) | — | Pending |
+| PLAT-01 | Phase 1 | Pending |
+| PLAT-02 | Phase 0 | Pending |
+| PLAT-03 | Phase 1 | Pending |
+| PLAT-04 | Phase 1 | Pending |
+| PLAT-05 | Phase 1 | Pending |
+| PLAT-06 | Phase 0 | Pending |
+| PLAT-07 | Phase 0 | Pending |
+| PLAT-08 | Phase 0 | Pending |
+| PLAT-09 | Phase 0 | Pending |
+| WS-01 | Phase 1 | Pending |
+| WS-02 | Phase 1 | Pending |
+| WS-03 | Phase 1 | Pending |
+| WS-04 | Phase 1 | Pending |
+| WS-05 | Phase 1 | Pending |
+| WS-06 | Phase 1 | Pending |
+| WS-07 | Phase 1 | Pending |
+| WS-08 | Phase 1 | Pending |
+| WS-09 | Phase 1 | Pending |
+| WS-10 | Phase 1 | Pending |
+| WS-11 | Phase 1 | Pending |
+| TERM-01 | Phase 2 | Pending |
+| TERM-02 | Phase 2 | Pending |
+| TERM-03 | Phase 2 | Pending |
+| TERM-04 | Phase 2 | Pending |
+| TERM-05 | Phase 2 | Pending |
+| TERM-06 | Phase 2 | Pending |
+| TERM-07 | Phase 2 | Pending |
+| UI-01 | Phase 2 | Pending |
+| UI-02 | Phase 2 | Pending |
+| UI-03 | Phase 2 | Pending |
+| UI-04 | Phase 2 | Pending |
+| UI-05 | Phase 2 | Pending |
+| UI-06 | Phase 4 | Pending |
+| WORK-01 | Phase 0 | Pending |
+| WORK-02 | Phase 3 | Pending |
+| WORK-03 | Phase 1 | Pending |
+| WORK-04 | Phase 0 | Pending |
+| WORK-05 | Phase 3 | Pending |
+| CAP-01 | Phase 1 | Pending |
+| CAP-02 | Phase 4 | Pending |
+| CAP-03 | Phase 4 | Pending |
+| CAP-04 | Phase 1 | Pending |
+| CICD-01 | Phase 0 | Pending |
+| CICD-02 | Phase 1 | Pending |
+| CICD-03 | Phase 1 | Pending |
+| CICD-04 | Phase 4 | Pending |
+| CICD-05 | Phase 4 | Pending |
+| CICD-06 | Phase 0 | Pending |
 
 **Coverage:**
-- v1 requirements: 46 total
-- Mapped to phases: 0 (pending roadmap)
-- Unmapped: 46 ⚠️
+- v1 requirements: 48 total
+- Mapped to phases: 48
+- Unmapped: 0
 
 ---
 *Requirements defined: 2026-06-09*
-*Last updated: 2026-06-09 after initial definition*
+*Last updated: 2026-06-09 after roadmap creation (traceability populated)*
