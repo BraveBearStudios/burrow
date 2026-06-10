@@ -1,8 +1,8 @@
 ---
 phase: 0
 slug: contracts-seams-golden-template
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-06-09
 ---

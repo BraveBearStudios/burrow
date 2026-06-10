@@ -828,21 +828,21 @@ Format: follow the existing **ADR-0001** (tech-spec Appendix A) — `Status / Co
 
 **Note:** No `[ASSUMED]` package names — every package traces to STACK.md's live registry reads. The assumptions above are about *tooling choices and wiring details*, not package legitimacy.
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **`cc-worker-config`: in-repo directory vs separate repo for Phase 0?**
    - What we know: CONTEXT says "separate repo, authored here as specs/scripts under that name." tech-spec §4.2 + PROXMOX-PRIMING §6 use the path `cc-worker-config/lxc/...`.
    - What's unclear: whether to create a real top-level `cc-worker-config/` directory in `burrow` now, or stage the scripts elsewhere.
-   - Recommendation: vendor `cc-worker-config/` in-repo for Phase 0 so scripts are SPDX-headered, shellcheck-able, and gated; split to its own repo when the worker pipeline lands (Phase 3). (A5)
+   - RESOLVED: LOCK to an **in-repo top-level `cc-worker-config/` directory** for Phase 0 (A5 recommendation). Authoring the scripts here means they get the SPDX two-line header, `shellcheck`, and CI gating *now*; split to a dedicated `cc-worker-config` repo when the Phase-3 worker pull pipeline lands. This matches what plans 00-06 / 00-07 already author (`cc-worker-config/PRIMING.md`, `cc-worker-config/lxc/host-prime/*`, `cc-worker-config/lxc/worker-template/*`).
 
 2. **PR-title-validation Action choice.**
    - What we know: squash-merge ⇒ PR title is the commit; ci-cd requires "PR title + commit messages validated."
    - What's unclear: which specific Action.
-   - Recommendation: a maintained PR-title-validation Action + a permissive commit-msg regex; team picks the Action. (A2)
+   - RESOLVED: Use **`amannn/action-semantic-pull-request`**, SHA-pinned (per ci-cd §5.5 "third-party actions pinned to a full commit SHA"). Plan 00-04 names this Action explicitly and pins a SHA placeholder with a `# TODO pin exact SHA` note rather than leaving the choice to implementation. A permissive local commit-msg regex remains an optional nice-to-have.
 
 3. **Minimal `ui/` scaffold vs full UI install in Phase 0.**
    - What we know: only `tsc` + `biome` gates need `ui/` to exist this phase; full UI is Phase 2.
-   - Recommendation: minimal scaffold (tsconfig + biome.json + one placeholder `.tsx`) to keep the phase focused; full STACK.md UI tree lands Phase 2.
+   - RESOLVED: Minimal scaffold only — `ui/package.json` + the `vite`/`tsconfig`/`biome` configs and one placeholder source — to keep the phase focused and give the JS gates a real target. The full STACK.md UI runtime tree (React 19, Vite 8, xterm, react-mosaic, TanStack Query, Zustand, Tailwind v4) lands in Phase 2.
 
 ## Environment Availability
 
