@@ -18,14 +18,25 @@ your real values in a copy kept outside version control (or in your gitignored
 Unprivileged LXC has no guest agent, and the Proxmox interfaces API is
 unreliable for DHCP leases. So Burrow **computes** each worker's IP from its
 VMID and knows the address the instant a VMID is allocated — no polling, no
-race. A VMID collision *is* an IP collision, so the DB unique constraint on
-`vmid` guards both at once.
+race. A VMID collision *is* an IP collision, so the same DB guard that prevents
+two live workspaces from holding one VMID prevents the IP collision too.
+
+> **Where that guard lives.** Phase 0 ships the schema (`001_init.sql`) without a
+> `vmid` uniqueness constraint, by design: a plain `UNIQUE(vmid)` would block
+> VMID reuse after a destroy, but the worker pool must recycle VMIDs while
+> soft-deleted rows retain their old value. The collision guard is therefore a
+> **partial unique index** scoped to live rows —
+> `CREATE UNIQUE INDEX ... ON workspaces(vmid) WHERE vmid IS NOT NULL AND deletedAt IS NULL`
+> — landed by the Phase-1 create saga (SC-4 / WS-10) alongside the bounded scan
+> and the `/pool` ACL fence. Until that index exists, the bounded scan plus the
+> single-writer create path are the only backstop, so the off-host DHCP
+> exclusion below remains load-bearing.
 
 ## The scheme (placeholders — replace `<...>` with your LAN values)
 
 | Item | Placeholder | Example shape | Notes |
 |------|-------------|---------------|-------|
-| Worker VMID range | `<pool-start>`–`<pool-end>` | a contiguous block | Convention, made real by the bounded scan + DB unique reservation + the `/pool` ACL fence |
+| Worker VMID range | `<pool-start>`–`<pool-end>` | a contiguous block | Convention, made real by the bounded scan + the Phase-1 partial unique index on `vmid` (live rows) + the `/pool` ACL fence |
 | Subnet | `<subnet>` | a `/<prefix>` LAN | the bridge's subnet |
 | Prefix | `<prefix>` | CIDR prefix length | e.g. a `/24` |
 | Gateway | `<gw>` | bare gateway IP | `gw=` takes a bare IP |
