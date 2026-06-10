@@ -24,7 +24,7 @@ CREATE TABLE events (
   workspaceId   TEXT NOT NULL REFERENCES workspaces(id),
   type          TEXT NOT NULL,
   -- type values: workspace.created|started|stopped|destroyed|terminal.connected|terminal.disconnected|boot.error
-  data          TEXT DEFAULT '{}',  -- JSON blob
+  data          TEXT NOT NULL DEFAULT '{}',  -- JSON blob (non-optional, matches WorkspaceEvent.data)
   createdAt     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
 
