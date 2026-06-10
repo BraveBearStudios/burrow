@@ -10,8 +10,14 @@
 // `→ 202 · polling status…` footnote render, not any real per-step API claim.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
+import {
+	cleanup,
+	fireEvent,
+	render,
+	screen,
+	waitFor,
+} from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server } from "../../tests/msw/server";
@@ -25,8 +31,10 @@ function renderModal(onClose = vi.fn()) {
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={client}>{children}</QueryClientProvider>
 	);
-	render(<NewWorkspaceModal onClose={onClose} />, { wrapper });
-	return { onClose };
+	const { unmount } = render(<NewWorkspaceModal onClose={onClose} />, {
+		wrapper,
+	});
+	return { onClose, unmount };
 }
 
 /** Fill the three required fields (Name, Git repo, Node) with valid values. */
@@ -49,6 +57,10 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+	// Unmount so the modal's unmount effect flips isMountedRef (any in-flight saga
+	// becomes a no-op). Assertions read the reset-per-test layoutStore state, so no
+	// spy-identity leakage across tests is possible.
+	cleanup();
 	vi.restoreAllMocks();
 });
 
@@ -80,9 +92,12 @@ describe("NewWorkspaceModal — validation (UI-03)", () => {
 });
 
 describe("NewWorkspaceModal — create saga (UI-03)", () => {
-	it("submits → cosmetic boot-progress (4 steps + 202 footnote) → openPanel + close", async () => {
-		const openPanel = vi.spyOn(useLayoutStore.getState(), "openPanel");
-		const { onClose } = renderModal();
+	// These assert against the REAL layoutStore state (reset in beforeEach) rather
+	// than a spy on the singleton store method — a spy's identity is shared across
+	// tests, so a stray async could be attributed to the wrong test; the store's
+	// mosaicNode is reset per test, making "did the panel open?" leak-proof.
+	it("submits → cosmetic boot-progress (4 steps + 202 footnote) → opens the panel + closes", async () => {
+		const { onClose, unmount } = renderModal();
 		await waitFor(() =>
 			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
 		);
@@ -90,15 +105,37 @@ describe("NewWorkspaceModal — create saga (UI-03)", () => {
 		fireEvent.click(screen.getByRole("button", { name: /Create/ }));
 
 		// The saga swaps in: title → Creating {name}, the 202 footnote + 4 steps.
-		expect(await screen.findByText("Creating project-omega")).toBeInTheDocument();
+		expect(
+			await screen.findByText("Creating project-omega"),
+		).toBeInTheDocument();
 		expect(
 			screen.getByText("POST /api/v1/workspaces → 202 · polling status…"),
 		).toBeInTheDocument();
 		expect(screen.getByText(/Waiting for Claude/)).toBeInTheDocument();
 
 		// On the resolved running row the panel opens (newId) + the modal closes.
-		await waitFor(() => expect(openPanel).toHaveBeenCalledWith("ws-created"));
+		await waitFor(() =>
+			expect(useLayoutStore.getState().mosaicNode).toBe("ws-created"),
+		);
 		await waitFor(() => expect(onClose).toHaveBeenCalled());
+		unmount();
+	});
+
+	it("does not double-open when Create is clicked twice (single-shot guard)", async () => {
+		const { unmount } = renderModal();
+		await waitFor(() =>
+			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
+		);
+		fillRequired();
+		const create = screen.getByRole("button", { name: /Create/ });
+		fireEvent.click(create);
+		fireEvent.click(create);
+		await waitFor(() =>
+			expect(useLayoutStore.getState().mosaicNode).toBe("ws-created"),
+		);
+		// A single leaf — the second click was latched out (no duplicate open).
+		expect(useLayoutStore.getState().mosaicNode).toBe("ws-created");
+		unmount();
 	});
 
 	it("surfaces a server envelope error (capacity CAP-01) verbatim + a Close button", async () => {
@@ -117,8 +154,7 @@ describe("NewWorkspaceModal — create saga (UI-03)", () => {
 				),
 			),
 		);
-		const openPanel = vi.spyOn(useLayoutStore.getState(), "openPanel");
-		renderModal();
+		const { onClose, unmount } = renderModal();
 		await waitFor(() =>
 			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
 		);
@@ -129,7 +165,10 @@ describe("NewWorkspaceModal — create saga (UI-03)", () => {
 			await screen.findByText("Node node1 is over its memory threshold."),
 		).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Close" })).toBeInTheDocument();
-		expect(openPanel).not.toHaveBeenCalled();
+		// The panel never opened and the modal stayed up (no auto-close on error).
+		expect(useLayoutStore.getState().mosaicNode).toBeNull();
+		expect(onClose).not.toHaveBeenCalled();
+		unmount();
 	});
 });
 
