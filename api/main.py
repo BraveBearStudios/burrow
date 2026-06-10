@@ -30,6 +30,7 @@ from lib.envelope import respond_error
 from lib.errors import (
     CapacityError,
     IllegalTransitionError,
+    IllegalVmidError,
     NoFreeVmidError,
     ServiceError,
     WorkspaceBootError,
@@ -46,6 +47,9 @@ _SERVICE_ERROR_STATUS: dict[type[ServiceError], int] = {
     CapacityError: 409,
     NoFreeVmidError: 409,
     WorkspaceNotFoundError: 404,
+    # Out-of-pool / source-IP-mismatch bootconfig probe → 404 with NO echo of the
+    # probed vmid (enumeration resistance, T-01-17). Same wire shape as not_found.
+    IllegalVmidError: 404,
     WorkspaceBootError: 502,
 }
 # Operator-facing fallback messages keyed by code, so a router never echoes an
@@ -55,6 +59,8 @@ _SAFE_ERROR_MESSAGES: dict[str, str] = {
     "capacity_exceeded": "The selected node is over capacity.",
     "no_free_vmid": "No free workspace slot is available.",
     "not_found": "Workspace not found.",
+    # Generic message for the out-of-pool bootconfig probe — never echoes the vmid.
+    "illegal_vmid": "Not found.",
     "boot_failed": "The workspace failed to boot.",
     "compute_error": "The compute backend is unavailable.",
     "service_error": "The request could not be completed.",
@@ -177,11 +183,12 @@ def create_app() -> FastAPI:
     # Deferred import: routers import the DI seams (get_service/get_compute/get_db)
     # from this module, so they are imported here — after those names are defined —
     # to avoid a circular import at module load.
-    from routers import health, templates, workspaces
+    from routers import health, internal, templates, workspaces
 
     app.include_router(workspaces.router)
     app.include_router(templates.router)
     app.include_router(health.router)
+    app.include_router(internal.router)
     return app
 
 
