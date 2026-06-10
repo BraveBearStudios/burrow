@@ -16,6 +16,11 @@ Wants=network-online.target
 
 [Service]
 Type=simple
+# Optional env channel for boot config. The leading `-` makes a missing file
+# non-fatal: Phase 0 ships no worker.env, and pull-at-boot (Phase 3) populates
+# CONTROL_PLANE/CONFIG_*/PROJECT_* at runtime. Without this, burrow-boot.sh has
+# no channel to receive them at all.
+EnvironmentFile=-/etc/burrow/worker.env
 ExecStart=/opt/burrow-boot.sh
 Restart=on-failure
 RestartSec=5

@@ -33,14 +33,25 @@ log() { echo "[burrow-boot] $*"; }
 #      the worker env, SC-4 / Pitfall 13).
 # Phase 0 leaves the fetch + auth a documented stub; the control-plane bootconfig
 # endpoint contract lands Phase 1 and the live fetch lands Phase 3.
-CONTROL_PLANE="${CONTROL_PLANE:?CONTROL_PLANE must be set (e.g. http://<control-plane>:8000)}"
+#
+# CONTROL_PLANE is the Phase-3 pull-at-boot endpoint. It is NOT yet wired (the
+# fetch is a stub), and the systemd unit's EnvironmentFile is optional, so it may
+# legitimately be unset on a Phase-0 boot. Warn-and-skip rather than hard-`:?`
+# exit: a missing CONTROL_PLANE must NOT abort the unit, because the persistent
+# ttyd below is the thing that actually has to come up on every boot. The `:?`
+# guard returns in Phase 3 once the live fetch depends on it.
+CONTROL_PLANE="${CONTROL_PLANE:-}"
+if [[ -z "$CONTROL_PLANE" ]]; then
+  log "CONTROL_PLANE unset; skipping the Phase-3 pull-at-boot fetch (stub). ttyd still starts."
+else
+  log "control plane: ${CONTROL_PLANE}"
+fi
 
 # TODO(Phase 3): replace the env-var defaults below with the live pull:
 #   1. VMID="$(resolve_vmid_from_hostname)"
 #   2. curl -fsSL "${CONTROL_PLANE}/api/v1/internal/bootconfig/${VMID}" -> CONFIG_*/PROJECT_*
 #   3. obtain + use + discard a short-lived git credential for the clones below.
 log "pull-at-boot fetch is a Phase-3 stub; reading boot config from env for now"
-log "control plane: ${CONTROL_PLANE}"
 
 CONFIG_REPO="${CONFIG_REPO:-}"
 CONFIG_BRANCH="${CONFIG_BRANCH:-main}"
