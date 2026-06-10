@@ -118,7 +118,24 @@ class ProxmoxComputeProvider(ComputeProvider):
     async def usedVmids(self) -> set[int]:
         resources = await asyncio.to_thread(lambda: self._api.cluster.resources.get(type="vm"))
         start, end = self._settings.worker_pool_start, self._settings.worker_pool_end
-        return {int(r["vmid"]) for r in resources if "vmid" in r and start <= int(r["vmid"]) <= end}
+        # WR-04: cluster/resources rows are heterogeneous — a row may carry `vmid`
+        # present but non-numeric/None (storage, sdn, or a future resource type
+        # reusing the key). int() on that raises ValueError/TypeError, which is NOT
+        # a ComputeError and would escape the seam as an uncaught 500 during the
+        # pre-clone scan. Parse defensively: skip a row whose vmid is absent or
+        # unparseable rather than crash.
+        out: set[int] = set()
+        for r in resources:
+            raw = r.get("vmid")
+            if raw is None:
+                continue
+            try:
+                vmid = int(raw)
+            except (TypeError, ValueError):
+                continue
+            if start <= vmid <= end:
+                out.add(vmid)
+        return out
 
     # ── lifecycle mutations (each UPID-blocked) ───────────────────────────────
     async def cloneCt(

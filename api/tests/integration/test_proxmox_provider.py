@@ -314,3 +314,31 @@ async def test_destroy_missing_ct_is_idempotent_noop() -> None:
     task = await _provider().destroyCt(_NODE, 201)
     assert task.status == "ok"
     assert task.exitstatus == "OK"
+
+
+@responses.activate
+async def test_used_vmids_skips_malformed_rows_without_crashing() -> None:
+    """WR-04: heterogeneous cluster/resources rows are parsed defensively.
+
+    A row with vmid present-but-None, non-numeric, or absent must be skipped — not
+    crash the pre-clone scan with an uncaught ValueError/TypeError that escapes the
+    seam as a 500. Only valid in-range numeric vmids are returned.
+    """
+    responses.add(
+        responses.GET,
+        f"{_BASE}/cluster/resources",
+        json={
+            "data": [
+                {"vmid": 201, "type": "lxc"},  # valid, in range
+                {"vmid": "202", "type": "lxc"},  # numeric string, in range
+                {"vmid": None, "type": "storage"},  # present but None -> skip
+                {"vmid": "not-a-number", "type": "sdn"},  # non-numeric -> skip
+                {"type": "node"},  # vmid absent -> skip
+                {"vmid": 9000, "type": "lxc"},  # numeric but out of pool range
+            ]
+        },
+        status=200,
+    )
+
+    used = await _provider().usedVmids()
+    assert used == {201, 202}
