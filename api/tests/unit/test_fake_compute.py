@@ -55,6 +55,28 @@ async def test_destroy_frees_the_vmid() -> None:
     assert await fake.getNextVmid(205, 210, set()) == 205
 
 
+async def test_destroy_running_ct_is_idempotent_and_frees_vmid() -> None:
+    """CR-03: destroying a *running* CT stops-then-removes it and frees the VMID.
+
+    The cloned-but-running case (a half-started clone) must not orphan the CT.
+    The Fake models the real provider's stop-then-destroy, so a destroy on a
+    running container leaves no leftover and frees the id.
+    """
+    fake = FakeComputeProvider()
+    await fake.cloneCt(9000, 206, "ws-206", "pve1")
+    await fake.startCt("pve1", 206)  # CT is now RUNNING
+    assert (await fake.getStatus("pve1", 206)).status == "running"
+
+    # Destroy a running CT: no error, the container is gone, the VMID is freed.
+    task = await fake.destroyCt("pve1", 206)
+    assert task.status == "ok"
+    assert 206 not in await fake.usedVmids()
+
+    # Idempotent: a second destroy on the now-missing CT is still a no-op success.
+    again = await fake.destroyCt("pve1", 206)
+    assert again.status == "ok"
+
+
 async def test_get_next_vmid_skips_used_and_known() -> None:
     fake = FakeComputeProvider()
     await fake.cloneCt(9000, 200, "ws-200", "pve1")  # 200 now known to the provider

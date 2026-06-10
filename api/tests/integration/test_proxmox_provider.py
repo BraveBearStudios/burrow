@@ -200,3 +200,76 @@ async def test_get_next_vmid_raises_when_pool_exhausted() -> None:
     """getNextVmid raises NoFreeVmidError when every id in the range is used."""
     with pytest.raises(NoFreeVmidError):
         await _provider().getNextVmid(200, 202, {200, 201, 202})
+
+
+# A stop/destroy UPID for the running-CT compensation path (CR-03).
+_STOP_UPID = f"UPID:{_NODE}:0000ABCE:00100000:64000000:vzstop:201:burrow@pve:"
+_DESTROY_UPID = f"UPID:{_NODE}:0000ABCF:00100000:64000000:vzdestroy:201:burrow@pve:"
+
+
+@responses.activate
+async def test_destroy_running_ct_stops_then_destroys() -> None:
+    """CR-03: a running CT (DELETE refused) is stopped, then destroyed idempotently.
+
+    Proxmox refuses to DELETE a running LXC with a non-404 error. destroyCt must
+    recognise that, issue a stop (UPID-blocked), then retry the DELETE so
+    compensation actually removes the orphan and frees the VMID.
+    """
+    # First DELETE: Proxmox refuses because the CT is running (not a 404).
+    responses.add(
+        responses.DELETE,
+        f"{_BASE}/nodes/{_NODE}/lxc/201",
+        json={"data": None, "errors": {"err": "CT 201 is running"}},
+        status=500,
+    )
+    # The stop POST returns a UPID; its task completes OK.
+    responses.add(
+        responses.POST,
+        f"{_BASE}/nodes/{_NODE}/lxc/201/status/stop",
+        json={"data": _STOP_UPID},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        f"{_BASE}/nodes/{_NODE}/tasks/{_STOP_UPID}/status",
+        json={"data": {"status": "stopped", "exitstatus": "OK", "upid": _STOP_UPID}},
+        status=200,
+    )
+    # Retry DELETE now succeeds (CT stopped) and returns a destroy UPID.
+    responses.add(
+        responses.DELETE,
+        f"{_BASE}/nodes/{_NODE}/lxc/201",
+        json={"data": _DESTROY_UPID},
+        status=200,
+    )
+    responses.add(
+        responses.GET,
+        f"{_BASE}/nodes/{_NODE}/tasks/{_DESTROY_UPID}/status",
+        json={"data": {"status": "stopped", "exitstatus": "OK", "upid": _DESTROY_UPID}},
+        status=200,
+    )
+
+    task = await _provider().destroyCt(_NODE, 201)
+    assert task.status == "ok"
+    assert task.exitstatus == "OK"
+
+    methods_urls = [(c.request.method, c.request.url) for c in responses.calls]
+    # The stop was issued between the failed and the successful DELETE (CR-03).
+    assert ("POST", f"{_BASE}/nodes/{_NODE}/lxc/201/status/stop") in methods_urls
+    # Two DELETEs were attempted (the refused one and the post-stop retry).
+    delete_count = sum(1 for m, _ in methods_urls if m == "DELETE")
+    assert delete_count == 2
+
+
+@responses.activate
+async def test_destroy_missing_ct_is_idempotent_noop() -> None:
+    """A 404 on DELETE reads as idempotent success (destroy of an already-gone CT)."""
+    responses.add(
+        responses.DELETE,
+        f"{_BASE}/nodes/{_NODE}/lxc/201",
+        json={"data": None, "errors": {"err": "CT 201 does not exist"}},
+        status=404,
+    )
+    task = await _provider().destroyCt(_NODE, 201)
+    assert task.status == "ok"
+    assert task.exitstatus == "OK"

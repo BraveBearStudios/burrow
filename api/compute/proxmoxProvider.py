@@ -178,15 +178,46 @@ class ProxmoxComputeProvider(ComputeProvider):
         return await self._block(upid, timeout=self._settings.task_timeout)
 
     async def destroyCt(self, node: str, vmid: int) -> ComputeTask:
-        # Idempotent compensation (Pitfall 7): destroying a nonexistent CT is a no-op
-        # success so a saga that failed before/after the clone cleans up safely.
+        # Idempotent compensation (Pitfall 7 + CR-03): destroying a nonexistent CT
+        # is a no-op success, AND a *running* CT (which Proxmox refuses to DELETE)
+        # is stopped first and then destroyed — so a half-started clone the saga
+        # produced is still torn down and its VMID freed, never left orphaned.
         try:
             upid = await asyncio.to_thread(lambda: self._api.nodes(node).lxc(vmid).delete())
         except Exception as exc:
             if _is_not_found(exc):
                 return ComputeTask(upid=None, status="ok", exitstatus="OK")
-            raise LxcNotReadyError(f"destroy of {vmid} failed: {exc}") from exc
+            if not _is_running_or_locked(exc):
+                raise LxcNotReadyError(f"destroy of {vmid} failed: {exc}") from exc
+            # CR-03: the CT is running/locked. Stop it (UPID-blocked) then retry the
+            # destroy so compensation actually removes the orphan and frees the VMID.
+            await self._force_stop(node, vmid)
+            try:
+                upid = await asyncio.to_thread(lambda: self._api.nodes(node).lxc(vmid).delete())
+            except Exception as retry_exc:
+                if _is_not_found(retry_exc):
+                    return ComputeTask(upid=None, status="ok", exitstatus="OK")
+                raise LxcNotReadyError(
+                    f"destroy of {vmid} failed after stop: {retry_exc}"
+                ) from retry_exc
         return await self._block(upid, timeout=self._settings.task_timeout)
+
+    async def _force_stop(self, node: str, vmid: int) -> None:
+        """Stop a running CT and block on the UPID, tolerating an already-gone CT.
+
+        Used by :meth:`destroyCt` to clear a running/locked CT before a retry of the
+        DELETE (CR-03). A 404 here means the CT vanished between the failed delete
+        and the stop — treated as success so destroy stays idempotent.
+        """
+        try:
+            upid = await asyncio.to_thread(
+                lambda: self._api.nodes(node).lxc(vmid).status.stop.post()
+            )
+        except Exception as exc:
+            if _is_not_found(exc):
+                return
+            raise LxcNotReadyError(f"stop-before-destroy of {vmid} failed: {exc}") from exc
+        await self._block(upid, timeout=self._settings.task_timeout)
 
     # ── reads ─────────────────────────────────────────────────────────────────
     async def getStatus(self, node: str, vmid: int) -> ComputeStatus:
@@ -236,3 +267,22 @@ def _is_not_found(exc: Exception) -> bool:
         return True
     text = str(exc).lower()
     return "does not exist" in text or "not found" in text
+
+
+def _is_running_or_locked(exc: Exception) -> bool:
+    """True when a destroy failed because the CT is running or transiently locked.
+
+    Proxmox refuses to DELETE a running LXC (and a clone can leave one in a locked
+    transient state); the error is NOT a 404, so without this discriminator
+    ``destroyCt`` would wrongly surface it as a hard failure and leak the VMID
+    (CR-03). Inspected defensively by message/status so no driver exception type
+    crosses the seam.
+    """
+    text = str(exc).lower()
+    return (
+        "running" in text
+        or "is locked" in text
+        or "lock" in text
+        or "can't lock" in text
+        or "not stopped" in text
+    )

@@ -145,6 +145,13 @@ class FakeComputeProvider(ComputeProvider):
 
     async def destroyCt(self, node: str, vmid: int) -> ComputeTask:
         self._maybe_fail("destroyCt")
+        # CR-03: model the real provider's stop-then-destroy. A running CT is
+        # stopped first (Proxmox refuses to DELETE a running LXC), then removed —
+        # so destroy is idempotent for the cloned-but-running case and always
+        # frees the VMID (no orphan), matching ProxmoxComputeProvider.destroyCt.
+        container = self._containers.get(vmid)
+        if container is not None and container.running:
+            container.running = False
         self._containers.pop(vmid, None)
         return self._ok_task()
 
