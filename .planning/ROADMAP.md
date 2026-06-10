@@ -35,7 +35,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 0: Contracts, Seams & Golden Template** - Pydantic models, provider ABCs, FakeComputeProvider, envelope, app factory, static CI gates, the Proxmox host-prime kit + runbook, and the golden-template + boot-script decisions (completed 2026-06-10)
 - [x] **Phase 1: Control Plane API** - The create saga, state machine, real SQLite + Proxmox providers, `/api/v1` envelope, `/health`, structured logs, security headers, test pyramid (all 5 plans complete; ready for phase verification)
-- [ ] **Phase 2: Terminal Proxy + React UI** - ttyd-subprotocol WS bridge, xterm.js, react-mosaic tiling, reconnect overlay, sidebar, new-workspace modal, status bar, restore-after-refresh
+- [x] **Phase 2: Terminal Proxy + React UI** - ttyd-subprotocol WS bridge, xterm.js, react-mosaic tiling, reconnect overlay, sidebar, new-workspace modal, status bar, restore-after-refresh (completed 2026-06-10)
 - [ ] **Phase 3: Reproducible Workers** - Manifest-driven plugin/CLAUDE.md pull, hardened `burrow-boot.sh`, secret-safe boot config injection
 - [ ] **Phase 4: Hardening & Release** - Orphan reaper, auto-stop idle, capacity tuning, event-log drawer, and the supply-chain release path (scan/SBOM/sign/provenance/GHCR)
 
@@ -121,7 +121,7 @@ Plans:
 - [x] 02-03-PLAN.md — MVP vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App (render/echo/fit/reconnect/dispose) (TERM-05/06/07, UI-01)
 - [x] 02-04-PLAN.md — Tiling: layoutStore (Mosaic tree + persist + reconcile) + WorkspaceLayout + restore-after-refresh (UI-02, UI-05)
 - [x] 02-05-PLAN.md — Surfaces: WorkspaceList sidebar + Navbar capacity chips + NewWorkspaceModal + StatusBar (UI-01, UI-03, UI-04)
-- [ ] 02-06-PLAN.md — Phase e2e gate: Playwright create→terminal→split→detach→reconnect→terminate + UI-05 restore integration (UI-02, UI-05)
+- [x] 02-06-PLAN.md — Phase e2e gate: Playwright create→terminal→split→detach→reconnect→terminate + UI-05 restore integration (UI-02, UI-05)
 
 **UI hint**: yes
 **Infra note**: CI exercises the bridge against a protocol-accurate stub ttyd (not a bare echo) and the UI via MSW + Playwright over the Fake provider; the real `tty` handshake/resize framing is confirmed against the pinned ttyd version, with full terminal correctness validated against real ttyd in the dev homelab. Likely `--research-phase` to confirm the AuthToken/init handshake + resize frame format before the xterm adapter is finalized.
@@ -171,6 +171,6 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
-| 2. Terminal Proxy + React UI | 5/6 | In Progress|  |
+| 2. Terminal Proxy + React UI | 6/6 | Complete   | 2026-06-10 |
 | 3. Reproducible Workers | 0/TBD | Not started | - |
 | 4. Hardening & Release | 0/TBD | Not started | - |

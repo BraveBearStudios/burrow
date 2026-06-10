@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 02-03-PLAN.md (MVP terminal vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App; render/echo/fit/reconnect/dispose proven over a mocked WebSocket; TERM-05/06/07 done, UI-01 poll foundation). Commits 35948b4, ea58fc4, fd59d68."
-last_updated: "2026-06-10T20:52:30.529Z"
+stopped_at: "Completed 02-06-PLAN.md — phase e2e gate: full Playwright journey (create → echo → split/tile → detach→reconnect → terminate) RAN GREEN over Fake + standalone stub ttyd; UI-05 restore integration test green; terminate confirm + detach wired. Phase 2 complete (6/6). Commits f714da1, 8fbd527."
+last_updated: "2026-06-10T22:37:03.788Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 18
-  completed_plans: 17
-  percent: 40
+  completed_plans: 18
+  percent: 60
 ---
 
 <!--
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 2 of 4 (Terminal Proxy + React UI)
-Plan: 5 of 6 complete in current phase
-Status: Ready to execute
+Plan: 6 of 6 complete in current phase
+Status: Phase 2 complete — ready to verify, then plan Phase 3
 Last activity: 2026-06-10
 
-Progress: [██████░░░░] 67% (Phase 2: 4/6 plans)
+Progress: [██████████] 100% (Phase 2: 6/6 plans)
 
 ## Performance Metrics
 
@@ -78,6 +78,7 @@ Progress: [██████░░░░] 67% (Phase 2: 4/6 plans)
 | Phase 02 P03 | 16min | 3 tasks | 10 files |
 | Phase 2 P04 | 23 | 2 tasks | 11 files |
 | Phase 2 P05 | 51min | 3 tasks | 12 files |
+| Phase 2 P06 | 35min | 2 tasks | 13 files |
 
 ## Accumulated Context
 
@@ -137,6 +138,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 02-04]: layoutStore is the ONLY persisted client state (zustand persist, partialized to mosaicNode + activeWorkspaceId; status stays in TanStack Query, Pitfall 11). Tree mutations are pure helpers over react-mosaic getLeaves + createBalancedTreeFromLeaves (deep util import to dodge the nested react-dom). reconcile(liveIds) drops gone leaves, rebalances, retargets active id (UI-05).
 - [Phase ?]: [Plan 02-04]: react/react-dom 19.2.7 overrides collapse react-mosaic's nested react-dom@18 (else <Mosaic> crashes on ReactCurrentDispatcher); <Mosaic> 6.2.0 bundles its own DndProvider (never double-wrap); Blueprint chrome suppressed via className=burrow-mosaic. Node 25 localStorage shadow fixed by an in-memory Storage polyfill in tests/setup.ts.
 - [Phase ?]: [Plan 02-05]: WorkspaceList sidebar + Navbar capacity chips + NewWorkspaceModal + StatusBar + useNodes + the assembled four-theme App shell complete the operator surface (UI-01/03/04). Status discipline is single-sourced in lib/status.ts; four themes in lib/themes.ts (swatch hex is theme-identity DATA, components stay hex-free). Node capacity is the REAL memoryUsedFraction % (no fabricated GB). Boot-progress is COSMETIC over the SYNCHRONOUS create (A3/Pitfall 5) with single-shot submit+mounted guards; async-202+poll deferred. App kept at ui/src/App.tsx (Rule 3). Tests assert real layoutStore state for leak-proof isolation. Gate: 77 vitest + tsc + biome(39) + build + REUSE 212/212 + no CDN/hex.
+- [Phase 02]: [Plan 02-06]: The phase e2e gate. The full Playwright journey (create → terminal echoes → split/tile → detach→reconnect → terminate) RAN GREEN locally (21.7s) over BURROW_COMPUTE=fake + a STANDALONE protocol-accurate stub ttyd (api/tests/e2e/stub_ttyd_server.py) — the SAME tty handler the Plan-01 pytest fixture uses, factored into one shared module so a .encode()/subprotocol regression fails BOTH tiers (T-02-07). The stub also answers the create saga's HTTP health GET (websockets process_request → 200) so the synchronous create resolves. A BURROW_E2E_TTYD_HOST override (operator env, NEVER client input — SSRF posture unchanged) retargets the bridge dial + the saga health poll at the single local stub instead of the unroutable 10.99.0.x Fake worker IP. The UI-05 restore-after-refresh integration test (vitest+MSW) proves reconcile (gone leaf dropped) + live reconnect (running panel re-mounts, fresh WS) + NO scrollback (Pitfall 7). DEVIATION (Rule 2): the terminate confirm gate (Destroy {name}? …) + non-destructive detach (useTerminal.detach closes the live socket → reconnect overlay, session survives) were unwired before this plan despite being must_haves truths — added + unit-covered (UI-SPEC criterion 12). Harness: playwright.config.ts webServer (stub+uvicorn-on-fake+vite preview) / BURROW_E2E_USE_COMPOSE toggle + docker-compose.e2e.yml + nginx.e2e.conf (Docker not on this host → compose validated by YAML parse, first CI run confirms boot). Gate: 81 vitest + 127 pytest + tsc + biome + ruff + mypy --strict all green. Real ttyd handshake + live claude TUI stays the deferred dev-homelab smoke.
 
 ### Pending Todos
 
@@ -161,7 +163,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T20:51:16.183Z
-Stopped at: Completed 02-03-PLAN.md (MVP terminal vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App; render/echo/fit/reconnect/dispose proven over a mocked WebSocket; TERM-05/06/07 done, UI-01 poll foundation). Commits 35948b4, ea58fc4, fd59d68.
+Last session: 2026-06-10T22:37:03.780Z
+Stopped at: Completed 02-06-PLAN.md — the phase e2e gate. Full Playwright journey (create → echo → split/tile → detach→reconnect → terminate) RAN GREEN over Fake + a standalone protocol-accurate stub ttyd; UI-05 restore-after-refresh integration test green; terminate confirm + non-destructive detach wired (Rule 2). Commits f714da1, 8fbd527. Phase 2 (Terminal Proxy + React UI) is now complete (6/6 plans).
 Resume file: None
-Next plan: 02-03-PLAN.md — MVP vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App (render/echo/fit/reconnect/dispose) (TERM-05/06/07, UI-01), importing client.ts/types/ttyd.ts + the token sheet + MSW harness from 02-02. Open items (carried): UI half of UI-04 (capacity chip) lands in 02-05; A3 operator-confirm of the real git-credential-minting mechanism before Phase 3; Playwright browser binaries install in CI (02-06).
+Next plan: Phase 2 is complete — run /gsd:verify-work on Phase 2, then plan Phase 3. Carried open items: real ttyd `tty` handshake + live claude TUI = deferred dev-homelab smoke (human_needed); `docker compose -f docker-compose.e2e.yml config` not validated here (no Docker on this host) — first CI run confirms the compose stack boots; A3 operator-confirm of the real git-credential-minting mechanism before Phase 3; B4 plugin-cadence ADR before/within Phase 3.
