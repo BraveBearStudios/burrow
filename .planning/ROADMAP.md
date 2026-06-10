@@ -33,7 +33,7 @@ the dev homelab — CI proves builds and inter-app behavior, never live infra.
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 0: Contracts, Seams & Golden Template** - Pydantic models, provider ABCs, FakeComputeProvider, envelope, app factory, static CI gates, the Proxmox host-prime kit + runbook, and the golden-template + boot-script decisions
+- [x] **Phase 0: Contracts, Seams & Golden Template** - Pydantic models, provider ABCs, FakeComputeProvider, envelope, app factory, static CI gates, the Proxmox host-prime kit + runbook, and the golden-template + boot-script decisions (completed 2026-06-10)
 - [ ] **Phase 1: Control Plane API** - The create saga, state machine, real SQLite + Proxmox providers, `/api/v1` envelope, `/health`, structured logs, security headers, test pyramid
 - [ ] **Phase 2: Terminal Proxy + React UI** - ttyd-subprotocol WS bridge, xterm.js, react-mosaic tiling, reconnect overlay, sidebar, new-workspace modal, status bar, restore-after-refresh
 - [ ] **Phase 3: Reproducible Workers** - Manifest-driven plugin/CLAUDE.md pull, hardened `burrow-boot.sh`, secret-safe boot config injection
@@ -61,7 +61,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] 00-01-PLAN.md — Backend foundation: uv project, pydantic-settings config, response envelope (PLAT-02), camelCase models + compute DTOs (PLAT-09)
 - [x] 00-02-PLAN.md — Provider seams: ComputeProvider ABC + FakeComputeProvider + Proxmox skeleton (PLAT-07/08), DbProvider ABC + SqliteProvider + 001_init.sql + Postgres stub (PLAT-06)
-- [ ] 00-03-PLAN.md — App factory DI by env + test substrate (conftest, envelope/models/fake-compute/db unit tests, seam-leakage guard)
+- [x] 00-03-PLAN.md — App factory DI by env + test substrate (conftest, envelope/models/fake-compute/db unit tests, seam-leakage guard)
 - [x] 00-04-PLAN.md — Static CI gates (CICD-01) + REUSE/SPDX (CICD-06) + minimal ui/ scaffold
 - [x] 00-05-PLAN.md — Eight Nygard ADRs (pull-at-boot, ACL scoping, static-IP, --full, ttyd persistent, ttyd LAN bind/WORK-04, stack bumps)
 - [x] 00-06-PLAN.md — Proxmox host-prime kit + PRIMING.md runbook (SETUP-01..05)
@@ -150,7 +150,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 0. Contracts, Seams & Golden Template | 6/7 | In Progress|  |
+| 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
 | 1. Control Plane API | 0/TBD | Not started | - |
 | 2. Terminal Proxy + React UI | 0/TBD | Not started | - |
 | 3. Reproducible Workers | 0/TBD | Not started | - |

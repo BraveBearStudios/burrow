@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 00-04-PLAN.md (static CI gates CICD-01 + REUSE/SPDX CICD-06 + minimal ui/ scaffold)
-last_updated: "2026-06-10T05:43:19.852Z"
+stopped_at: Completed 00-03-PLAN.md (app factory DI by env + Phase-0 test substrate; PLAT-02/06/07/08/09 CI-proven; Phase 0 complete 7/7)
+last_updated: "2026-06-10T06:01:47.751Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 7
-  completed_plans: 6
-  percent: 86
+  completed_plans: 7
+  percent: 20
 ---
 
 <!--
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 0 of 4 (Contracts, Seams & Golden Template)
-Plan: 6 of 7 complete in current phase
-Status: Executing
-Last activity: 2026-06-10 — Plan 00-04 complete: Tier-0 static CI gates (CICD-01) + repo-wide REUSE/SPDX compliance (CICD-06) + minimal ui/ scaffold. `.github/workflows/ci.yml` static-gates job runs every gate (ruff lint+format, mypy --strict, uv lock --check, tsc --noEmit, biome ci, reuse lint) with SHA-pinned actions + least-privilege permissions, plus a Conventional-Commit PR-title gate. `LICENSES/AGPL-3.0-or-later.txt` + a precisely-scoped `REUSE.toml` (non-headerable files only) make `uvx reuse lint` green at 100/100. ui/ scaffold pins typescript@6.0.3 + @biomejs/biome@2.4.16 (fresh Biome 2 config); npm ci + tsc + biome all green. CICD-01/CICD-06 complete.
+Plan: 7 of 7 complete in current phase
+Status: Phase 0 complete
+Last activity: 2026-06-10 — Plan 00-03 complete: FastAPI app factory + the single env-driven provider-DI seam (get_compute()/get_db() are the ONLY place concrete impls are named; BURROW_COMPUTE/BURROW_DB flip the backend with no service edit) + the hermetic Phase-0 test substrate. conftest fixtures (fake_compute, migrated tmp sqlite_db, httpx ASGITransport client) + five req-anchored unit files prove PLAT-02/06/07/08/09 green over Fake/Sqlite with zero Proxmox, and a tokenize-based seam-leakage guard (red on an injected leak, green on the tree) confines proxmoxer/aiosqlite/raw-SQL to their owning provider files. Full gate green: 28 pytest passed, ruff + ruff format + mypy --strict (26 files) + uv lock --check + reuse lint (110/110). Closes the Wave-0 VALIDATION.md test gaps; Phase 0 is now 7/7.
 
-Progress: [█████████░] 86%
+Progress: [██████████] 100% (Phase 0)
 
 ## Performance Metrics
 
@@ -66,6 +66,7 @@ Progress: [█████████░] 86%
 
 *Updated after each plan completion*
 | Phase 0 P04 | 20 min | 3 tasks | 22 files |
+| Phase 0 P03 | 18 min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -95,6 +96,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 00-04]: Tier-0 static-gates CI job (CICD-01) runs ruff lint+format, mypy --strict, uv lock --check (api/), tsc --noEmit + biome ci (ui/), uvx reuse lint (repo); third-party actions SHA-pinned (checkout v4.3.1, setup-uv v6.8.0, setup-node v4.4.0), contents:read. PR-title gate via amannn/action-semantic-pull-request with placeholder SHA + '# TODO pin exact SHA' (exact pin deferred).
 - [Phase ?]: [Plan 00-04]: REUSE/SPDX green repo-wide (CICD-06, 100/100) via LICENSES/AGPL-3.0-or-later.txt + REUSE.toml scoped to non-headerable files ONLY (uv.lock, package-lock.json, comment-less JSON, design/Burrow-handoff bundle) -- never blanket-globs source extensions so a missing inline header still fails. Headerable sources got inline headers; in-body example SPDX strings wrapped in REUSE-IgnoreStart/End.
 - [Phase ?]: [Plan 00-04]: ui/ scaffold minimal-by-design (typescript@6.0.3 + @biomejs/biome@2.4.16 only); full UI tree is Phase 2. biome.json written fresh from biome init (2.4.16 schema); vcs.useIgnoreFile=false, includes scoped to src/**.
+- [Phase ?]: [Plan 00-03]: App factory is the lone composition root — get_compute()/get_db() in main.py are the ONLY place concrete impls are named; BURROW_COMPUTE/BURROW_DB flip the backend with no service edit (both branches verified at runtime).
+- [Phase ?]: [Plan 00-03]: Envelope shipped this phase as an ASGI error boundary only (Exception -> respond_error); success-wrapping middleware + routers are Phase 1 per plan.
+- [Phase ?]: [Plan 00-03]: Seam-leakage guard uses Python tokenize to drop COMMENT + STRING tokens so seam-contract prose in docstrings is exempt while real driver usage is caught; negative-tested red on an injected leak, green on the tree (PLAT-06/07).
 
 ### Pending Todos
 
@@ -119,7 +123,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T05:41:26.949Z
-Stopped at: Completed 00-04-PLAN.md (static CI gates CICD-01 + REUSE/SPDX CICD-06 + minimal ui/ scaffold)
+Last session: 2026-06-10T06:00:35.338Z
+Stopped at: Completed 00-03-PLAN.md (app factory DI by env + Phase-0 test substrate; PLAT-02/06/07/08/09 CI-proven; Phase 0 complete 7/7)
 Resume file: None
-Next plan: 00-02 (provider seams: ComputeProvider/DbProvider ABCs + FakeComputeProvider + Sqlite/Postgres + Proxmox skeleton) — wave-1 sibling, no remaining dependency.
+Next plan: Phase 1 (Control Plane API) — plan with `/gsd:plan-phase 1`. Phase 0 contracts, seams, FakeComputeProvider, envelope, app factory, static gates, golden-template + host-prime decisions are all done; the create saga + state machine + real providers build against the now-frozen seam.
