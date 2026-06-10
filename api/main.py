@@ -61,16 +61,42 @@ _SAFE_ERROR_MESSAGES: dict[str, str] = {
 }
 
 
+# Process-wide compute singleton. The Fake holds container existence in its own
+# memory (PLAT-08), so it MUST be the SAME instance across requests or a workspace
+# created by one request is invisible to the next (stop/start/destroy would 502).
+# Keyed by the selected kind so a settings change (e.g. tests flipping to ``fake``)
+# rebuilds the right impl rather than returning a stale one.
+_compute_singleton: ComputeProvider | None = None
+_compute_kind: str | None = None
+
+
 def get_compute() -> ComputeProvider:
-    """Return the compute provider selected by ``settings.compute``.
+    """Return the process-wide compute provider selected by ``settings.compute``.
 
     ``BURROW_COMPUTE=fake`` -> :class:`FakeComputeProvider` (hermetic default);
     anything else -> :class:`ProxmoxComputeProvider`. This is the sole place a
-    concrete compute impl is named.
+    concrete compute impl is named. The instance is cached for the process so the
+    Fake's in-memory container state survives across requests (lifecycle continuity).
     """
-    if settings.compute == "fake":
-        return FakeComputeProvider()
-    return ProxmoxComputeProvider(settings)
+    global _compute_singleton, _compute_kind
+    if _compute_singleton is None or _compute_kind != settings.compute:
+        _compute_kind = settings.compute
+        if settings.compute == "fake":
+            _compute_singleton = FakeComputeProvider()
+        else:
+            _compute_singleton = ProxmoxComputeProvider(settings)
+    return _compute_singleton
+
+
+def reset_compute() -> None:
+    """Drop the cached compute singleton (test isolation hook).
+
+    The next :func:`get_compute` rebuilds a fresh provider, so a test starts with an
+    empty Fake (no leaked containers/VMIDs from a prior test). Not used in prod.
+    """
+    global _compute_singleton, _compute_kind
+    _compute_singleton = None
+    _compute_kind = None
 
 
 def get_db() -> DbProvider:
