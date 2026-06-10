@@ -57,6 +57,12 @@ def _source_ip_ok(request: Request, expected_ip: str | None) -> bool:
     the workspace (``lxc_ip``, ADR-0004). When the workspace has no resolved IP yet
     there is nothing to bind against, so the check passes (it never blocks a
     legitimate boot before the IP is known).
+
+    IN-03 limitation: ``request.client.host`` is only the worker's address when the
+    API is reached DIRECTLY. Behind the documented nginx TLS terminator (or any
+    proxy) it is the proxy's address, so this check would reject every legitimate
+    caller — hence ``bootconfig_source_ip_check`` defaults off and is only sound on
+    a direct-to-API topology (or once it honors a trusted ``X-Forwarded-For``).
     """
     if expected_ip is None:
         return True

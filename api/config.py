@@ -75,6 +75,12 @@ class Settings(BaseSettings):
     git_credential_token: str = ""
     # Defense-in-depth source-IP binding for the bootconfig endpoint; default off
     # so it does not break the no-auth LAN posture unless an operator enables it.
+    # IN-03: this check compares request.client.host to the worker's VMID-derived
+    # static IP, so it is ONLY valid when the API is reached DIRECTLY by workers.
+    # Behind the documented nginx TLS terminator (or any proxy) client.host is the
+    # proxy's address, not the worker's, and the check would 404 every legitimate
+    # boot. Enable it only on a direct-to-API topology, or extend it to honor a
+    # trusted X-Forwarded-For before turning it on behind a proxy.
     bootconfig_source_ip_check: bool = False
 
     # ── Database ──────────────────────────────────────────────────────────
