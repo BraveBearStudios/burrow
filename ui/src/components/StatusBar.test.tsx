@@ -9,9 +9,9 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, waitFor, within } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { server } from "../../tests/msw/server";
 import { StatusBar } from "./StatusBar";
 
@@ -25,12 +25,7 @@ function renderBar() {
 	return render(<StatusBar />, { wrapper });
 }
 
-beforeEach(() => {
-	vi.useFakeTimers();
-});
-
 afterEach(() => {
-	vi.useRealTimers();
 	vi.restoreAllMocks();
 });
 
@@ -38,15 +33,19 @@ describe("StatusBar — counts derived from the list (UI-04)", () => {
 	it("shows running / stopped / error counts from the live workspace list", async () => {
 		renderBar();
 		// Seed: 1 running, 1 creating, 1 stopped, 1 error.
-		const running = await screen.findByTestId("count-running");
-		expect(within(running).getByText("1")).toBeInTheDocument();
-		expect(within(screen.getByTestId("count-stopped")).getByText("1")).toBeInTheDocument();
-		expect(within(screen.getByTestId("count-error")).getByText("1")).toBeInTheDocument();
+		await waitFor(() =>
+			expect(screen.getByTestId("count-running")).toHaveTextContent("1"),
+		);
+		expect(screen.getByTestId("count-stopped")).toHaveTextContent("1");
+		expect(screen.getByTestId("count-error")).toHaveTextContent("1");
 	});
 
 	it("each count number is gold mono and paired with a text label (a11y, gold discipline)", async () => {
 		renderBar();
-		const running = await screen.findByTestId("count-running");
+		await waitFor(() =>
+			expect(screen.getByTestId("count-running")).toHaveTextContent("1"),
+		);
+		const running = screen.getByTestId("count-running");
 		const number = within(running).getByText("1");
 		expect(number).toHaveStyle({ color: "var(--gold)" });
 		// Status is never color-only — a text label accompanies the count.
@@ -55,8 +54,7 @@ describe("StatusBar — counts derived from the list (UI-04)", () => {
 
 	it("renders the session uptime readout (gold mono Xh Ym)", async () => {
 		renderBar();
-		await screen.findByTestId("count-running");
-		const uptime = screen.getByTestId("uptime");
+		const uptime = await screen.findByTestId("uptime");
 		expect(uptime).toHaveTextContent(/uptime/);
 		// Formatted Xh Ym (0h 0m at mount).
 		expect(within(uptime).getByText(/\dh \dm/)).toBeInTheDocument();
@@ -75,10 +73,11 @@ describe("StatusBar — zero state (UI-04)", () => {
 			),
 		);
 		renderBar();
-		const running = await screen.findByTestId("count-running");
-		expect(within(running).getByText("0")).toBeInTheDocument();
-		expect(within(screen.getByTestId("count-stopped")).getByText("0")).toBeInTheDocument();
-		expect(within(screen.getByTestId("count-error")).getByText("0")).toBeInTheDocument();
+		await waitFor(() =>
+			expect(screen.getByTestId("count-running")).toHaveTextContent("0"),
+		);
+		expect(screen.getByTestId("count-stopped")).toHaveTextContent("0");
+		expect(screen.getByTestId("count-error")).toHaveTextContent("0");
 	});
 });
 
