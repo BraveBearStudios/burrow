@@ -1,0 +1,90 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Burrow CI — Tier-0 static gates (CICD-01) + Conventional-Commit PR-title
+# validation. The test pyramid (unit/integration/e2e) and image build/scan
+# jobs land in Phase 1 / Phase 4; this file intentionally ships only the
+# always-green-on-commit static gates plus the PR-title check.
+#
+# Third-party actions are SHA-pinned (ci-cd-and-testing.md §5.5 / §7); the
+# trailing comment records the human-readable version the SHA resolves to.
+
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  static-gates:
+    name: Tier-0 static gates
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+
+      # ── API gates (api/) ───────────────────────────────────────────────
+      - name: api · install (frozen)
+        run: uv sync --frozen
+        working-directory: api
+
+      - name: api · ruff check
+        run: uv run ruff check .
+        working-directory: api
+
+      - name: api · ruff format --check
+        run: uv run ruff format --check .
+        working-directory: api
+
+      - name: api · mypy . --strict
+        run: uv run mypy . --strict
+        working-directory: api
+
+      - name: api · lockfile freshness (uv lock --check)
+        run: uv lock --check
+        working-directory: api
+
+      # ── UI gates (ui/) ─────────────────────────────────────────────────
+      - name: ui · install (frozen, npm ci)
+        run: npm ci
+        working-directory: ui
+
+      - name: ui · tsc --noEmit
+        run: npx tsc --noEmit
+        working-directory: ui
+
+      - name: ui · biome ci
+        run: npx biome ci .
+        working-directory: ui
+
+      # ── Repo-wide SPDX gate (CICD-06) ──────────────────────────────────
+      - name: spdx · reuse lint
+        run: uvx reuse lint
+
+  pr-title:
+    name: Conventional-Commit PR title
+    runs-on: ubuntu-latest
+    # PRs are squash-merged, so the PR title becomes the commit message and
+    # must itself be a valid Conventional Commit (CONTRIBUTING.md / ci-cd §3.3).
+    if: github.event_name == 'pull_request'
+    permissions:
+      pull-requests: read
+    steps:
+      - name: Validate PR title (semantic / conventional-commit)
+        uses: amannn/action-semantic-pull-request@e32d7e603df1aa1ba07e981f2a23455dee596825 # TODO pin exact SHA
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
