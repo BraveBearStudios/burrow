@@ -187,7 +187,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | WORK-01 | Phase 0 | Pending |
 | WORK-02 | Phase 3 | Pending |
 | WORK-03 | Phase 1 | Pending |
-| WORK-04 | Phase 0 | Pending |
+| WORK-04 | Phase 0 | Pending (ADR-0007 records the ttyd LAN-bind decision; impl/validation half lands with burrow-boot.sh in 00-07 + dev-homelab smoke) |
 | WORK-05 | Phase 3 | Pending |
 | CAP-01 | Phase 1 | Pending |
 | CAP-02 | Phase 4 | Pending |
@@ -207,4 +207,4 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 
 ---
 *Requirements defined: 2026-06-09*
-*Last updated: 2026-06-09 after Proxmox priming gap analysis (added SETUP-01..05; reframed WORK-03 to pull-at-boot)*
+*Last updated: 2026-06-10 after Plan 00-05 (eight Phase-0 ADRs authored; WORK-04 traceability annotated with ADR-0007 doc-half coverage)*
