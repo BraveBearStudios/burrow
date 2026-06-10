@@ -242,6 +242,45 @@ class WorkspaceService:
             await self.db.logEvent(ws.id, "workspace.destroyed", {})
             await self.db.softDeleteWorkspace(ws.id)
 
+    # ── bootconfig (WORK-03 / ADR-0002) ───────────────────────────────────
+    async def get_by_vmid(self, vmid: int) -> Workspace:
+        """Return the active workspace owning ``vmid`` or raise (bootconfig lookup).
+
+        Delegates to the DB seam's ``getByVmid`` (active, non-soft-deleted rows
+        only). Raises :class:`WorkspaceNotFoundError` when no live workspace owns
+        ``vmid`` so the bootconfig router can map both the no-workspace and the
+        destroyed-vmid cases to the same 404 (WORK-03; pull-at-boot, ADR-0002).
+        """
+        ws = await self.db.getByVmid(vmid)
+        if ws is None:
+            # Keyed by the vmid for triage; the router emits a generic 404 (no echo).
+            raise WorkspaceNotFoundError(str(vmid))
+        return ws
+
+    async def mint_repo_credential(self, repo: str) -> str:
+        """Mint a short-lived, repo-scoped git credential for a boot fetch (A3 seam).
+
+        PLUGGABLE issuance seam (RESEARCH Open Question 1 / Assumption A3). v1 reads
+        a short-lived, repo-scoped token from ``settings.git_credential_token`` (the
+        gitignored ``.env``; Plan 01 added the key) and returns it; when unset it
+        returns a clearly-marked placeholder so the contract is exercisable without a
+        real token. The ``repo`` argument is the scope the real issuer will bind the
+        credential to.
+
+        Operator action (A3, confirm before Phase 3 wires ``burrow-boot.sh``): replace
+        this body with the real minting mechanism — a GitHub App installation token, a
+        repo deploy token, or an ephemeral fine-grained PAT. The returned value MUST be
+        short-lived and single-repo-scoped, MUST NEVER be a long-lived PAT, and MUST
+        NEVER be logged or persisted to the worker env (ADR-0002). The worker uses it
+        once for ``git clone`` and discards it. Do NOT hard-code a long-lived PAT here
+        and do NOT read a global, broadly-scoped token.
+        """
+        token = self.settings.git_credential_token
+        if token:
+            return token
+        # No token configured: a marked placeholder, never a real credential (A3).
+        return f"placeholder-credential-for:{repo}"
+
     # ── lifecycle helpers ──────────────────────────────────────────────────
     def _lock_for(self, workspace_id: str) -> asyncio.Lock:
         """Return the per-workspace in-flight lock, creating it on first use."""

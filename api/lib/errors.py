@@ -73,3 +73,23 @@ class WorkspaceNotFoundError(ServiceError):
     def __init__(self, workspace_id: str) -> None:
         self.workspace_id = workspace_id
         super().__init__(f"workspace {workspace_id!r} not found")
+
+
+class IllegalVmidError(ServiceError):
+    """A bootconfig request named a vmid outside the worker pool (WORK-03, T-01-17).
+
+    Raised by the bootconfig router when ``vmid`` falls outside
+    ``[worker_pool_start, worker_pool_end]``. The router maps it to a 404 whose
+    operator-facing message is a generic "not found" — the probed value is held on
+    ``.vmid`` for triage but MUST NOT be echoed into the envelope (enumeration
+    resistance, ASVS V4/V5). It is distinct from ``WorkspaceNotFoundError`` (which
+    is keyed by a string id) so the out-of-pool probe and the no-active-workspace
+    case can be reasoned about separately while presenting the same wire shape.
+    """
+
+    code = "illegal_vmid"
+
+    def __init__(self, vmid: int) -> None:
+        self.vmid = vmid
+        # Message is for internal triage only; the router never echoes it (T-01-17).
+        super().__init__("vmid out of pool range")
