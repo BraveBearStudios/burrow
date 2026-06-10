@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 00-06-PLAN.md (Proxmox host-prime kit + PRIMING.md, SETUP-01..05 doc/script half)
-last_updated: "2026-06-10T03:02:23.503Z"
+stopped_at: Completed 00-07-PLAN.md (golden-template provisioner + SC-corrected burrow-boot.sh + systemd unit, WORK-01/WORK-04 script half)
+last_updated: "2026-06-10T03:25:00.000Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 7
-  completed_plans: 3
-  percent: 43
+  completed_plans: 4
+  percent: 57
 ---
 
 <!--
@@ -31,31 +31,32 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 0 of 4 (Contracts, Seams & Golden Template)
-Plan: 3 of 7 complete in current phase
+Plan: 4 of 7 complete in current phase
 Status: Executing
-Last activity: 2026-06-10 — Plan 00-06 complete: re-runnable Proxmox Day-0 host-prime kit (cc-worker-config/lxc/host-prime/ lib/common.sh + 00/10/20/40 scripts + 30-network-notes.md) + PRIMING.md runbook. BurrowProvisioner 9-priv least-privilege role + privsep token to both principals, full secret hygiene, static-IP-from-VMID note, five-step acceptance gate. SETUP-01..05 doc/script half done; real-Proxmox validation deferred to dev-homelab smoke.
+Last activity: 2026-06-10 — Plan 00-07 complete: golden-template shell artifacts (cc-worker-config/lxc/worker-template/provision-template.sh + burrow-boot.sh, cc-worker-config/systemd/burrow-worker.service). provision-template.sh bakes Ubuntu 24.04 + Node 22 (setup_22.x) + pinned @anthropic-ai/claude-code@2.1.170 + ttyd + baked plugins and enables the boot unit; burrow-boot.sh launches a PERSISTENT (no --once, SC-8), LAN-bound (--interface 0.0.0.0, SC-9) ttyd on :7681 with a documented pull-at-boot stub keeping secrets off the worker env. WORK-01/WORK-04 script half done; real-template build/boot deferred to dev-homelab smoke. (Unit canonicalized under systemd/; 20-create-template.sh repointed.)
 
-Progress: [████░░░░░░] 43%
+Progress: [██████░░░░] 57%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 3
-- Average duration: 18 min
-- Total execution time: 0.9 hours
+- Total plans completed: 4
+- Average duration: 19 min
+- Total execution time: 1.25 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 0 | 3 | 55 min | 18 min |
+| 0 | 4 | 75 min | 19 min |
 
 **Per-plan:**
 
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
 | Phase 0 P06 | 35 min | 4 tasks | 7 files |
+| Phase 0 P07 | 20 min | 3 tasks | 4 files |
 
 **Recent Trend:**
 
@@ -83,6 +84,8 @@ Recent decisions affecting current work:
 - [Plan 00-05]: ADR-0007 satisfies WORK-04's **documentation half** (ttyd LAN bind, security dimension recorded); the implementation/validation half lands with `burrow-boot.sh` (00-07) + dev-homelab smoke, so WORK-04 stays Pending.
 - [Plan 00-06]: Host-prime kit authored (cc-worker-config/lxc/host-prime/ + PRIMING.md). BurrowProvisioner = exactly 9 privs; privsep token granted to BOTH user and token at pool/template/storage/node (effective = user-intersect-token); token captured silently, never echoed/CLI-arged, .env write refused unless git check-ignore passes (0600). SETUP-01..05 doc/script half complete; real-Proxmox acceptance deferred to dev-homelab smoke.
 - [Plan 00-06]: shellcheck unavailable on the Windows dev host -> scripts validated with bash -n (all pass); shellcheck static analysis unverified, run in CI/homelab. SPDX verified via uvx --with charset-normalizer reuse lint-file.
+- [Plan 00-07]: Golden-template shell artifacts authored from the SC-corrected RESEARCH skeletons, NOT the tech-spec §9.3 snippet (its --once and --interface lo are both SC-reversed). burrow-boot.sh ttyd is FROZEN: --port 7681 --writable --interface 0.0.0.0, NO --once (SC-8 persistent) + LAN bind (SC-9 / WORK-04). Pull-at-boot is a documented TODO(Phase 3) stub; no secret is written to /etc/burrow/worker.env (SC-4). WORK-01/WORK-04 script half done; real-template build/boot is the dev-homelab gate.
+- [Plan 00-07]: Unit-location conflict resolved — burrow-worker.service canonicalized under cc-worker-config/systemd/ (Plan 00-07, most-recent-doc-wins) rather than worker-template/ where 00-06's 20-create-template.sh expected it; 20-create-template.sh's WORKER_UNIT repointed at the systemd/ path.
 
 ### Pending Todos
 
@@ -107,7 +110,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T03:01:38.728Z
-Stopped at: Completed 00-06-PLAN.md (Proxmox host-prime kit + PRIMING.md, SETUP-01..05 doc/script half)
+Last session: 2026-06-10T03:25:00.000Z
+Stopped at: Completed 00-07-PLAN.md (golden-template provisioner + SC-corrected burrow-boot.sh + systemd unit, WORK-01/WORK-04 script half)
 Resume file: None
 Next plan: 00-02 (provider seams: ComputeProvider/DbProvider ABCs + FakeComputeProvider + Sqlite/Postgres + Proxmox skeleton) — wave-1 sibling, no remaining dependency.
