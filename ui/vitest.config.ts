@@ -8,6 +8,13 @@ import { defineConfig } from "vitest/config";
 // installs the jest-dom matchers and starts the MSW server for /api/v1 mocking.
 export default defineConfig({
 	plugins: [react()],
+	// react-mosaic-component pulls react-dnd-multi-backend, whose react/react-dom
+	// peer excludes 19 — npm would nest an older react-dom and crash against root
+	// React 19. The package.json `overrides` pin collapses that; `dedupe` keeps a
+	// single runtime in the test bundle too (defense in depth).
+	resolve: {
+		dedupe: ["react", "react-dom"],
+	},
 	test: {
 		globals: true,
 		environment: "jsdom",

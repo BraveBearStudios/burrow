@@ -12,6 +12,12 @@ const CONTROL_PLANE = "http://localhost:8000";
 
 export default defineConfig({
 	plugins: [react(), tailwindcss()],
+	// react-mosaic-component ships a nested react-dom (via react-dnd-multi-backend);
+	// dedupe react/react-dom to the single root copy so the bundle has one React
+	// runtime (without this, two Reacts collide — see vitest.config.ts).
+	resolve: {
+		dedupe: ["react", "react-dom"],
+	},
 	server: {
 		proxy: {
 			"/api/v1": { target: CONTROL_PLANE, changeOrigin: true },

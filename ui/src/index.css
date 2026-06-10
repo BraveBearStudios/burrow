@@ -183,6 +183,53 @@
 	--btn-pri-text: #e5f0e5;
 }
 
+/*
+ * react-mosaic — Burrow chrome (02-UI-SPEC Terminal grid, UI-02).
+ * We pass className="burrow-mosaic" (NOT mosaic-blueprint-theme) so none of the
+ * library's Blueprint blue applies; here we restyle the splitters / drop-targets
+ * with Burrow tokens: flat hairline gutters that show --accent-line at low
+ * emphasis on hover, no gradients/shadows. The base layout CSS (positioning) is
+ * still imported by WorkspaceLayout — only the chrome colors live here.
+ */
+.burrow-mosaic.mosaic {
+	background: transparent;
+}
+
+/* Resize gutters: a hairline by default, --accent-line low-emphasis on hover. */
+.burrow-mosaic .mosaic-split {
+	background: transparent;
+}
+.burrow-mosaic .mosaic-split:hover {
+	background: transparent;
+}
+.burrow-mosaic .mosaic-split .mosaic-split-line {
+	box-shadow: none;
+	border-color: var(--border);
+}
+.burrow-mosaic .mosaic-split:hover .mosaic-split-line {
+	border-color: var(--accent-line);
+	opacity: 0.6;
+}
+
+/* Drag drop-targets: a faint --accent-bg wash + --accent-line edge (no blue). */
+.burrow-mosaic.mosaic-drop-target .drop-target-container .drop-target,
+.burrow-mosaic .mosaic-drop-target .drop-target-container .drop-target {
+	background: var(--accent-bg);
+	border: 0.5px solid var(--accent-line);
+}
+.burrow-mosaic
+	.mosaic-drop-target
+	.drop-target-container
+	.drop-target.drop-target-hover {
+	background: var(--accent-bg);
+	opacity: 0.9;
+}
+
+/* Tiles carry no library chrome — the TerminalPanel owns its own surface. */
+.burrow-mosaic .mosaic-tile {
+	margin: 5.5px;
+}
+
 /* ── Animations (02-UI-SPEC Motion + component contracts) ── */
 
 /* creating-dot pulse (sidebar row, 1.4s) */
