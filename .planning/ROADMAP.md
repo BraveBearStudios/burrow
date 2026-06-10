@@ -112,7 +112,17 @@ Plans:
   4. On a transient disconnect the terminal auto-reconnects with jittered backoff behind a visible reconnecting overlay, stops retrying (showing a terminal error) on `error`/`destroyed`, and never thunders the API across many panels.
   5. After a browser refresh, the UI reconnects to the same live `claude` session of a still-running workspace (no fresh process, no scrollback restore in v1), and the persisted Mosaic layout reconciles against the live workspace list.
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+
+- [ ] 02-01-PLAN.md — Backend tty-subprotocol WS bridge + protocol-accurate stub ttyd + GET /api/v1/nodes (TERM-01..04, UI-04)
+- [ ] 02-02-PLAN.md — UI foundation: pinned stack, Vite/Tailwind v4/vitest/Playwright, typed envelope client + types + ttyd frame lib + four-theme tokens + self-host fonts + MSW
+- [ ] 02-03-PLAN.md — MVP vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App (render/echo/fit/reconnect/dispose) (TERM-05/06/07, UI-01)
+- [ ] 02-04-PLAN.md — Tiling: layoutStore (Mosaic tree + persist + reconcile) + WorkspaceLayout + restore-after-refresh (UI-02, UI-05)
+- [ ] 02-05-PLAN.md — Surfaces: WorkspaceList sidebar + Navbar capacity chips + NewWorkspaceModal + StatusBar (UI-01, UI-03, UI-04)
+- [ ] 02-06-PLAN.md — Phase e2e gate: Playwright create→terminal→split→detach→reconnect→terminate + UI-05 restore integration (UI-02, UI-05)
+
 **UI hint**: yes
 **Infra note**: CI exercises the bridge against a protocol-accurate stub ttyd (not a bare echo) and the UI via MSW + Playwright over the Fake provider; the real `tty` handshake/resize framing is confirmed against the pinned ttyd version, with full terminal correctness validated against real ttyd in the dev homelab. Likely `--research-phase` to confirm the AuthToken/init handshake + resize frame format before the xterm adapter is finalized.
 
@@ -161,6 +171,6 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
-| 2. Terminal Proxy + React UI | 0/TBD | Not started | - |
+| 2. Terminal Proxy + React UI | 0/6 | Not started | - |
 | 3. Reproducible Workers | 0/TBD | Not started | - |
 | 4. Hardening & Release | 0/TBD | Not started | - |
