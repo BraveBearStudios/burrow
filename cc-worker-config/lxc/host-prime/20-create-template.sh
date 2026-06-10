@@ -15,8 +15,9 @@
 # inside the worker; clones inherit `features`, so set it once here.
 #
 # The worker-template payload (provision-template.sh, burrow-boot.sh,
-# burrow-worker.service, /tmp/plugins) is authored in Plan 07 under
-# cc-worker-config/lxc/worker-template/ — this script references it by path.
+# /tmp/plugins) is authored in Plan 07 under cc-worker-config/lxc/worker-template/;
+# the burrow-worker.service unit lives under cc-worker-config/systemd/. This
+# script references both by path.
 #
 # Run as root@pam on the template's node.
 # Source: .planning/research/PROXMOX-PRIMING.md §3.2, §3.3.
@@ -41,7 +42,7 @@ TMPL="ubuntu-24.04-standard_<ver>_amd64.tar.zst"   # match step 10's pin
 WT_DIR="${HERE}/../worker-template"
 PROVISIONER="${WT_DIR}/provision-template.sh"
 BOOT_SCRIPT="${WT_DIR}/burrow-boot.sh"
-WORKER_UNIT="${WT_DIR}/burrow-worker.service"
+WORKER_UNIT="${HERE}/../../systemd/burrow-worker.service"
 PLUGINS_DIR="${WT_DIR}/plugins"
 
 # ---------------------------------------------------------------------------

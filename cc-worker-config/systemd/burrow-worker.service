@@ -1,0 +1,24 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# burrow-worker.service — starts the worker boot orchestration on every boot.
+#
+# ExecStart runs /opt/burrow-boot.sh, which performs the pull-at-boot config
+# fetch (Phase 3) and then exec's a persistent, LAN-bound ttyd (:7681). Because
+# ttyd is persistent, the unit stays active for the life of the session; a
+# transient boot failure is retried via Restart=on-failure. No secrets or
+# topology are embedded here — boot config is pulled at boot, not baked in.
+
+[Unit]
+Description=Burrow worker boot (persistent LAN-bound ttyd + Claude Code)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/opt/burrow-boot.sh
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
