@@ -231,7 +231,10 @@ class SqliteProvider(DbProvider):
             cursor = await conn.execute(
                 "SELECT id, workspaceId AS workspace_id, type, data, "
                 "createdAt AS created_at FROM events WHERE workspaceId = ? "
-                "ORDER BY createdAt",
+                # rowid is a stable insertion-order tiebreaker so two events
+                # logged in the same millisecond still come back oldest-first
+                # (the WS-11 ordering guarantee), not in arbitrary order.
+                "ORDER BY createdAt, rowid",
                 (workspaceId,),
             )
             rows = await cursor.fetchall()
