@@ -119,8 +119,17 @@ class WorkspaceService:
             await self.compute.cloneCt(
                 self.settings.template_vmid, vmid, payload.name, payload.node
             )
-            # 3 — persist non-secret boot intent (pull-at-boot DB write, ADR-0002).
-            await self.compute.injectBootConfig(vmid, self._boot_config(payload))
+            # 3 — persist boot intent (pull-at-boot DB checkpoint, ADR-0002). WR-03:
+            # the per-workspace boot intent (project repo/branch) is the row data
+            # persisted at step 1; the global config repo/branch is derived from
+            # settings at read time by the bootconfig endpoint. There is no provider
+            # push (no pct/cloud-init), so this step is a DELIBERATE DB-state
+            # checkpoint, not a provider call: it records that the intent is
+            # captured and recoverable (SC-2), and fails loudly if the row's
+            # persisted intent does not match what the bootconfig endpoint will
+            # serve — rather than the old dead `injectBootConfig` no-op that claimed
+            # to persist intent but wrote nothing.
+            await self._persist_boot_intent(ws, payload)
             # 4 — start the container (UPID-blocked).
             await self.compute.startCt(payload.node, vmid)
             # 5 — resolve the static IP from the VMID (computed, not polled).
@@ -343,6 +352,39 @@ class WorkspaceService:
             config_branch=self.settings.config_branch,
             project_repo=payload.project_repo,
             project_branch=payload.project_branch,
+        )
+
+    async def _persist_boot_intent(self, ws: Workspace, payload: WorkspaceCreate) -> None:
+        """Saga step 3: record that the boot intent is captured + recoverable (WR-03).
+
+        Pull-at-boot (ADR-0002) means the worker fetches its boot config from the
+        control plane at boot, derived from (a) the per-workspace project repo/branch
+        persisted on the reservation row at step 1 and (b) the global config
+        repo/branch from settings. Nothing is pushed into the CT, so this step is a
+        DELIBERATE DB-state checkpoint rather than a provider call.
+
+        It does real, verifiable work: it asserts the persisted row's project
+        repo/branch match the create payload (the intent the bootconfig endpoint will
+        serve), failing loudly with a ``WorkspaceBootError`` if they ever diverge —
+        and logs a ``bootconfig.persisted`` event so the captured intent is auditable
+        for recovery. This replaces the old ``injectBootConfig`` no-op that claimed to
+        persist intent but mutated nothing.
+        """
+        config = self._boot_config(payload)
+        if (ws.project_repo, ws.project_branch) != (config.project_repo, config.project_branch):
+            raise WorkspaceBootError(
+                "persisted boot intent does not match the create payload "
+                f"for workspace {ws.id}"
+            )
+        await self.db.logEvent(
+            ws.id,
+            "bootconfig.persisted",
+            {
+                "config_repo": config.config_repo,
+                "config_branch": config.config_branch,
+                "project_repo": config.project_repo,
+                "project_branch": config.project_branch,
+            },
         )
 
     async def _wait_ttyd(self, ip: str | None) -> None:

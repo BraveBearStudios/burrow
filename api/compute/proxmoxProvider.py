@@ -154,9 +154,12 @@ class ProxmoxComputeProvider(ComputeProvider):
         return await self._block(upid, timeout=self._settings.clone_timeout)
 
     async def injectBootConfig(self, vmid: int, config: BootConfig) -> None:
-        # DB-write-only seam (pull-at-boot, ADR-0002): the worker fetches its boot intent
-        # from the control plane at boot. The provider holds no DB handle, so this is a
-        # no-op at the provider level — the saga persists the intent via DbProvider.
+        # Pull-at-boot (ADR-0002): the worker FETCHES its boot intent from the control
+        # plane at boot — nothing is pushed into the CT. The v1 create saga does NOT
+        # call this; it persists/checkpoints the intent via the DbProvider directly
+        # (see WorkspaceService._persist_boot_intent, WR-03). This provider method is
+        # retained as the contract seam for a future push-based backend and is a no-op
+        # here (the provider holds no DB handle).
         return None
 
     async def startCt(self, node: str, vmid: int) -> ComputeTask:

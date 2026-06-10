@@ -112,7 +112,9 @@ async def test_event_log_oldest_first(integration_client: httpx.AsyncClient) -> 
     assert response.status_code == 200
     events = response.json()["data"]
     types = [event["type"] for event in events]
-    assert types == ["workspace.created", "workspace.stopped"]
+    # Oldest-first (WS-11): the step-3 boot-intent checkpoint (WR-03) precedes the
+    # created mark, which precedes the stop.
+    assert types == ["bootconfig.persisted", "workspace.created", "workspace.stopped"]
 
 
 async def test_illegal_transition_returns_409(integration_client: httpx.AsyncClient) -> None:

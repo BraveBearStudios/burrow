@@ -153,17 +153,20 @@ async def test_failed_create_does_not_leave_stuck_creating_row(
 
 
 class _LogEventFailingDb(SqliteProvider):
-    """SqliteProvider whose ``logEvent`` always raises (compensation-path hiccup).
+    """SqliteProvider whose ``boot.error`` ``logEvent`` raises (compensation hiccup).
 
-    CR-01 regression substrate: the saga's compensation block logs a
-    ``boot.error`` event AFTER it must have already landed the row in ``error``.
-    If a DB hiccup makes that event write raise, the row must still be ``error``
-    (never stuck ``creating``, SC-11) and the ORIGINAL boot exception — not the
-    logging error — must surface.
+    CR-01 regression substrate: the saga's compensation block logs a ``boot.error``
+    event AFTER it must have already landed the row in ``error``. If a DB hiccup
+    makes that event write raise, the row must still be ``error`` (never stuck
+    ``creating``, SC-11) and the ORIGINAL boot exception — not the logging error —
+    must surface. Only the ``boot.error`` write is failed so the saga still reaches
+    compensation normally (other event writes, e.g. the step-3 checkpoint, succeed).
     """
 
     async def logEvent(self, workspaceId: str, eventType: str, data: dict[str, Any]) -> None:
-        raise RuntimeError("simulated event-log disk-full during compensation")
+        if eventType == "boot.error":
+            raise RuntimeError("simulated event-log disk-full during compensation")
+        await super().logEvent(workspaceId, eventType, data)
 
 
 async def test_compensation_lands_error_even_when_logevent_raises(tmp_path: Path) -> None:

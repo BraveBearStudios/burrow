@@ -88,6 +88,32 @@ async def test_create_saga_logs_created_event(
     assert any(e.type == "workspace.created" for e in events)
 
 
+async def test_create_saga_persists_boot_intent_checkpoint(
+    service: WorkspaceService, db: SqliteProvider
+) -> None:
+    """WR-03: saga step 3 does real work — a bootconfig.persisted checkpoint event.
+
+    The boot intent (project repo/branch from the payload + global config from
+    settings) is recorded as an auditable, recoverable DB checkpoint, replacing the
+    old injectBootConfig no-op that mutated nothing.
+    """
+    ws = await service.createWorkspace(_payload())
+    events = await db.getEvents(ws.id)
+
+    persisted = [e for e in events if e.type == "bootconfig.persisted"]
+    assert persisted, "expected a bootconfig.persisted checkpoint event (WR-03)"
+    data = persisted[0].data
+    # The persisted intent matches what the bootconfig endpoint will serve.
+    assert data["project_repo"] == _payload().project_repo
+    assert data["project_branch"] == _payload().project_branch
+    assert data["config_repo"] == real_settings.config_repo
+    assert data["config_branch"] == real_settings.config_branch
+
+    # The checkpoint lands BEFORE the running mark (it is a create-time capture).
+    types = [e.type for e in events]
+    assert types.index("bootconfig.persisted") < types.index("workspace.created")
+
+
 async def test_create_saga_clone_starts_the_container(
     service: WorkspaceService, compute: FakeComputeProvider
 ) -> None:

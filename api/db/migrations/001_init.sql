@@ -23,7 +23,7 @@ CREATE TABLE events (
   id            TEXT PRIMARY KEY DEFAULT (lower(hex(randomblob(16)))),
   workspaceId   TEXT NOT NULL REFERENCES workspaces(id),
   type          TEXT NOT NULL,
-  -- type values: workspace.created|started|stopped|destroyed|terminal.connected|terminal.disconnected|boot.error
+  -- type values: workspace.created|started|stopped|destroyed|bootconfig.persisted|terminal.connected|terminal.disconnected|boot.error
   data          TEXT NOT NULL DEFAULT '{}',  -- JSON blob (non-optional, matches WorkspaceEvent.data)
   createdAt     TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 );
