@@ -17,6 +17,7 @@ not provider concerns.
 """
 
 import asyncio
+import logging
 import re
 from datetime import datetime, timezone
 
@@ -39,6 +40,10 @@ from lib.statemachine import assert_transition
 # Bounded reservation retries: each loss re-scans the (DB ∪ compute) used-set and
 # tries the next free VMID. 10 is generous for a single operator on a ~100-id pool.
 _RESERVE_ATTEMPTS = 10
+
+# Module logger: only whitelisted, non-secret extras reach it (lib.logging drops
+# anything outside its allow-list), so a credential value can never leak here.
+logger = logging.getLogger("burrow.workspace")
 
 _REDACTED = "[redacted]"
 
@@ -270,28 +275,45 @@ class WorkspaceService:
         return ws
 
     async def mint_repo_credential(self, repo: str) -> str:
-        """Mint a short-lived, repo-scoped git credential for a boot fetch (A3 seam).
+        """Return a git credential for a boot fetch — a DEV PLACEHOLDER, not a real cred.
 
-        PLUGGABLE issuance seam (RESEARCH Open Question 1 / Assumption A3). v1 reads
-        a short-lived, repo-scoped token from ``settings.git_credential_token`` (the
-        gitignored ``.env``; Plan 01 added the key) and returns it; when unset it
-        returns a clearly-marked placeholder so the contract is exercisable without a
-        real token. The ``repo`` argument is the scope the real issuer will bind the
-        credential to.
+        PLUGGABLE issuance seam (RESEARCH Open Question 1 / Assumption A3), pending the
+        operator's A3 decision. **v1 does NOT mint a real short-lived, per-repo-scoped
+        credential.** It returns either (a) a clearly-marked dev placeholder string when
+        ``settings.git_credential_token`` is unset, or (b) the configured
+        ``git_credential_token`` value verbatim — a single, static, process-wide value
+        that is NOT scoped to ``repo`` and does NOT expire. ``repo`` is recorded only as
+        the scope the *real* issuer will eventually bind to; the current body ignores it
+        for issuance.
 
-        Operator action (A3, confirm before Phase 3 wires ``burrow-boot.sh``): replace
-        this body with the real minting mechanism — a GitHub App installation token, a
-        repo deploy token, or an ephemeral fine-grained PAT. The returned value MUST be
-        short-lived and single-repo-scoped, MUST NEVER be a long-lived PAT, and MUST
-        NEVER be logged or persisted to the worker env (ADR-0002). The worker uses it
-        once for ``git clone`` and discards it. Do NOT hard-code a long-lived PAT here
-        and do NOT read a global, broadly-scoped token.
+        Because the configured-token path serves one global value to every repo and
+        caller, this method emits a structured warning whenever it serves a non-empty
+        ``git_credential_token`` so the "not actually repo-scoped" reality is visible in
+        the logs — it is the operator's signal that this is a stopgap, not the A3 issuer.
+
+        Operator action (A3, MUST be resolved before Phase 3 wires ``burrow-boot.sh``):
+        replace this body with a real minting mechanism — a GitHub App installation
+        token, a repo deploy token, or an ephemeral fine-grained PAT — that is
+        short-lived and single-repo-scoped, NEVER a long-lived PAT, and NEVER logged or
+        persisted to the worker env (ADR-0002). The worker uses the credential once for
+        ``git clone`` and discards it. Do NOT hard-code a long-lived PAT here, and treat
+        a non-empty ``git_credential_token`` in multi-repo use as a misconfiguration
+        until the real issuer lands.
         """
         token = self.settings.git_credential_token
         if token:
+            # NOT repo-scoped and NOT short-lived: surface the stopgap loudly so an
+            # operator never mistakes the global token for the real A3 issuer. The
+            # token value itself is NEVER logged (only the repo it is served for).
+            logger.warning(
+                "serving the global, non-repo-scoped git_credential_token (A3 dev "
+                "stopgap, NOT a per-repo short-lived credential)",
+                extra={"repo": repo},
+            )
             return token
-        # No token configured: a marked placeholder, never a real credential (A3).
-        return f"placeholder-credential-for:{repo}"
+        # No token configured: an explicitly non-production placeholder, never a
+        # real credential. The DEV-PLACEHOLDER marker makes a leak obvious in triage.
+        return f"DEV-PLACEHOLDER-NOT-A-REAL-CREDENTIAL:{repo}"
 
     # ── lifecycle helpers ──────────────────────────────────────────────────
     def _lock_for(self, workspace_id: str) -> asyncio.Lock:
