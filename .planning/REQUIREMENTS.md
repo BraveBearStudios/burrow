@@ -67,9 +67,9 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 - [x] **TERM-02**: The proxy negotiates ttyd's `tty` subprotocol and preserves its frame framing without corruption (SC-6; fixes spec §6.4 `msg.encode()`)
 - [x] **TERM-03**: The proxy logs connect/disconnect events and emits a typed error frame when ttyd is unreachable
 - [x] **TERM-04**: The proxy tears down cleanly when either side closes (FIRST_COMPLETED + cancel; no half-open leaks)
-- [ ] **TERM-05**: The browser terminal renders via xterm.js and fits/reflows to its panel on resize
-- [ ] **TERM-06**: The browser terminal auto-reconnects with backoff and shows a reconnecting overlay
-- [ ] **TERM-07**: The terminal unmounts cleanly on panel close (WebSocket closed, xterm disposed)
+- [x] **TERM-05**: The browser terminal renders via xterm.js and fits/reflows to its panel on resize
+- [x] **TERM-06**: The browser terminal auto-reconnects with backoff and shows a reconnecting overlay
+- [x] **TERM-07**: The terminal unmounts cleanly on panel close (WebSocket closed, xterm disposed)
 
 ### UI (UI)
 
@@ -180,9 +180,9 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | TERM-02 | Phase 2 | Done (02-01) |
 | TERM-03 | Phase 2 | Done (02-01) |
 | TERM-04 | Phase 2 | Done (02-01) |
-| TERM-05 | Phase 2 | Pending |
-| TERM-06 | Phase 2 | Pending |
-| TERM-07 | Phase 2 | Pending |
+| TERM-05 | Phase 2 | Complete |
+| TERM-06 | Phase 2 | Complete |
+| TERM-07 | Phase 2 | Complete |
 | UI-01 | Phase 2 | Pending |
 | UI-02 | Phase 2 | Pending |
 | UI-03 | Phase 2 | Pending |
