@@ -1,0 +1,104 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Tier-3 e2e stack (docs/ci-cd-and-testing.md §4.4): the full slice — built UI →
+# API → WebSocket bridge → terminal — with NO real infrastructure. Playwright drives
+# a real browser against this stack (see ui/playwright.config.ts).
+#
+# Three services, hermetic by design:
+#   1. api      — FastAPI control plane over the FakeComputeProvider (BURROW_COMPUTE=fake,
+#                 in-memory; no Proxmox, no secrets). The create saga is synchronous and
+#                 returns a `running` workspace whose lxc_ip the Fake derives from the VMID
+#                 as 10.99.0.<vmid % 256> (api/compute/fakeProvider.py::_fake_ip).
+#   2. stub-ttyd — the standalone protocol-accurate stub ttyd (api/tests/e2e/stub_ttyd_server.py).
+#                 NOT a bare echo: it negotiates `tty`, requires the JSON init, and echoes
+#                 INPUT verbatim preserving frame type, so the SC-7 corruption bug fails the
+#                 journey. The bridge dials ws://{lxc_ip}:7681/ws; we pin this service at the
+#                 first worker IP (10.99.0.200, vmid pool start) on the worker subnet so that
+#                 dial resolves to it. The e2e creates ONE workspace, so it lands on vmid 200.
+#   3. ui       — the built SPA served by nginx, proxying /api/v1 + /ws to the api (same-origin,
+#                 matching ui/vite.config.ts dev proxy). Playwright's baseURL points here.
+#
+# T-02-08 (accept): this file is test-only — Fake compute, no real Proxmox creds, no
+# secrets; LAN-only no-auth e2e by design (A6). The BURROW_ALLOWED_ORIGIN below is the
+# in-network UI origin, not a real LAN host.
+#
+# Images: the api/ui app Dockerfiles land with the build/publish job (ci-cd §4.5), so this
+# stack runs the source directly off lightweight base images + bind mounts — it needs no
+# pre-built app image to validate the e2e seam in CI today.
+
+services:
+  stub-ttyd:
+    image: python:3.12-slim
+    working_dir: /app/api
+    volumes:
+      - ./api:/app/api:ro
+    command: >
+      sh -c "pip install --quiet 'websockets==16.0' &&
+             python -m tests.e2e.stub_ttyd_server --host 0.0.0.0 --port 7681"
+    networks:
+      worker_net:
+        # Pin the first worker IP (vmid pool starts at 200 → 10.99.0.200) so the
+        # bridge's ws://{lxc_ip}:7681 dial resolves to the stub for the e2e's one workspace.
+        ipv4_address: 10.99.0.200
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 7681), 2).close()"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+
+  api:
+    image: python:3.12-slim
+    working_dir: /app/api
+    volumes:
+      - ./api:/app/api
+    environment:
+      # Provider switches use the BURROW_ alias (config.py validation_alias); the rest
+      # bind their bare uppercased field name (see .env.example), so NO BURROW_ prefix.
+      BURROW_COMPUTE: fake
+      BURROW_DB: sqlite
+      # SQLite-on-disk inside the container (hermetic; dropped on teardown).
+      DATABASE_PATH: /tmp/burrow-e2e.db
+      # The in-network UI origin the SPA is served from (CSWSH allow-list; not a real LAN host).
+      ALLOWED_ORIGIN: http://localhost:4173
+    command: >
+      sh -c "pip install --quiet uv &&
+             uv sync --frozen &&
+             uv run uvicorn main:app --host 0.0.0.0 --port 8000"
+    networks:
+      worker_net:
+      default:
+    depends_on:
+      stub-ttyd:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  ui:
+    image: nginx:1.27-alpine
+    ports:
+      - "4173:80"
+    volumes:
+      # The built SPA (npm run build → ui/dist) served statically; /api/v1 + /ws proxy
+      # to the api container (same-origin, matching the vite dev proxy).
+      - ./ui/dist:/usr/share/nginx/html:ro
+      - ./ui/nginx.e2e.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      api:
+        condition: service_healthy
+    networks:
+      default:
+
+networks:
+  # The api + ui talk over the default bridge; the worker subnet is a separate
+  # network the api also joins so it can reach the stub at the Fake-derived worker IP.
+  default:
+  worker_net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 10.99.0.0/24
+          gateway: 10.99.0.1

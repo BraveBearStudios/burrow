@@ -17,7 +17,6 @@ tool here: the ttyd leg is httpx, and proxmoxer (requests-based) is not involved
 the Fake.
 """
 
-import json
 import re
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -29,6 +28,8 @@ import websockets
 from websockets.asyncio.server import ServerConnection, serve
 
 from config import settings
+
+from tests.e2e.stub_ttyd_server import handle_ttyd_connection
 
 # The Fake derives a worker IP from the VMID (10.99.0.<vmid % 256>); the stub ttyd
 # answers the health GET on :7681 for any address in that range.
@@ -79,13 +80,15 @@ async def integration_client(
 # This is NOT a bare echo. A bare echo would forward bytes regardless of frame
 # type and never negotiate a subprotocol, so a proxy that drops the ``tty``
 # subprotocol or ``.encode()``\s a text frame (the spec §6.4 SC-7 corruption bug)
-# would still pass. This stub enforces the real ttyd ``tty`` contract so that
-# regression FAILS CI:
+# would still pass.
 #
-#   - it advertises + requires the ``tty`` subprotocol on the upgrade,
-#   - it requires the first frame to be the JSON init (``AuthToken/columns/rows``),
-#   - it echoes INPUT (``'0'`` + data) back as OUTPUT (``'0'`` + data) preserving
-#     the frame's text-vs-binary type, and silently accepts RESIZE (``'1'`` + JSON).
+# The protocol logic (negotiate ``tty``, require the JSON init, echo INPUT
+# verbatim preserving frame type, drop RESIZE) lives ONCE in
+# ``tests.e2e.stub_ttyd_server.handle_ttyd_connection`` — the SAME handler the
+# standalone e2e-stack server runs. This in-process fixture imports it and only
+# adds the per-test bookkeeping (live-connection count + echoed-frame-type) via the
+# shared ``on_echo`` observer, so the integration tier and the Playwright/Fake tier
+# can never drift apart on the SC-7 contract.
 #
 # A separate ``websockets.serve`` server (a different transport from the respx
 # httpx health mock above) backs it on an ephemeral loopback port.
@@ -109,45 +112,29 @@ class StubTtyd:
         self.text_echo: bool | None = None
 
 
-async def _stub_ttyd_handler(conn: ServerConnection, state: StubTtyd) -> None:
-    """Speak the real ttyd ``tty`` protocol against the bridge's upstream leg."""
-    # 1) The proxy MUST have negotiated the 'tty' subprotocol (TERM-02).
-    assert conn.subprotocol == "tty", f"expected 'tty' subprotocol, got {conn.subprotocol!r}"
-    state.connections += 1
-    state.live += 1
-    try:
-        # 2) The first frame MUST be the JSON init (AuthToken/columns/rows).
-        init = await conn.recv()
-        raw_init = init.decode() if isinstance(init, (bytes, bytearray)) else init
-        payload = json.loads(raw_init)
-        assert {"AuthToken", "columns", "rows"} <= payload.keys()
-        # 3) Echo INPUT ('0'+data) as OUTPUT ('0'+data) preserving frame TYPE so a
-        #    relay that re-encodes a text frame to bytes (SC-7) is observable; accept
-        #    RESIZE ('1'+JSON) silently.
-        async for msg in conn:
-            is_text = isinstance(msg, str)
-            head = msg[:1]
-            if head in ("0", b"0"):
-                state.text_echo = is_text
-                await conn.send(msg)  # verbatim: '0'-prefixed, same text-vs-binary type
-            # head == '1' → RESIZE: accept and ignore (no echo)
-    finally:
-        state.live -= 1
-
-
 @pytest.fixture
 async def stub_ttyd_ws() -> AsyncIterator[StubTtyd]:
     """Start a protocol-accurate stub ttyd and yield its handle.
 
-    The proxy's production dial is ``ws://{lxc_ip}:7681/ws``; point that at this
-    stub in a test by monkeypatching ``routers.terminal._ttyd_url`` to return
-    ``state.url`` (a test-only seam — the production URL construction is unchanged).
+    Wraps the SHARED ``handle_ttyd_connection`` (no duplicate protocol logic): the
+    fixture only tracks the live-connection count and the echoed-frame-type via the
+    handler's ``on_echo`` observer. The proxy's production dial is
+    ``ws://{lxc_ip}:7681/ws``; point that at this stub in a test by monkeypatching
+    ``routers.terminal._ttyd_url`` to return ``state.url`` (a test-only seam — the
+    production URL construction is unchanged).
     """
     state: StubTtyd | None = None
 
     async def handler(conn: ServerConnection) -> None:
         assert state is not None
-        await _stub_ttyd_handler(conn, state)
+        state.connections += 1
+        state.live += 1
+        try:
+            await handle_ttyd_connection(
+                conn, on_echo=lambda is_text: setattr(state, "text_echo", is_text)
+            )
+        finally:
+            state.live -= 1
 
     async with serve(
         handler, "127.0.0.1", 0, subprotocols=[websockets.Subprotocol("tty")]
