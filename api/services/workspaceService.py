@@ -90,9 +90,11 @@ class WorkspaceService:
         self.db = db
         self.settings = settings
         # Per-workspace in-flight lock: serializes concurrent mutations on a single
-        # workspace id within this process (SC-12, A2). Created lazily per id. The
-        # DB status-guarded read-then-act inside the lock is the cross-process
-        # backstop (the reservation index covers create-create).
+        # workspace id within this process (SC-12, A2). Created lazily per id and
+        # RECLAIMED when the workspace is destroyed (WR-02) so the dict does not grow
+        # unbounded over the process lifetime. The DB status-guarded read-then-act
+        # inside the lock is the cross-process backstop (the reservation index covers
+        # create-create).
         self._locks: dict[str, asyncio.Lock] = {}
 
     # ── create saga (WS-01/02/03, CAP-01/04) ──────────────────────────────
@@ -267,6 +269,12 @@ class WorkspaceService:
             )
             await self.db.logEvent(ws.id, "workspace.destroyed", {})
             await self.db.softDeleteWorkspace(ws.id)
+        # WR-02: the workspace is terminal (soft-deleted) — no future caller will
+        # ever need its lock, so reclaim the dict entry to bound _locks growth.
+        # Popped AFTER releasing the lock (outside the `async with`) so we never
+        # mutate the registry while the lock is held; the local `async with`
+        # reference kept the object alive for the duration of this call.
+        self._locks.pop(workspace_id, None)
 
     # ── bootconfig (WORK-03 / ADR-0002) ───────────────────────────────────
     async def get_by_vmid(self, vmid: int) -> Workspace:

@@ -193,6 +193,23 @@ async def test_mutating_unknown_workspace_raises_not_found(
         await service.stopWorkspace("does-not-exist")
 
 
+async def test_destroy_reclaims_the_in_flight_lock(service: WorkspaceService) -> None:
+    """WR-02: a workspace's lock entry is reclaimed on destroy (bounded _locks).
+
+    Without reclamation, _locks grows monotonically for the process lifetime as
+    random-UUID workspaces churn. A stop creates the lock; destroy must pop it so
+    the dict does not leak the entry for a now-terminal workspace.
+    """
+    ws = await _running_workspace(service)
+    await service.stopWorkspace(ws.id)
+    # The stop created (and now retains) the per-workspace lock.
+    assert ws.id in service._locks
+
+    await service.destroyWorkspace(ws.id)
+    # Destroy reclaimed it — the terminal workspace's lock is gone.
+    assert ws.id not in service._locks
+
+
 async def test_in_flight_lock_serializes_concurrent_stops(
     service: WorkspaceService,
 ) -> None:
