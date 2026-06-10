@@ -381,8 +381,7 @@ class WorkspaceService:
         config = self._boot_config(payload)
         if (ws.project_repo, ws.project_branch) != (config.project_repo, config.project_branch):
             raise WorkspaceBootError(
-                "persisted boot intent does not match the create payload "
-                f"for workspace {ws.id}"
+                f"persisted boot intent does not match the create payload for workspace {ws.id}"
             )
         await self.db.logEvent(
             ws.id,

@@ -156,7 +156,7 @@ class _LockOnceProvider(SqliteProvider):
                     raise aiosqlite.OperationalError("database is locked")
                 return await original_execute(sql, *args, **kwargs)
 
-            conn.execute = _execute  # type: ignore[method-assign]
+            conn.execute = _execute  # type: ignore[assignment]
             yield conn
 
 

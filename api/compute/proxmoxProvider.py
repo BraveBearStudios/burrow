@@ -199,9 +199,7 @@ class ProxmoxComputeProvider(ComputeProvider):
         try:
             await asyncio.to_thread(_configure)
         except Exception as exc:  # no driver type escapes the seam
-            raise CloneError(
-                f"post-clone configuration of {new_vmid} failed: {exc}"
-            ) from exc
+            raise CloneError(f"post-clone configuration of {new_vmid} failed: {exc}") from exc
         return task
 
     async def injectBootConfig(self, vmid: int, config: BootConfig) -> None:
