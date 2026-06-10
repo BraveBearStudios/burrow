@@ -39,6 +39,7 @@ from typing import cast
 
 import websockets
 from websockets.asyncio.server import ServerConnection, serve
+from websockets.http11 import Request, Response
 
 logger = logging.getLogger("burrow.stub_ttyd")
 
@@ -114,6 +115,21 @@ async def handle_ttyd_connection(
         await relay_ttyd_frame(conn, msg, on_echo)
 
 
+def _health_response(connection: ServerConnection, request: Request) -> Response | None:
+    """Answer the create-saga's ttyd-health GET (step 6) on plain HTTP requests.
+
+    A real ttyd serves HTTP on the same :7681 port; the workspace create saga
+    (``_wait_ttyd``) polls ``GET http://{ip}:7681/`` and treats any non-5xx as ready.
+    A WebSocket upgrade carries an ``Upgrade: websocket`` header — for those we return
+    ``None`` so the normal ``tty`` handshake proceeds; a bare GET (the health probe)
+    gets a 200 so the e2e saga resolves quickly against this one stub.
+    """
+    upgrade = request.headers.get("Upgrade", "")
+    if upgrade.lower() == "websocket":
+        return None  # let the tty handshake run
+    return connection.respond(200, "stub ttyd ok\n")
+
+
 async def run_server(host: str, port: int) -> None:
     """Serve the protocol-accurate stub ttyd until cancelled (the process entrypoint)."""
     async with serve(
@@ -121,9 +137,10 @@ async def run_server(host: str, port: int) -> None:
         host,
         port,
         subprotocols=[websockets.Subprotocol("tty")],
+        process_request=_health_response,
     ) as server:
         bound = server.sockets[0].getsockname()[:2]
-        logger.info("stub ttyd listening on ws://%s:%s", *bound)
+        logger.info("stub ttyd listening on ws://%s:%s (HTTP health on /)", *bound)
         await asyncio.get_running_loop().create_future()  # run forever
 
 

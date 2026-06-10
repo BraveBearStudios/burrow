@@ -24,4 +24,13 @@ export default defineConfig({
 			"/ws": { target: CONTROL_PLANE, changeOrigin: true, ws: true },
 		},
 	},
+	// `vite preview` (used by the Tier-3 Playwright webServer over the built dist)
+	// does NOT inherit `server.proxy`, so mirror the same control-plane forwarding
+	// here — the e2e SPA uses same-origin /api/v1 + /ws against the FastAPI backend.
+	preview: {
+		proxy: {
+			"/api/v1": { target: CONTROL_PLANE, changeOrigin: true },
+			"/ws": { target: CONTROL_PLANE, changeOrigin: true, ws: true },
+		},
+	},
 });

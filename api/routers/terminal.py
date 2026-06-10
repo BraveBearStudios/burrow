@@ -35,6 +35,7 @@ never leave a half-open upstream connection (bounded FD growth).
 """
 
 import asyncio
+import os
 
 from fastapi import APIRouter, WebSocket
 from websockets import Subprotocol
@@ -56,15 +57,28 @@ _TTYD_PATH = "/ws"
 # rejection: non-running workspace and Origin mismatch.
 _POLICY_VIOLATION = 1008
 
+# E2E-only dial override (NOT for production). When set, the upstream ttyd host is
+# this fixed value instead of the workspace's VMID-derived IP, so the Tier-3
+# Playwright stack can reach a single local/standalone stub ttyd without a routable
+# 10.99.0.x worker network. It is an OPERATOR-controlled env var, never client input,
+# so the SSRF posture is unchanged (the access gate still requires a running
+# workspace with a resolved IP; this only retargets the reachable test stub). Leave
+# it unset in any real deployment.
+_E2E_TTYD_HOST_ENV = "BURROW_E2E_TTYD_HOST"
+
 
 def _ttyd_url(lxc_ip: str) -> str:
     """Build the upstream ttyd URL from the workspace's own IP only (SSRF guard).
 
     Isolated as a module function so the host is interpolated in exactly one place
     (never from client input) and so the integration tests can redirect the dial at
-    a stub server without changing this production construction.
+    a stub server without changing this production construction. The e2e-only
+    ``BURROW_E2E_TTYD_HOST`` override (operator env, never client input) retargets the
+    host to a single local stub for the Tier-3 stack; absent it, production behavior
+    (dial the workspace's own IP) is unchanged.
     """
-    return f"ws://{lxc_ip}:{_TTYD_PORT}{_TTYD_PATH}"
+    host = os.environ.get(_E2E_TTYD_HOST_ENV) or lxc_ip
+    return f"ws://{host}:{_TTYD_PORT}{_TTYD_PATH}"
 
 
 @router.websocket("/workspaces/{workspace_id}/terminal")

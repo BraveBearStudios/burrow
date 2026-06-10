@@ -9,6 +9,7 @@
 // (no icon font / CDN — 02-UI-SPEC Registry Safety) wired to optional no-op props
 // (Wave 3/4 connects split/detach/terminate).
 
+import { useState } from "react";
 import { useTerminal } from "../hooks/useTerminal";
 import type { WorkspaceStatus } from "../types/workspace";
 
@@ -27,6 +28,10 @@ export interface TerminalPanelProps {
 
 /** Human-readable reason for the error overlay (02-UI-SPEC Copywriting). */
 const ERROR_REASON = "the worker isn't ready";
+
+/** 02-UI-SPEC Copywriting — the terminate confirmation copy ({name} interpolated). */
+const terminateConfirmCopy = (name: string) =>
+	`Destroy ${name}? The container and its session are gone for good.`;
 
 const ICON = {
 	stroke: "currentColor",
@@ -180,7 +185,12 @@ export function TerminalPanel({
 		status: termStatus,
 		reconnectAttempts,
 		reattach,
+		detach,
 	} = useTerminal(id, status, { onTerminalEvent });
+
+	// Terminate (×) is confirm-gated + distinct from detach (UI-SPEC criterion 12):
+	// the × opens a confirm overlay (dimming the panel) and only `Destroy` removes it.
+	const [isConfirmingTerminate, setConfirmingTerminate] = useState(false);
 
 	return (
 		<section
@@ -192,6 +202,8 @@ export function TerminalPanel({
 				border: "0.5px solid var(--border)",
 				borderRadius: "var(--radius-panel)",
 				overflow: "hidden",
+				// Dim the panel while the terminate confirm is pending (UI-SPEC).
+				opacity: isConfirmingTerminate ? 0.4 : 1,
 			}}
 		>
 			<header style={headerStyle}>
@@ -247,7 +259,12 @@ export function TerminalPanel({
 					type="button"
 					aria-label="Detach (keeps the session running)"
 					style={iconButtonStyle}
-					onClick={() => onDetach?.(id)}
+					onClick={() => {
+						// Non-destructive: close the live socket (reconnecting overlay), then
+						// let the parent know. The session survives — distinct from terminate.
+						detach();
+						onDetach?.(id);
+					}}
 				>
 					<PlugIcon />
 				</button>
@@ -255,7 +272,7 @@ export function TerminalPanel({
 					type="button"
 					aria-label="Terminate"
 					style={iconButtonStyle}
-					onClick={() => onTerminate?.(id)}
+					onClick={() => setConfirmingTerminate(true)}
 				>
 					<CloseIcon />
 				</button>
@@ -333,6 +350,42 @@ export function TerminalPanel({
 						<button type="button" style={overlayButton} onClick={reattach}>
 							Retry
 						</button>
+					</div>
+				) : null}
+
+				{isConfirmingTerminate ? (
+					<div
+						style={{
+							...overlayBase,
+							background: "rgba(26,28,26,.92)",
+							opacity: 1,
+						}}
+						role="alertdialog"
+						aria-label={`Terminate ${name}`}
+						aria-live="assertive"
+					>
+						<span style={{ maxWidth: "260px", textAlign: "center" }}>
+							{terminateConfirmCopy(name)}
+						</span>
+						<div style={{ display: "flex", gap: "8px" }}>
+							<button
+								type="button"
+								style={overlayButton}
+								onClick={() => setConfirmingTerminate(false)}
+							>
+								Cancel
+							</button>
+							<button
+								type="button"
+								style={{ ...overlayButton, color: "var(--err)" }}
+								onClick={() => {
+									setConfirmingTerminate(false);
+									onTerminate?.(id);
+								}}
+							>
+								Destroy
+							</button>
+						</div>
 					</div>
 				) : null}
 			</div>

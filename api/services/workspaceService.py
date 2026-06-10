@@ -18,6 +18,7 @@ not provider concerns.
 
 import asyncio
 import logging
+import os
 import re
 from datetime import datetime, timezone
 
@@ -404,12 +405,17 @@ class WorkspaceService:
         """
         if ip is None:
             raise WorkspaceBootError("no IP resolved for the worker; cannot reach ttyd")
+        # E2E-only health-probe host override (operator env, never client input): the
+        # Tier-3 stack runs a single local stub ttyd, so the saga's step-6 health GET
+        # is retargeted at it instead of the unroutable 10.99.0.x worker IP. Unset in
+        # any real deployment — production probes the workspace's own resolved IP.
+        host = os.environ.get("BURROW_E2E_TTYD_HOST") or ip
         loop = asyncio.get_event_loop()
         deadline = loop.time() + self.settings.ttyd_timeout
         async with httpx.AsyncClient() as client:
             while loop.time() < deadline:
                 try:
-                    response = await client.get(f"http://{ip}:7681/", timeout=2)
+                    response = await client.get(f"http://{host}:7681/", timeout=2)
                     if response.status_code < 500:
                         return
                 except (httpx.ConnectError, httpx.TimeoutException):

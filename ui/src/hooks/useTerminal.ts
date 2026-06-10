@@ -99,6 +99,13 @@ export interface UseTerminalResult {
 	reconnectAttempts: number;
 	/** Force an immediate (re)connect — backs the Reattach / Retry overlay buttons. */
 	reattach: () => void;
+	/**
+	 * Detach (non-destructive): close the live socket WITHOUT destroying the
+	 * workspace. The session survives on the worker; the hook's reconnect loop then
+	 * shows the reconnecting overlay and re-attaches to the live PTY (UI-05). This is
+	 * the plug affordance — distinct from terminate (WS-08 destroy).
+	 */
+	detach: () => void;
 }
 
 export interface UseTerminalOptions {
@@ -147,6 +154,22 @@ export function useTerminal(
 		setReconnectAttempts(0);
 		setState("connecting");
 		connectRef.current();
+	}, []);
+
+	// `detach` is the non-destructive plug affordance: close the live socket (the
+	// session keeps running on the worker), which the socket's onclose treats as a
+	// dropped connection → the reconnect loop shows the overlay and re-attaches to
+	// the LIVE PTY (UI-05). It never destroys the workspace (that is terminate).
+	const detach = useCallback(() => {
+		if (disposedRef.current) {
+			return;
+		}
+		const socket = socketRef.current;
+		if (socket) {
+			// A bare close() (no policy-violation code) routes through onclose →
+			// scheduleReconnect, surfacing the reconnecting overlay.
+			socket.close();
+		}
 	}, []);
 
 	useEffect(() => {
@@ -279,5 +302,5 @@ export function useTerminal(
 		};
 	}, [workspaceId, status]);
 
-	return { containerRef, status: state, reconnectAttempts, reattach };
+	return { containerRef, status: state, reconnectAttempts, reattach, detach };
 }

@@ -29,6 +29,12 @@ dist/
 .vite/
 *.local
 
+# ── E2E / Playwright artifacts (Tier-3) ───────────────────────────────
+test-results/
+playwright-report/
+blob-report/
+.playwright/
+
 # ── Databases / runtime state ─────────────────────────────────────────
 *.db
 *.sqlite
