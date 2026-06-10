@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 00-02-PLAN.md (provider seams: ComputeProvider/DbProvider ABCs + FakeComputeProvider + SqliteProvider + Proxmox/Postgres stubs, PLAT-06/07/08)"
-last_updated: "2026-06-10T05:05:49.556Z"
+stopped_at: Completed 00-04-PLAN.md (static CI gates CICD-01 + REUSE/SPDX CICD-06 + minimal ui/ scaffold)
+last_updated: "2026-06-10T05:43:19.852Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 7
-  completed_plans: 5
-  percent: 71
+  completed_plans: 6
+  percent: 86
 ---
 
 <!--
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 0 of 4 (Contracts, Seams & Golden Template)
-Plan: 5 of 7 complete in current phase
+Plan: 6 of 7 complete in current phase
 Status: Executing
-Last activity: 2026-06-10 — Plan 00-02 complete: the two provider seams. api/compute/ (ComputeProvider ABC with the full Phase-1 saga method set + typed ComputeError hierarchy, deterministic in-memory FakeComputeProvider with injectable FakeFailures hooks, ProxmoxComputeProvider NotImplementedError skeleton) and api/db/ (DbProvider ABC, SqliteProvider over aiosqlite + 001_init.sql migration runner, PostgresProvider stub). Providers return Pydantic DTOs only — no proxmoxer/aiosqlite type leaks past the interface. ruff + ruff format + mypy --strict green across the 17-file api/ tree; uv lock fresh. PLAT-06/07/08 complete.
+Last activity: 2026-06-10 — Plan 00-04 complete: Tier-0 static CI gates (CICD-01) + repo-wide REUSE/SPDX compliance (CICD-06) + minimal ui/ scaffold. `.github/workflows/ci.yml` static-gates job runs every gate (ruff lint+format, mypy --strict, uv lock --check, tsc --noEmit, biome ci, reuse lint) with SHA-pinned actions + least-privilege permissions, plus a Conventional-Commit PR-title gate. `LICENSES/AGPL-3.0-or-later.txt` + a precisely-scoped `REUSE.toml` (non-headerable files only) make `uvx reuse lint` green at 100/100. ui/ scaffold pins typescript@6.0.3 + @biomejs/biome@2.4.16 (fresh Biome 2 config); npm ci + tsc + biome all green. CICD-01/CICD-06 complete.
 
-Progress: [███████░░░] 71%
+Progress: [█████████░] 86%
 
 ## Performance Metrics
 
@@ -65,6 +65,7 @@ Progress: [███████░░░] 71%
 - Trend: -
 
 *Updated after each plan completion*
+| Phase 0 P04 | 20 min | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,9 @@ Recent decisions affecting current work:
 - [Plan 00-02]: FakeComputeProvider is in-memory + deterministic (IP=10.99.0.<vmid%256>, no random/sleep), lifecycle-accurate, with an injectable FakeFailures(raise_on_nth_call) hook shaped for Phase-1 compensation tests (PLAT-08).
 - [Plan 00-02]: Scoped mypy override module='proxmoxer.*' ignore_missing_imports (no py.typed) keeps --strict on all first-party code; proxmoxer stays confined to proxmoxProvider.py.
 - [Plan 00-02]: SQLite columns are camelCase (tech-spec §7.1 verbatim); snake<->camel bridge lives ONLY in sqliteProvider.py. 001_init.sql omits the UNIQUE(vmid) partial index (Phase-1 002_* migration, SC-4).
+- [Phase ?]: [Plan 00-04]: Tier-0 static-gates CI job (CICD-01) runs ruff lint+format, mypy --strict, uv lock --check (api/), tsc --noEmit + biome ci (ui/), uvx reuse lint (repo); third-party actions SHA-pinned (checkout v4.3.1, setup-uv v6.8.0, setup-node v4.4.0), contents:read. PR-title gate via amannn/action-semantic-pull-request with placeholder SHA + '# TODO pin exact SHA' (exact pin deferred).
+- [Phase ?]: [Plan 00-04]: REUSE/SPDX green repo-wide (CICD-06, 100/100) via LICENSES/AGPL-3.0-or-later.txt + REUSE.toml scoped to non-headerable files ONLY (uv.lock, package-lock.json, comment-less JSON, design/Burrow-handoff bundle) -- never blanket-globs source extensions so a missing inline header still fails. Headerable sources got inline headers; in-body example SPDX strings wrapped in REUSE-IgnoreStart/End.
+- [Phase ?]: [Plan 00-04]: ui/ scaffold minimal-by-design (typescript@6.0.3 + @biomejs/biome@2.4.16 only); full UI tree is Phase 2. biome.json written fresh from biome init (2.4.16 schema); vcs.useIgnoreFile=false, includes scoped to src/**.
 
 ### Pending Todos
 
@@ -115,7 +119,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T05:05:49.547Z
-Stopped at: Completed 00-02-PLAN.md (provider seams: ComputeProvider/DbProvider ABCs + FakeComputeProvider + SqliteProvider + Proxmox/Postgres stubs, PLAT-06/07/08)
+Last session: 2026-06-10T05:41:26.949Z
+Stopped at: Completed 00-04-PLAN.md (static CI gates CICD-01 + REUSE/SPDX CICD-06 + minimal ui/ scaffold)
 Resume file: None
 Next plan: 00-02 (provider seams: ComputeProvider/DbProvider ABCs + FakeComputeProvider + Sqlite/Postgres + Proxmox skeleton) — wave-1 sibling, no remaining dependency.
