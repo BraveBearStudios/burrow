@@ -18,6 +18,7 @@ step (step 6 does not call the Fake, so it cannot be injected there).
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -149,3 +150,45 @@ async def test_failed_create_does_not_leave_stuck_creating_row(
         await service.createWorkspace(_payload())
 
     assert await db.listWorkspaces(status="creating") == []
+
+
+class _LogEventFailingDb(SqliteProvider):
+    """SqliteProvider whose ``logEvent`` always raises (compensation-path hiccup).
+
+    CR-01 regression substrate: the saga's compensation block logs a
+    ``boot.error`` event AFTER it must have already landed the row in ``error``.
+    If a DB hiccup makes that event write raise, the row must still be ``error``
+    (never stuck ``creating``, SC-11) and the ORIGINAL boot exception — not the
+    logging error — must surface.
+    """
+
+    async def logEvent(self, workspaceId: str, eventType: str, data: dict[str, Any]) -> None:
+        raise RuntimeError("simulated event-log disk-full during compensation")
+
+
+async def test_compensation_lands_error_even_when_logevent_raises(tmp_path: Path) -> None:
+    """CR-01: a failing ``logEvent`` during compensation must not strand `creating`.
+
+    The status=error write must land BEFORE the best-effort event log, and the
+    event-log failure must be swallowed so the original boot error propagates.
+    """
+    db = _LogEventFailingDb(_DbSettings(database_path=str(tmp_path / "cr01.db")))
+    await db.migrate()
+    # Fail the saga at startCt so we enter compensation; the boot error is the
+    # injected LxcNotReadyError, which must be what surfaces.
+    compute = FakeComputeProvider(failures=FakeFailures({"startCt": 1}))
+    service = _make_service(compute, db)
+
+    with pytest.raises(Exception) as excinfo:  # noqa: B017
+        await service.createWorkspace(_payload())
+
+    # The ORIGINAL boot exception surfaces, NOT the RuntimeError from logEvent.
+    assert "simulated event-log disk-full" not in str(excinfo.value)
+
+    rows = await db.listWorkspaces()
+    assert len(rows) == 1
+    # The row landed in error despite the event-log failure (SC-11, never stuck).
+    assert rows[0].status == "error"
+    assert await db.listWorkspaces(status="creating") == []
+    # The VMID was still freed by compensation.
+    assert await compute.usedVmids() == set()

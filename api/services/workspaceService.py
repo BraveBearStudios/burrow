@@ -128,9 +128,21 @@ class WorkspaceService:
             return await self.db.updateWorkspace(ws.id, {"status": "running"})
         except Exception as exc:
             await self._compensate(payload.node, vmid)
-            await self.db.logEvent(ws.id, "boot.error", {"reason": _safe(exc)})
-            await self.db.updateWorkspace(ws.id, {"status": "error"})
-            raise
+            # Land the row in `error` FIRST and guard it — this is the SC-11
+            # guarantee (never stuck `creating`, Pitfall 4). A failure in the
+            # status write or the best-effort event log must NOT mask the
+            # original boot exception, so each lands in its own try/except and we
+            # re-raise `exc` explicitly (a bare `raise` could rebind to a guarded
+            # call's exception if one ever escaped).
+            try:
+                await self.db.updateWorkspace(ws.id, {"status": "error"})
+            except Exception:
+                pass  # never mask the original boot failure
+            try:
+                await self.db.logEvent(ws.id, "boot.error", {"reason": _safe(exc)})
+            except Exception:
+                pass  # event log is best-effort diagnostics, not the landing
+            raise exc
 
     async def _reserve_vmid_and_row(self, payload: WorkspaceCreate) -> Workspace:
         """Reserve a VMID by INSERT under the partial-unique index (SC-3/SC-4).
