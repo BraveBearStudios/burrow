@@ -63,10 +63,10 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 
 ### Terminal Proxy (TERM)
 
-- [ ] **TERM-01**: A WebSocket endpoint bridges the browser terminal to the worker's ttyd, relaying frames in both directions
-- [ ] **TERM-02**: The proxy negotiates ttyd's `tty` subprotocol and preserves its frame framing without corruption (SC-6; fixes spec §6.4 `msg.encode()`)
-- [ ] **TERM-03**: The proxy logs connect/disconnect events and emits a typed error frame when ttyd is unreachable
-- [ ] **TERM-04**: The proxy tears down cleanly when either side closes (FIRST_COMPLETED + cancel; no half-open leaks)
+- [x] **TERM-01**: A WebSocket endpoint bridges the browser terminal to the worker's ttyd, relaying frames in both directions
+- [x] **TERM-02**: The proxy negotiates ttyd's `tty` subprotocol and preserves its frame framing without corruption (SC-6; fixes spec §6.4 `msg.encode()`)
+- [x] **TERM-03**: The proxy logs connect/disconnect events and emits a typed error frame when ttyd is unreachable
+- [x] **TERM-04**: The proxy tears down cleanly when either side closes (FIRST_COMPLETED + cancel; no half-open leaks)
 - [ ] **TERM-05**: The browser terminal renders via xterm.js and fits/reflows to its panel on resize
 - [ ] **TERM-06**: The browser terminal auto-reconnects with backoff and shows a reconnecting overlay
 - [ ] **TERM-07**: The terminal unmounts cleanly on panel close (WebSocket closed, xterm disposed)
@@ -176,17 +176,17 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | WS-09 | Phase 1 | Complete |
 | WS-10 | Phase 1 | Done (01-01) |
 | WS-11 | Phase 1 | In progress (01-01 DB read path; endpoint 01-04) |
-| TERM-01 | Phase 2 | Pending |
-| TERM-02 | Phase 2 | Pending |
-| TERM-03 | Phase 2 | Pending |
-| TERM-04 | Phase 2 | Pending |
+| TERM-01 | Phase 2 | Done (02-01) |
+| TERM-02 | Phase 2 | Done (02-01) |
+| TERM-03 | Phase 2 | Done (02-01) |
+| TERM-04 | Phase 2 | Done (02-01) |
 | TERM-05 | Phase 2 | Pending |
 | TERM-06 | Phase 2 | Pending |
 | TERM-07 | Phase 2 | Pending |
 | UI-01 | Phase 2 | Pending |
 | UI-02 | Phase 2 | Pending |
 | UI-03 | Phase 2 | Pending |
-| UI-04 | Phase 2 | Pending |
+| UI-04 | Phase 2 | In progress (02-01 backend: GET /api/v1/nodes; UI capacity chip 02-05) |
 | UI-05 | Phase 2 | Pending |
 | UI-06 | Phase 4 | Pending |
 | WORK-01 | Phase 0 | Pending |

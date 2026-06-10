@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 01-05-PLAN.md (pull-at-boot bootconfig endpoint: GET /api/v1/internal/bootconfig/{vmid} serves the non-secret payload + a short-lived repo-scoped credential via a pluggable mint_repo_credential seam, with a vmid-in-pool gate, enumeration-resistant 404, source-IP defense-in-depth, and a sentinel-proven no-credential-in-logs/events guarantee — WORK-03 endpoint contract; live burrow-boot.sh consumer pull-step deferred to Phase 3)"
-last_updated: "2026-06-10T16:35:08.000Z"
+stopped_at: "Completed 02-01-PLAN.md (Phase-2 backend: tty-subprotocol WS terminal bridge /ws/workspaces/{id}/terminal — opaque type-preserving relay, FIRST_COMPLETED teardown, pre-accept access gate (1008), Origin/CSWSH gate, SSRF-safe upstream dial, LXC_NOT_READY error frame, {}-only connect/disconnect logging (TERM-01..04); plus GET /api/v1/nodes degrade-not-500 per-node capacity endpoint (UI-04 backend) and websockets==16.0 pin. Proven over a protocol-accurate stub ttyd that makes the SC-7 .encode() bug fail CI. UI half of UI-04 lands in 02-05.)"
+last_updated: "2026-06-10T18:20:00.000Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 12
-  completed_plans: 12
-  percent: 20
+  total_plans: 18
+  completed_plans: 13
+  percent: 24
 ---
 
 <!--
@@ -26,16 +26,16 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 1 — Control Plane API
+**Current focus:** Phase 2 — Terminal Proxy + React UI
 
 ## Current Position
 
-Phase: 1 of 4 (Control Plane API)
-Plan: 5 of 5 complete in current phase
-Status: Phase 1 plans complete — ready for phase verification
+Phase: 2 of 4 (Terminal Proxy + React UI)
+Plan: 1 of 6 complete in current phase
+Status: Phase 2 in progress — backend WS bridge + nodes capacity endpoint shipped (02-01); next is the UI foundation (02-02)
 Last activity: 2026-06-10
 
-Progress: [██████████] 100% (Phase 1: 5/5 plans)
+Progress: [██░░░░░░░░] 17% (Phase 2: 1/6 plans)
 
 ## Performance Metrics
 
@@ -73,6 +73,7 @@ Progress: [██████████] 100% (Phase 1: 5/5 plans)
 | Phase 01 P02 | 21min | 3 tasks | 4 files |
 | Phase 1 P04 | 12 | 3 tasks | 14 files |
 | Phase 1 P05 | 9 min | 3 tasks | 5 files |
+| Phase 2 P01 | 14 min | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -122,6 +123,9 @@ Recent decisions affecting current work:
 - [Plan 01-05]: GET /api/v1/internal/bootconfig/{vmid} is the phase's one ASVS L1 surface (WORK-03 endpoint contract). vmid is an int path param + an [worker_pool_start, worker_pool_end] gate; out-of-pool → IllegalVmidError → 404 with a generic "Not found." message that never echoes the probe (T-01-17 enumeration resistance). The SAME IllegalVmidError is reused for a source-IP mismatch so out-of-pool / wrong-source-IP / no-workspace are indistinguishable to a prober.
 - [Plan 01-05]: Credential issuance is a pluggable seam — WorkspaceService.mint_repo_credential reads the short-lived, repo-scoped settings.git_credential_token (gitignored .env, Plan-01 key) and returns it, or a marked placeholder when unset (A3). NO long-lived PAT is hard-coded; the real issuer (GitHub App installation token / deploy token / ephemeral PAT) is operator config to confirm before Phase 3 wires burrow-boot.sh. The credential is a response-body field ONLY (gitCredential) — never a log extra; a sentinel-token caplog + event-data test proves it appears in zero logs and zero event blobs (T-01-18, block_on=high).
 - [Plan 01-05]: Source-IP binding (request.client.host == ws.lxc_ip, ADR-0004) is defense-in-depth, NOT auth — gated off by default (bootconfig_source_ip_check) and pass-through when lxc_ip is unresolved, so it never blocks a legitimate boot and preserves the v1 LAN no-auth posture. WORK-03 endpoint contract done + CI-proven (99 pytest + ruff + format + mypy --strict + reuse + lock); the live burrow-boot.sh consumer pull-step is deferred to Phase 3.
+- [Plan 02-01]: The terminal bridge is an OPAQUE, type-preserving relay — forward every frame verbatim (str→send_text, bytes→send_bytes) on BOTH legs, NEVER .encode() (SC-7). It lives OUTSIDE /api/v1 at prefix /ws (CLAUDE.md /ws/* convention). Teardown races the two pump directions under asyncio.wait(FIRST_COMPLETED), cancels + gather(return_exceptions=True)s the loser, and dials upstream with ping_interval keepalive so a dead browser leg can never leave a half-open upstream (T-02-04). Pre-accept access gate (getWorkspace + status==running + lxc_ip) closes 1008 before accept (T-02-02); an explicit Origin gate vs settings.allowed_origin handles CSWSH since Starlette WS bypasses CORS (T-02-03); the upstream URL is built ONLY from the DB row's lxc_ip via a single _ttyd_url() (SSRF, T-02-01); connect/disconnect events carry {} only (T-02-05).
+- [Plan 02-01]: The protocol-accurate stub_ttyd_ws fixture (websockets.serve, asserts the tty subprotocol + JSON init, echoes preserving frame type) is what makes the SC-7 bug un-hideable — a bare echo would pass a relay that drops the subprotocol or re-encodes a text frame. Tests redirect the production ws://{lxc_ip}:7681/ws dial at the stub by monkeypatching routers.terminal._ttyd_url (test-only seam; production construction unchanged).
+- [Plan 02-01]: GET /api/v1/nodes returns per-node {node, memoryUsedFraction, capacityThreshold, overThreshold} over the Fake's real getNodeMemory fraction — no fabricated "free GB". overThreshold is the strict CAP-01 guard (fraction > threshold; boundary == is NOT over), and capacity_threshold is read LIVE per request. Degrade-not-500 (mirrors health.py): a raising getNodeMemory yields a null fraction + overThreshold=false at HTTP 200, never a 500 oracle (T-02-06). Backend half of UI-04; the UI capacity chip lands in 02-05. Full gate green: 127 pytest + ruff + format + mypy --strict + reuse.
 
 ### Pending Todos
 
@@ -146,7 +150,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T16:35:08.000Z
-Stopped at: Completed 01-05-PLAN.md (pull-at-boot bootconfig endpoint: GET /api/v1/internal/bootconfig/{vmid} — non-secret payload + short-lived repo-scoped credential via a pluggable mint_repo_credential seam, vmid-in-pool gate, enumeration-resistant 404, source-IP defense-in-depth, sentinel-proven no-credential-in-logs/events. WORK-03 endpoint contract done + CI-proven; live burrow-boot.sh consumer pull-step deferred to Phase 3). All 5 Phase-1 plans complete.
+Last session: 2026-06-10T18:20:00.000Z
+Stopped at: Completed 02-01-PLAN.md (Phase-2 backend: tty-subprotocol WS terminal bridge /ws/workspaces/{id}/terminal — opaque type-preserving relay, FIRST_COMPLETED teardown, pre-accept access gate (1008), Origin/CSWSH gate, SSRF-safe upstream dial, LXC_NOT_READY error frame, {}-only connect/disconnect logging (TERM-01..04); plus GET /api/v1/nodes degrade-not-500 per-node capacity endpoint (UI-04 backend) and websockets==16.0 pin. Proven over a protocol-accurate stub ttyd that makes the SC-7 .encode() bug fail CI. Full gate green: 127 pytest + ruff + format + mypy --strict + reuse). Commits: dbb3bfe, 7297e98, a53d640, 7a9e644.
 Resume file: None
-Next plan: None in Phase 1 (5/5 complete) — Phase 1 is ready for phase verification. Open item: A3 operator-confirm of the real git-credential-minting mechanism (deploy token / GitHub App installation token / ephemeral PAT) before Phase 3 wires burrow-boot.sh. Next milestone work is Phase 2 (Terminal Proxy + React UI).
+Next plan: 02-02-PLAN.md — UI foundation (pinned stack, Vite/Tailwind v4/vitest/Playwright, typed envelope client + types + ttyd frame lib + four-theme tokens + self-host fonts + MSW). Note: the UI half of UI-04 (capacity chip) lands in 02-05; this plan delivered only the backend half. Open item (carried): A3 operator-confirm of the real git-credential-minting mechanism before Phase 3.
