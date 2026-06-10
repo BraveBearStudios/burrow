@@ -37,11 +37,11 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 
 ### Platform & API (PLAT)
 
-- [ ] **PLAT-01**: All API routes are served under `/api/v1` (resolves spec §5.2 un-versioned examples)
+- [x] **PLAT-01**: All API routes are served under `/api/v1` (resolves spec §5.2 un-versioned examples)
 - [x] **PLAT-02**: Every API response uses the standard envelope (`data`/`meta`/`error`) with `requestId` + `timestamp` in `meta`
-- [ ] **PLAT-03**: `GET /api/v1/health` reports overall status plus `db` and `compute` connectivity
-- [ ] **PLAT-04**: Backend emits structured JSON logs
-- [ ] **PLAT-05**: API responses carry security headers
+- [x] **PLAT-03**: `GET /api/v1/health` reports overall status plus `db` and `compute` connectivity
+- [x] **PLAT-04**: Backend emits structured JSON logs
+- [x] **PLAT-05**: API responses carry security headers
 - [x] **PLAT-06**: Persistence goes through an abstract `DbProvider`; v1 ships the SQLite (`aiosqlite`) impl with no SQLite specifics leaking past the interface
 - [x] **PLAT-07**: Compute goes through an abstract `ComputeProvider` in a first-class `api/compute/` package; v1 ships the Proxmox impl with no Proxmox specifics leaking past the interface (SC-13)
 - [x] **PLAT-08**: A `FakeComputeProvider` lets the integration + e2e tiers run hermetically with no real Proxmox
@@ -52,14 +52,14 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 - [x] **WS-01**: Operator can create a workspace from name, git repo, branch (default `main`), plugin set, and node
 - [x] **WS-02**: Create runs the full saga — persist `creating` row + reserved VMID *before* clone (SC-2) → clone golden template → inject boot config → start → await IP → await ttyd health → mark `running` — awaiting each Proxmox UPID task to completion (SC-1)
 - [x] **WS-03**: Create compensates on any failure (tear down partial clone, free the VMID, mark `error`), leaving no orphaned LXC (SC-9)
-- [ ] **WS-04**: Operator can list workspaces, filterable by `status`
-- [ ] **WS-05**: Operator can fetch a single workspace by id
+- [x] **WS-04**: Operator can list workspaces, filterable by `status`
+- [x] **WS-05**: Operator can fetch a single workspace by id
 - [x] **WS-06**: Operator can stop a running workspace (LXC stopped, disk state preserved)
 - [x] **WS-07**: Operator can start a stopped workspace (awaits ttyd health)
 - [x] **WS-08**: Operator can destroy a workspace (stop + destroy LXC, soft-delete the row)
 - [x] **WS-09**: Workspace status follows the enforced state machine (creating→running|error; running→stopped|destroyed; stopped→running|destroyed)
 - [x] **WS-10**: VMID allocation is race-safe across uvicorn workers via a DB unique reservation using a partial unique index that excludes soft-deleted rows (SC-3)
-- [ ] **WS-11**: Operator can read a workspace's event log (created/started/stopped/destroyed/terminal.connected/terminal.disconnected/boot.error) — DB read path (`getEvents`) landed in 01-01; `GET .../{id}/events` endpoint in 01-04
+- [x] **WS-11**: Operator can read a workspace's event log (created/started/stopped/destroyed/terminal.connected/terminal.disconnected/boot.error) — DB read path (`getEvents`) landed in 01-01; `GET .../{id}/events` endpoint in 01-04
 
 ### Terminal Proxy (TERM)
 
@@ -156,11 +156,11 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | SETUP-03 | Phase 0 | Complete |
 | SETUP-04 | Phase 0 | Complete |
 | SETUP-05 | Phase 0 | Complete |
-| PLAT-01 | Phase 1 | Pending |
+| PLAT-01 | Phase 1 | Complete |
 | PLAT-02 | Phase 0 | Done (00-01) |
-| PLAT-03 | Phase 1 | Pending |
-| PLAT-04 | Phase 1 | Pending |
-| PLAT-05 | Phase 1 | Pending |
+| PLAT-03 | Phase 1 | Complete |
+| PLAT-04 | Phase 1 | Complete |
+| PLAT-05 | Phase 1 | Complete |
 | PLAT-06 | Phase 0 | Complete |
 | PLAT-07 | Phase 0 | Complete |
 | PLAT-08 | Phase 0 | Complete |
@@ -168,8 +168,8 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | WS-01 | Phase 1 | Complete |
 | WS-02 | Phase 1 | Complete |
 | WS-03 | Phase 1 | Complete |
-| WS-04 | Phase 1 | Pending |
-| WS-05 | Phase 1 | Pending |
+| WS-04 | Phase 1 | Complete |
+| WS-05 | Phase 1 | Complete |
 | WS-06 | Phase 1 | Complete |
 | WS-07 | Phase 1 | Complete |
 | WS-08 | Phase 1 | Complete |

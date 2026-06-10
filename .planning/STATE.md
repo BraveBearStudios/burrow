@@ -4,14 +4,14 @@ milestone: v1.0
 milestone_name: milestone
 status: executing
 stopped_at: "Completed 01-03-PLAN.md (WorkspaceService: SC-corrected 8-step create saga with per-step compensation, server-enforced state machine, per-workspace in-flight lock, race-safe VMID reservation, capacity guard — over the two provider ABCs only; WS-01/02/03/06/07/08/09 + CAP-01/04 unit-proven over the Fake)"
-last_updated: "2026-06-10T16:03:05.347Z"
+last_updated: "2026-06-10T16:24:20.667Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 12
-  completed_plans: 10
-  percent: 83
+  completed_plans: 11
+  percent: 20
 ---
 
 <!--
@@ -31,9 +31,9 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 1 of 4 (Control Plane API)
-Plan: 3 of 5 complete in current phase
-Status: Executing Phase 1
-Last activity: 2026-06-10 — Plan 01-03 complete: the `WorkspaceService` orchestration core. `createWorkspace` runs the SC-corrected 8-step saga over the provider ABCs only — capacity guard (refuse node mem > 0.80, CAP-01/04), reserve a VMID by the DB partial-unique INSERT and persist the `creating` row BEFORE the clone (SC-2), then clone (`--full`, UPID-blocked), `injectBootConfig` (DB write, pull-at-boot), start (UPID-blocked), resolve the static IP from the VMID, await ttyd health, mark `running` (SC-1, WS-01/02). Any post-reservation failure runs idempotent reverse compensation (stop+destroy frees the VMID, no orphan), logs a redacted `boot.error` (`_safe` scrubs git/CI tokens + URL userinfo, T-01-09), and lands the row in `error` — never stuck `creating` (SC-11, WS-03); proven by `FakeFailures` at clone/start/getIp/ttyd. `lib/statemachine.py` (TRANSITIONS + `assert_transition`, SC-12) rejects illegal transitions (stop-on-creating, start-on-destroyed, double-destroy, running->start) with a typed `IllegalTransitionError`; `error` exits only via destroy (A4). `stop/start/destroy` each load-or-raise `WorkspaceNotFoundError`, acquire a per-workspace `asyncio.Lock`, `assert_transition` BEFORE mutating, UPID-block the provider, set the timestamp, and log the lifecycle event (WS-06/07/08); destroy stops-if-running then idempotently destroys then soft-deletes. VMID reservation unions `compute.usedVmids()` with DB-used vmids, scans `getNextVmid`, INSERTs, and retries on `VmidTakenError` (exhaustion -> `NoFreeVmidError`). The service imports neither `aiosqlite` nor `proxmoxer` (seam guard green). Full gate green: 81 pytest passed, ruff + ruff format + mypy --strict (37 files) + uv lock --check + reuse lint (135/135).
+Plan: 4 of 5 complete in current phase
+Status: Ready to execute
+Last activity: 2026-06-10
 
 Progress: [██████░░░░] 60% (Phase 1: 3/5 plans)
 
@@ -71,6 +71,7 @@ Progress: [██████░░░░] 60% (Phase 1: 3/5 plans)
 | Phase 0 P04 | 20 min | 3 tasks | 22 files |
 | Phase 0 P03 | 18 min | 3 tasks | 9 files |
 | Phase 01 P02 | 21min | 3 tasks | 4 files |
+| Phase 1 P04 | 12 | 3 tasks | 14 files |
 
 ## Accumulated Context
 
@@ -116,6 +117,7 @@ Recent decisions affecting current work:
 - [Plan 01-03]: lib/errors.py service-tier errors each carry a stable .code class attribute (illegal_transition / capacity_exceeded / no_free_vmid / boot_failed / not_found) so the Plan-04 router maps error.code without an isinstance ladder. NoFreeVmidError is a distinct service error (not the compute one) so it carries the policy code.
 - [Plan 01-03]: In-flight serialization = a per-workspace asyncio.Lock (lazily created, keyed by id) with the transition read done INSIDE the lock; the DB partial-unique index covers create-create and the in-lock status read-then-act covers stop/destroy double-fire. A cross-process status-CAS UPDATE is deferred to the DB/router layer if --workers >1 is confirmed at deploy (A2).
 - [Plan 01-03]: Capacity guard refuses strictly ABOVE the threshold (node mem > 0.80); a node at exactly 0.80 is allowed (boundary-tested). _safe() redacts git/CI tokens, URL userinfo, and long opaque tokens from event/log text and caps length, preserving the exception type for triage (ASVS V7, T-01-09).
+- [Phase ?]: Plan 01-04: /api/v1 thin routers (workspaces CRUD + stop/start/destroy/events, templates, degrade-not-500 health) wired via get_service DI; ServiceError/.code + ComputeError mapped to envelope statuses (409/404/502). JSON logging (stdlib JsonFormatter, extra-key whitelist, no secrets), SecurityHeadersMiddleware (4 headers, no HSTS), non-* CORS from Settings (outermost). get_compute is a process-wide singleton so the Fake state survives across requests (Rule 1); DbProvider.listTemplates added (Rule 2). Integration tier (ASGITransport + real temp SQLite + Fake + respx stub-ttyd) proves CRUD/health/security. Full gate green: 94 pytest + ruff + format + mypy --strict + uv lock --check + reuse.
 
 ### Pending Todos
 
@@ -140,7 +142,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T16:03:05.347Z
+Last session: 2026-06-10T16:23:51.865Z
 Stopped at: Completed 01-03-PLAN.md (WorkspaceService: SC-corrected 8-step create saga with per-step compensation, server-enforced state machine, per-workspace in-flight lock, race-safe VMID reservation, capacity guard — over the two provider ABCs only; WS-01/02/03/06/07/08/09 + CAP-01/04 unit-proven over the Fake)
 Resume file: None
 Next plan: 01-04-PLAN.md (routers — wire /api/v1/workspaces CRUD + stop/start/destroy/events to WorkspaceService, map error.code onto the envelope, /health degrade-not-500, security headers + non-* CORS, structured JSON logging; integration tier over real SQLite + responses-mocked Proxmox + stub ttyd). 01-05 (bootconfig) looks up workspaces via getByVmid and mints the short-lived repo-scoped credential (A3).
