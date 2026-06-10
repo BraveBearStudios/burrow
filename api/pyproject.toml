@@ -14,6 +14,11 @@ dependencies = [
     "aiosqlite==0.22.1",
     "proxmoxer==2.3.0",
     "httpx==0.28.1",
+    # Upstream WebSocket *client* to the worker's ttyd (FastAPI/Starlette ship a WS
+    # server, not a client). The terminal bridge imports it directly
+    # (`from websockets.asyncio.client import connect`), so it is a direct dep —
+    # not relied on transitively via uvicorn[standard]. Pinned to the STACK.md 16.0.
+    "websockets==16.0",
 ]
 
 [dependency-groups]
