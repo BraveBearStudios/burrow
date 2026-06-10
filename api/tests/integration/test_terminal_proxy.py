@@ -23,7 +23,6 @@ Proven here:
 """
 
 import asyncio
-import contextlib
 import json
 import socket
 from collections.abc import AsyncIterator
@@ -31,18 +30,23 @@ from typing import Any
 
 import pytest
 import uvicorn
-import websockets
 from websockets.asyncio.client import connect
-from websockets.exceptions import ConnectionClosed
+from websockets.exceptions import InvalidStatus
 
 from config import settings
 
 from .conftest import StubTtyd
 
+# A pre-accept ``websocket.close(code=1008)`` is surfaced by Starlette as an HTTP 403
+# on the upgrade (the handshake never completes), so the upstream ``websockets``
+# client raises ``InvalidStatus`` rather than ``ConnectionClosed`` — this is the
+# correct wire shape for a *rejected* upgrade (TERM-04 / access control).
+_PRE_ACCEPT_REJECT_STATUS = 403
+
 # A workspace whose terminal the bridge will proxy. The Fake/DB is bypassed for the
 # bridge unit-of-test: we monkeypatch ``db.getWorkspace`` to return this row so the
 # test stays focused on the relay rather than re-running the create saga.
-_RUNNING_WS = {
+_RUNNING_WS: dict[str, Any] = {
     "id": "ws-running",
     "name": "alpha",
     "status": "running",
@@ -124,9 +128,7 @@ async def bridge(
     monkeypatch.setattr(SqliteProvider, "logEvent", fake_log_event)
     handle.workspaces = workspaces  # type: ignore[attr-defined]
 
-    config = uvicorn.Config(
-        create_app(), host=host, port=port, log_level="warning", lifespan="off"
-    )
+    config = uvicorn.Config(create_app(), host=host, port=port, log_level="warning", lifespan="off")
     server = uvicorn.Server(config)
     serve_task = asyncio.create_task(server.serve())
     try:
@@ -175,7 +177,9 @@ async def test_error_frame_when_ttyd_unreachable(
     monkeypatch.setattr(terminal_module, "_ttyd_url", lambda lxc_ip: dead)
 
     async with await _open_browser_leg(bridge.ws_url("ws-running")) as conn:
-        raw = await asyncio.wait_for(conn.recv(), timeout=2)
+        # A refused upstream connect can take ~2s on Windows (TCP retry) before the
+        # bridge emits the typed error frame; allow generous headroom.
+        raw = await asyncio.wait_for(conn.recv(), timeout=10)
         payload = json.loads(raw.decode() if isinstance(raw, bytes) else raw)
         assert payload == {"type": "error", "code": "LXC_NOT_READY"}
 
@@ -206,22 +210,18 @@ async def test_rejects_non_running(bridge: _Bridge, workspace_id: str) -> None:
             "lxc_ip": None,
             "vmid": 202,
         }
-    with pytest.raises(ConnectionClosed) as excinfo:
-        async with await _open_browser_leg(bridge.ws_url(workspace_id)) as conn:
-            await conn.recv()
-    assert excinfo.value.rcvd is not None
-    assert excinfo.value.rcvd.code == 1008
+    with pytest.raises(InvalidStatus) as excinfo:
+        await _open_browser_leg(bridge.ws_url(workspace_id))
+    assert excinfo.value.response.status_code == _PRE_ACCEPT_REJECT_STATUS
 
 
 async def test_rejects_bad_origin(bridge: _Bridge) -> None:
-    """A mismatched Origin header closes with 1008 before accept (CSWSH defense)."""
-    with pytest.raises(ConnectionClosed) as excinfo:
-        async with connect(
+    """A mismatched Origin header is rejected before accept (CSWSH defense)."""
+    with pytest.raises(InvalidStatus) as excinfo:
+        await connect(
             bridge.ws_url("ws-running"), additional_headers={"Origin": "http://evil.example"}
-        ) as conn:
-            await conn.recv()
-    assert excinfo.value.rcvd is not None
-    assert excinfo.value.rcvd.code == 1008
+        )
+    assert excinfo.value.response.status_code == _PRE_ACCEPT_REJECT_STATUS
 
 
 async def test_allows_configured_origin(bridge: _Bridge) -> None:

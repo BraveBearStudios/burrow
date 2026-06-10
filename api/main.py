@@ -183,12 +183,15 @@ def create_app() -> FastAPI:
     # Deferred import: routers import the DI seams (get_service/get_compute/get_db)
     # from this module, so they are imported here — after those names are defined —
     # to avoid a circular import at module load.
-    from routers import health, internal, templates, workspaces
+    from routers import health, internal, templates, terminal, workspaces
 
     app.include_router(workspaces.router)
     app.include_router(templates.router)
     app.include_router(health.router)
     app.include_router(internal.router)
+    # The terminal bridge lives OUTSIDE /api/v1 by design (CLAUDE.md /ws/* WS
+    # convention); its prefix is /ws.
+    app.include_router(terminal.router)
     return app
 
 
