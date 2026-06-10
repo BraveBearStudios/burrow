@@ -8,7 +8,14 @@ hides the row, ``logEvent`` appends, and ``healthcheck`` is True. No aiosqlite
 type or raw row crosses the seam — every method returns a Pydantic model.
 """
 
+import json
+
+import aiosqlite
+import pytest
+
 from db.sqliteProvider import SqliteProvider
+from models.event import WorkspaceEvent
+from models.template import Template
 from models.workspace import Workspace
 
 
@@ -74,6 +81,40 @@ async def test_log_event_appends(sqlite_db: SqliteProvider) -> None:
     await sqlite_db.logEvent(ws.id, "workspace.created", {"by": "test"})
     await sqlite_db.logEvent(ws.id, "workspace.started", {})
     assert await sqlite_db.getWorkspace(ws.id) == ws
+
+
+async def test_log_event_unknown_workspace_raises(sqlite_db: SqliteProvider) -> None:
+    """WR-02 regression: with PRAGMA foreign_keys=ON, an event referencing a
+    missing workspace must be rejected, not silently orphaned."""
+    with pytest.raises(aiosqlite.IntegrityError):
+        await sqlite_db.logEvent("no-such-workspace", "workspace.created", {"x": 1})
+
+
+def test_event_data_json_round_trips_from_text() -> None:
+    """WR-04 regression: a row read hands ``data`` the column's TEXT JSON (a str);
+    the model must decode it to the declared dict, not raise ValidationError."""
+    row = {
+        "id": "e1",
+        "workspaceId": "w1",
+        "type": "workspace.created",
+        "data": json.dumps({"by": "test", "n": 2}),
+        "createdAt": "2026-06-10T00:00:00.000Z",
+    }
+    event = WorkspaceEvent.model_validate(row)
+    assert event.data == {"by": "test", "n": 2}
+
+
+def test_template_plugin_manifest_json_round_trips_from_text() -> None:
+    """WR-04 regression: ``pluginManifest`` comes back as TEXT JSON; decode to dict."""
+    row = {
+        "id": "t1",
+        "name": "default",
+        "proxmoxTid": 9000,
+        "pluginManifest": json.dumps({"plugins": ["a", "b"]}),
+        "createdAt": "2026-06-10T00:00:00.000Z",
+    }
+    template = Template.model_validate(row)
+    assert template.plugin_manifest == {"plugins": ["a", "b"]}
 
 
 async def test_healthcheck_true(sqlite_db: SqliteProvider) -> None:
