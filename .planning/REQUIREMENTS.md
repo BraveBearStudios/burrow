@@ -24,11 +24,11 @@ Requirements for the initial self-host release. Each maps to a roadmap phase (Tr
 
 One-time, operator-run bootstrap of the Proxmox host — the prerequisite for every real-infra path. See `.planning/research/PROXMOX-PRIMING.md`.
 
-- [ ] **SETUP-01**: A re-runnable `cc-worker-config/lxc/host-prime/` kit primes a bare Proxmox host (least-privilege `burrow@pve` user + `BurrowProvisioner` role + privsep token, scoped ACLs, CT template download, golden-template creation, control-plane provisioning), each step check→act idempotent with reversal notes
-- [ ] **SETUP-02**: The Proxmox role is the verified minimal privilege set (`VM.Audit VM.Clone VM.Allocate VM.Config.Network VM.Config.Options VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit Sys.Audit`, + conditional `SDN.Use`), scoped to `/pool/burrow-workers` + `/storage/<rootfs>` + `/nodes/<node>` (resolves Pitfall 14)
-- [ ] **SETUP-03**: The API token is `privsep=1` and the role is granted to **both** the user and the token at every scoped path (effective = user∩token); the token value is captured once into the gitignored `.env`, never committed, echoed, logged, or passed as a CLI arg
-- [ ] **SETUP-04**: A `PRIMING.md` Day-0 runbook orders the steps (identity → network decision → golden template → control plane → first-workspace smoke) with a per-step gate, ending in the five-step create→live→stop→start→destroy acceptance gate
-- [ ] **SETUP-05**: The static-IP-from-VMID scheme + off-host DHCP-range exclusion is recorded in `30-network-notes.md` (placeholders only) as the single source of truth for `pct set net0` and the control plane's IP computation
+- [x] **SETUP-01**: A re-runnable `cc-worker-config/lxc/host-prime/` kit primes a bare Proxmox host (least-privilege `burrow@pve` user + `BurrowProvisioner` role + privsep token, scoped ACLs, CT template download, golden-template creation, control-plane provisioning), each step check→act idempotent with reversal notes
+- [x] **SETUP-02**: The Proxmox role is the verified minimal privilege set (`VM.Audit VM.Clone VM.Allocate VM.Config.Network VM.Config.Options VM.PowerMgmt Datastore.AllocateSpace Datastore.Audit Sys.Audit`, + conditional `SDN.Use`), scoped to `/pool/burrow-workers` + `/storage/<rootfs>` + `/nodes/<node>` (resolves Pitfall 14)
+- [x] **SETUP-03**: The API token is `privsep=1` and the role is granted to **both** the user and the token at every scoped path (effective = user∩token); the token value is captured once into the gitignored `.env`, never committed, echoed, logged, or passed as a CLI arg
+- [x] **SETUP-04**: A `PRIMING.md` Day-0 runbook orders the steps (identity → network decision → golden template → control plane → first-workspace smoke) with a per-step gate, ending in the five-step create→live→stop→start→destroy acceptance gate
+- [x] **SETUP-05**: The static-IP-from-VMID scheme + off-host DHCP-range exclusion is recorded in `30-network-notes.md` (placeholders only) as the single source of truth for `pct set net0` and the control plane's IP computation
 
 ### Platform & API (PLAT)
 
@@ -146,11 +146,11 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| SETUP-01 | Phase 0 | Pending |
-| SETUP-02 | Phase 0 | Pending |
-| SETUP-03 | Phase 0 | Pending |
-| SETUP-04 | Phase 0 | Pending |
-| SETUP-05 | Phase 0 | Pending |
+| SETUP-01 | Phase 0 | Complete |
+| SETUP-02 | Phase 0 | Complete |
+| SETUP-03 | Phase 0 | Complete |
+| SETUP-04 | Phase 0 | Complete |
+| SETUP-05 | Phase 0 | Complete |
 | PLAT-01 | Phase 1 | Pending |
 | PLAT-02 | Phase 0 | Done (00-01) |
 | PLAT-03 | Phase 1 | Pending |
@@ -201,6 +201,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | CICD-06 | Phase 0 | Pending |
 
 **Coverage:**
+
 - v1 requirements: 53 total
 - Mapped to phases: 53
 - Unmapped: 0
