@@ -1,0 +1,26 @@
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+<!doctype html>
+<html lang="en" data-theme="dark">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<!--
+		  Strict same-origin CSP (PLAT-05 / UI-SPEC Security Reconciliation): no
+		  external font or icon CDN is permitted. Fonts are self-hosted under /fonts;
+		  icons are inline SVG. 'unsafe-inline' on style-src is required for Tailwind
+		  v4's injected styles; ws: covers the same-origin terminal WS.
+		-->
+		<meta
+			http-equiv="Content-Security-Policy"
+			content="default-src 'self'; img-src 'self' data:; font-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self' ws: wss:; base-uri 'self'; frame-ancestors 'none'"
+		/>
+		<title>Burrow</title>
+	</head>
+	<body>
+		<div id="root" aria-label="Burrow workspace manager"></div>
+		<script type="module" src="/src/main.tsx"></script>
+	</body>
+</html>

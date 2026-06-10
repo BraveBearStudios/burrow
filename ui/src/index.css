@@ -1,0 +1,8 @@
+/*
+ * SPDX-FileCopyrightText: 2026 Brave Bear Studios
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ */
+
+/* Tailwind v4, CSS-first (ADR-0008): no tailwind.config.ts. The four-theme
+ * @theme token sheet + self-hosted @font-face declarations are added in Task 3. */
+@import "tailwindcss";
