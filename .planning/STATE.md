@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 02-04-PLAN.md (tiling: layoutStore — mosaic tree + persist + reconcile — and WorkspaceLayout binding react-mosaic 6.2.0 with restore-after-refresh; App swapped to the tiling grid; UI-02 + UI-05 done). Commits 56052cb, d433202."
-last_updated: "2026-06-10T19:57:16.835Z"
+stopped_at: "Completed 02-03-PLAN.md (MVP terminal vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App; render/echo/fit/reconnect/dispose proven over a mocked WebSocket; TERM-05/06/07 done, UI-01 poll foundation). Commits 35948b4, ea58fc4, fd59d68."
+last_updated: "2026-06-10T20:52:30.529Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 18
-  completed_plans: 16
-  percent: 89
+  completed_plans: 17
+  percent: 40
 ---
 
 <!--
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 2 of 4 (Terminal Proxy + React UI)
-Plan: 4 of 6 complete in current phase
+Plan: 5 of 6 complete in current phase
 Status: Ready to execute
 Last activity: 2026-06-10
 
@@ -77,6 +77,7 @@ Progress: [██████░░░░] 67% (Phase 2: 4/6 plans)
 | Phase 2 P02 | 24 min | 3 tasks | 22 files |
 | Phase 02 P03 | 16min | 3 tasks | 10 files |
 | Phase 2 P04 | 23 | 2 tasks | 11 files |
+| Phase 2 P05 | 51min | 3 tasks | 12 files |
 
 ## Accumulated Context
 
@@ -135,6 +136,7 @@ Recent decisions affecting current work:
 - [Phase 02]: [Plan 02-03] App kept at ui/src/App.tsx (not the plan's components/App.tsx) so main.tsx's ./App import keeps resolving (Rule-3 blocking). useTerminal exposes an additive reattach() to back the overlay Reattach/Retry buttons. Terminal->list reconciliation is wired via an onTerminalEvent callback the panel hands to queryClient.invalidateQueries(['workspaces']) rather than calling useQueryClient inside useTerminal, keeping the hook provider-free and unit-testable (Pitfall 4). xterm/FitAddon/ResizeObserver are mocked in vitest (jsdom can't lay out xterm) so render/echo/fit/reconnect/dispose are CI-provable with zero real infra; the real ttyd/live-claude echo is the deferred dev-homelab smoke. UI-01 is partial (useWorkspaces poll done; sidebar rows land in 02-05).
 - [Phase ?]: [Plan 02-04]: layoutStore is the ONLY persisted client state (zustand persist, partialized to mosaicNode + activeWorkspaceId; status stays in TanStack Query, Pitfall 11). Tree mutations are pure helpers over react-mosaic getLeaves + createBalancedTreeFromLeaves (deep util import to dodge the nested react-dom). reconcile(liveIds) drops gone leaves, rebalances, retargets active id (UI-05).
 - [Phase ?]: [Plan 02-04]: react/react-dom 19.2.7 overrides collapse react-mosaic's nested react-dom@18 (else <Mosaic> crashes on ReactCurrentDispatcher); <Mosaic> 6.2.0 bundles its own DndProvider (never double-wrap); Blueprint chrome suppressed via className=burrow-mosaic. Node 25 localStorage shadow fixed by an in-memory Storage polyfill in tests/setup.ts.
+- [Phase ?]: [Plan 02-05]: WorkspaceList sidebar + Navbar capacity chips + NewWorkspaceModal + StatusBar + useNodes + the assembled four-theme App shell complete the operator surface (UI-01/03/04). Status discipline is single-sourced in lib/status.ts; four themes in lib/themes.ts (swatch hex is theme-identity DATA, components stay hex-free). Node capacity is the REAL memoryUsedFraction % (no fabricated GB). Boot-progress is COSMETIC over the SYNCHRONOUS create (A3/Pitfall 5) with single-shot submit+mounted guards; async-202+poll deferred. App kept at ui/src/App.tsx (Rule 3). Tests assert real layoutStore state for leak-proof isolation. Gate: 77 vitest + tsc + biome(39) + build + REUSE 212/212 + no CDN/hex.
 
 ### Pending Todos
 
@@ -159,7 +161,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T19:56:49.916Z
+Last session: 2026-06-10T20:51:16.183Z
 Stopped at: Completed 02-03-PLAN.md (MVP terminal vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App; render/echo/fit/reconnect/dispose proven over a mocked WebSocket; TERM-05/06/07 done, UI-01 poll foundation). Commits 35948b4, ea58fc4, fd59d68.
 Resume file: None
 Next plan: 02-03-PLAN.md — MVP vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App (render/echo/fit/reconnect/dispose) (TERM-05/06/07, UI-01), importing client.ts/types/ttyd.ts + the token sheet + MSW harness from 02-02. Open items (carried): UI half of UI-04 (capacity chip) lands in 02-05; A3 operator-confirm of the real git-credential-minting mechanism before Phase 3; Playwright browser binaries install in CI (02-06).

@@ -120,7 +120,7 @@ Plans:
 - [x] 02-02-PLAN.md — UI foundation: pinned stack, Vite/Tailwind v4/vitest/Playwright, typed envelope client + types + ttyd frame lib + four-theme tokens + self-host fonts + MSW
 - [x] 02-03-PLAN.md — MVP vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App (render/echo/fit/reconnect/dispose) (TERM-05/06/07, UI-01)
 - [x] 02-04-PLAN.md — Tiling: layoutStore (Mosaic tree + persist + reconcile) + WorkspaceLayout + restore-after-refresh (UI-02, UI-05)
-- [ ] 02-05-PLAN.md — Surfaces: WorkspaceList sidebar + Navbar capacity chips + NewWorkspaceModal + StatusBar (UI-01, UI-03, UI-04)
+- [x] 02-05-PLAN.md — Surfaces: WorkspaceList sidebar + Navbar capacity chips + NewWorkspaceModal + StatusBar (UI-01, UI-03, UI-04)
 - [ ] 02-06-PLAN.md — Phase e2e gate: Playwright create→terminal→split→detach→reconnect→terminate + UI-05 restore integration (UI-02, UI-05)
 
 **UI hint**: yes
@@ -171,6 +171,6 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
-| 2. Terminal Proxy + React UI | 4/6 | In Progress|  |
+| 2. Terminal Proxy + React UI | 5/6 | In Progress|  |
 | 3. Reproducible Workers | 0/TBD | Not started | - |
 | 4. Hardening & Release | 0/TBD | Not started | - |

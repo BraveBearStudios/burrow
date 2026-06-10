@@ -73,10 +73,10 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 
 ### UI (UI)
 
-- [ ] **UI-01**: A sidebar lists workspaces with live, polled status indicators
+- [x] **UI-01**: A sidebar lists workspaces with live, polled status indicators
 - [x] **UI-02**: Terminals render in a tiling react-mosaic layout supporting open, split (H/V), drag, and resize
-- [ ] **UI-03**: A New Workspace modal collects name/repo/branch/node and shows live boot-progress states
-- [ ] **UI-04**: A status bar shows running/stopped counts, session uptime, and node capacity
+- [x] **UI-03**: A New Workspace modal collects name/repo/branch/node and shows live boot-progress states
+- [x] **UI-04**: A status bar shows running/stopped counts, session uptime, and node capacity
 - [x] **UI-05**: After a browser refresh, the UI reconnects the terminal of a still-running workspace (live session; prior scrollback is not restored in v1)
 - [ ] **UI-06**: A per-workspace activity drawer surfaces the event log
 
@@ -183,10 +183,10 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | TERM-05 | Phase 2 | Complete |
 | TERM-06 | Phase 2 | Complete |
 | TERM-07 | Phase 2 | Complete |
-| UI-01 | Phase 2 | Pending |
+| UI-01 | Phase 2 | Complete |
 | UI-02 | Phase 2 | Complete |
-| UI-03 | Phase 2 | Pending |
-| UI-04 | Phase 2 | In progress (02-01 backend: GET /api/v1/nodes; UI capacity chip 02-05) |
+| UI-03 | Phase 2 | Complete |
+| UI-04 | Phase 2 | Complete |
 | UI-05 | Phase 2 | Complete |
 | UI-06 | Phase 4 | Pending |
 | WORK-01 | Phase 0 | Pending |
