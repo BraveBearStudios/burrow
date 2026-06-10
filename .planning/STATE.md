@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 01-03-PLAN.md (WorkspaceService: SC-corrected 8-step create saga with per-step compensation, server-enforced state machine, per-workspace in-flight lock, race-safe VMID reservation, capacity guard — over the two provider ABCs only; WS-01/02/03/06/07/08/09 + CAP-01/04 unit-proven over the Fake)"
-last_updated: "2026-06-10T16:24:20.667Z"
+stopped_at: "Completed 01-05-PLAN.md (pull-at-boot bootconfig endpoint: GET /api/v1/internal/bootconfig/{vmid} serves the non-secret payload + a short-lived repo-scoped credential via a pluggable mint_repo_credential seam, with a vmid-in-pool gate, enumeration-resistant 404, source-IP defense-in-depth, and a sentinel-proven no-credential-in-logs/events guarantee — WORK-03 endpoint contract; live burrow-boot.sh consumer pull-step deferred to Phase 3)"
+last_updated: "2026-06-10T16:35:08.000Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 12
-  completed_plans: 11
+  completed_plans: 12
   percent: 20
 ---
 
@@ -31,26 +31,26 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 1 of 4 (Control Plane API)
-Plan: 4 of 5 complete in current phase
-Status: Ready to execute
+Plan: 5 of 5 complete in current phase
+Status: Phase 1 plans complete — ready for phase verification
 Last activity: 2026-06-10
 
-Progress: [██████░░░░] 60% (Phase 1: 3/5 plans)
+Progress: [██████████] 100% (Phase 1: 5/5 plans)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 10
+- Total plans completed: 12
 - Average duration: 16 min
-- Total execution time: 2.70 hours
+- Total execution time: 2.95 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 0 | 5 | 86 min | 17 min |
-| 1 | 3 | 54 min | 18 min |
+| 0 | 7 | 137 min | 20 min |
+| 1 | 5 | 75 min | 15 min |
 
 **Per-plan:**
 
@@ -72,6 +72,7 @@ Progress: [██████░░░░] 60% (Phase 1: 3/5 plans)
 | Phase 0 P03 | 18 min | 3 tasks | 9 files |
 | Phase 01 P02 | 21min | 3 tasks | 4 files |
 | Phase 1 P04 | 12 | 3 tasks | 14 files |
+| Phase 1 P05 | 9 min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -118,6 +119,9 @@ Recent decisions affecting current work:
 - [Plan 01-03]: In-flight serialization = a per-workspace asyncio.Lock (lazily created, keyed by id) with the transition read done INSIDE the lock; the DB partial-unique index covers create-create and the in-lock status read-then-act covers stop/destroy double-fire. A cross-process status-CAS UPDATE is deferred to the DB/router layer if --workers >1 is confirmed at deploy (A2).
 - [Plan 01-03]: Capacity guard refuses strictly ABOVE the threshold (node mem > 0.80); a node at exactly 0.80 is allowed (boundary-tested). _safe() redacts git/CI tokens, URL userinfo, and long opaque tokens from event/log text and caps length, preserving the exception type for triage (ASVS V7, T-01-09).
 - [Phase ?]: Plan 01-04: /api/v1 thin routers (workspaces CRUD + stop/start/destroy/events, templates, degrade-not-500 health) wired via get_service DI; ServiceError/.code + ComputeError mapped to envelope statuses (409/404/502). JSON logging (stdlib JsonFormatter, extra-key whitelist, no secrets), SecurityHeadersMiddleware (4 headers, no HSTS), non-* CORS from Settings (outermost). get_compute is a process-wide singleton so the Fake state survives across requests (Rule 1); DbProvider.listTemplates added (Rule 2). Integration tier (ASGITransport + real temp SQLite + Fake + respx stub-ttyd) proves CRUD/health/security. Full gate green: 94 pytest + ruff + format + mypy --strict + uv lock --check + reuse.
+- [Plan 01-05]: GET /api/v1/internal/bootconfig/{vmid} is the phase's one ASVS L1 surface (WORK-03 endpoint contract). vmid is an int path param + an [worker_pool_start, worker_pool_end] gate; out-of-pool → IllegalVmidError → 404 with a generic "Not found." message that never echoes the probe (T-01-17 enumeration resistance). The SAME IllegalVmidError is reused for a source-IP mismatch so out-of-pool / wrong-source-IP / no-workspace are indistinguishable to a prober.
+- [Plan 01-05]: Credential issuance is a pluggable seam — WorkspaceService.mint_repo_credential reads the short-lived, repo-scoped settings.git_credential_token (gitignored .env, Plan-01 key) and returns it, or a marked placeholder when unset (A3). NO long-lived PAT is hard-coded; the real issuer (GitHub App installation token / deploy token / ephemeral PAT) is operator config to confirm before Phase 3 wires burrow-boot.sh. The credential is a response-body field ONLY (gitCredential) — never a log extra; a sentinel-token caplog + event-data test proves it appears in zero logs and zero event blobs (T-01-18, block_on=high).
+- [Plan 01-05]: Source-IP binding (request.client.host == ws.lxc_ip, ADR-0004) is defense-in-depth, NOT auth — gated off by default (bootconfig_source_ip_check) and pass-through when lxc_ip is unresolved, so it never blocks a legitimate boot and preserves the v1 LAN no-auth posture. WORK-03 endpoint contract done + CI-proven (99 pytest + ruff + format + mypy --strict + reuse + lock); the live burrow-boot.sh consumer pull-step is deferred to Phase 3.
 
 ### Pending Todos
 
@@ -142,7 +146,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T16:23:51.865Z
-Stopped at: Completed 01-03-PLAN.md (WorkspaceService: SC-corrected 8-step create saga with per-step compensation, server-enforced state machine, per-workspace in-flight lock, race-safe VMID reservation, capacity guard — over the two provider ABCs only; WS-01/02/03/06/07/08/09 + CAP-01/04 unit-proven over the Fake)
+Last session: 2026-06-10T16:35:08.000Z
+Stopped at: Completed 01-05-PLAN.md (pull-at-boot bootconfig endpoint: GET /api/v1/internal/bootconfig/{vmid} — non-secret payload + short-lived repo-scoped credential via a pluggable mint_repo_credential seam, vmid-in-pool gate, enumeration-resistant 404, source-IP defense-in-depth, sentinel-proven no-credential-in-logs/events. WORK-03 endpoint contract done + CI-proven; live burrow-boot.sh consumer pull-step deferred to Phase 3). All 5 Phase-1 plans complete.
 Resume file: None
-Next plan: 01-04-PLAN.md (routers — wire /api/v1/workspaces CRUD + stop/start/destroy/events to WorkspaceService, map error.code onto the envelope, /health degrade-not-500, security headers + non-* CORS, structured JSON logging; integration tier over real SQLite + responses-mocked Proxmox + stub ttyd). 01-05 (bootconfig) looks up workspaces via getByVmid and mints the short-lived repo-scoped credential (A3).
+Next plan: None in Phase 1 (5/5 complete) — Phase 1 is ready for phase verification. Open item: A3 operator-confirm of the real git-credential-minting mechanism (deploy token / GitHub App installation token / ephemeral PAT) before Phase 3 wires burrow-boot.sh. Next milestone work is Phase 2 (Terminal Proxy + React UI).
