@@ -17,6 +17,8 @@ snake_case field names so a row maps straight onto the model.
 
 import json
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -45,10 +47,24 @@ class SqliteProvider(DbProvider):
         self._database_path: str = settings.database_path
         self._migrated = False
 
+    # ── connection ────────────────────────────────────────────────────────
+    @asynccontextmanager
+    async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
+        """Yield a connection with foreign-key enforcement turned ON.
+
+        SQLite enforces foreign keys only when ``PRAGMA foreign_keys = ON`` is
+        set *per connection* (it defaults OFF), so the ``events.workspaceId``
+        FK in ``001_init.sql`` is a no-op unless every connection issues it.
+        Routing all methods through this helper closes that gap once, here.
+        """
+        async with aiosqlite.connect(self._database_path) as conn:
+            await conn.execute("PRAGMA foreign_keys = ON")
+            yield conn
+
     # ── migration ─────────────────────────────────────────────────────────
     async def migrate(self) -> None:
         """Apply ``001_init.sql`` once (idempotent: skips if tables exist)."""
-        async with aiosqlite.connect(self._database_path) as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute(
                 "SELECT name FROM sqlite_master WHERE type='table' AND name='workspaces'"
             )
@@ -73,7 +89,7 @@ class SqliteProvider(DbProvider):
     async def createWorkspace(self, data: dict[str, Any]) -> Workspace:
         await self._ensure_migrated()
         workspace_id = data.get("id") or uuid.uuid4().hex
-        async with aiosqlite.connect(self._database_path) as conn:
+        async with self._connect() as conn:
             await conn.execute(
                 "INSERT INTO workspaces "
                 "(id, name, status, vmid, node, lxcIp, projectRepo, projectBranch, pluginSet) "
@@ -99,7 +115,7 @@ class SqliteProvider(DbProvider):
 
     async def getWorkspace(self, workspaceId: str) -> Workspace | None:
         await self._ensure_migrated()
-        async with aiosqlite.connect(self._database_path) as conn:
+        async with self._connect() as conn:
             conn.row_factory = aiosqlite.Row
             cursor = await conn.execute(
                 f"SELECT {_WORKSPACE_COLUMNS} FROM workspaces WHERE id = ? AND deletedAt IS NULL",
@@ -117,7 +133,7 @@ class SqliteProvider(DbProvider):
             query += " AND status = ?"
             params = (status,)
         query += " ORDER BY createdAt"
-        async with aiosqlite.connect(self._database_path) as conn:
+        async with self._connect() as conn:
             conn.row_factory = aiosqlite.Row
             cursor = await conn.execute(query, params)
             rows = await cursor.fetchall()
@@ -148,7 +164,7 @@ class SqliteProvider(DbProvider):
             assignments.append(f"{column} = :{field_name}")
             params[field_name] = value
         if assignments:
-            async with aiosqlite.connect(self._database_path) as conn:
+            async with self._connect() as conn:
                 await conn.execute(
                     f"UPDATE workspaces SET {', '.join(assignments)} WHERE id = :id",
                     params,
@@ -161,7 +177,7 @@ class SqliteProvider(DbProvider):
 
     async def softDeleteWorkspace(self, workspaceId: str) -> None:
         await self._ensure_migrated()
-        async with aiosqlite.connect(self._database_path) as conn:
+        async with self._connect() as conn:
             await conn.execute(
                 "UPDATE workspaces "
                 "SET deletedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
@@ -172,7 +188,7 @@ class SqliteProvider(DbProvider):
 
     async def logEvent(self, workspaceId: str, eventType: str, data: dict[str, Any]) -> None:
         await self._ensure_migrated()
-        async with aiosqlite.connect(self._database_path) as conn:
+        async with self._connect() as conn:
             await conn.execute(
                 "INSERT INTO events (id, workspaceId, type, data) VALUES (?, ?, ?, ?)",
                 (uuid.uuid4().hex, workspaceId, eventType, json.dumps(data)),
@@ -180,7 +196,7 @@ class SqliteProvider(DbProvider):
             await conn.commit()
 
     async def healthcheck(self) -> bool:
-        async with aiosqlite.connect(self._database_path) as conn:
+        async with self._connect() as conn:
             cursor = await conn.execute("SELECT 1")
             row = await cursor.fetchone()
             await cursor.close()
