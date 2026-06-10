@@ -31,7 +31,7 @@ export class MockWebSocket {
 	binaryType: "arraybuffer" | "blob" = "blob";
 	readyState = 0;
 
-	/** Frames passed to send(), newest last (Uint8Array / string as the hook sent). */
+	/** Frames passed to send(), newest last, normalized to Uint8Array / string. */
 	readonly sent: Array<Uint8Array | string> = [];
 	/** Set true when the hook calls close(). */
 	closed = false;
@@ -47,8 +47,16 @@ export class MockWebSocket {
 		MockWebSocket.instances.push(this);
 	}
 
-	send(frame: Uint8Array | string): void {
-		this.sent.push(frame);
+	send(frame: Uint8Array | ArrayBuffer | string): void {
+		// The hook sends ttyd frames as ArrayBuffer; normalize to Uint8Array so
+		// callers can assert on bytes uniformly (a string passes through).
+		if (typeof frame === "string") {
+			this.sent.push(frame);
+		} else if (frame instanceof ArrayBuffer) {
+			this.sent.push(new Uint8Array(frame));
+		} else {
+			this.sent.push(frame);
+		}
 	}
 
 	close(code?: number): void {
@@ -109,8 +117,13 @@ export class MockWebSocket {
 /** Install MockWebSocket as the global WebSocket and reset its instance list. */
 export function installMockWebSocket(): typeof MockWebSocket {
 	MockWebSocket.instances = [];
-	// biome-ignore lint/suspicious/noExplicitAny: test-only global swap
-	(globalThis as any).WebSocket = MockWebSocket;
+	// jsdom defines WebSocket as a read-only accessor, so a plain assignment
+	// throws; redefine the property descriptor instead.
+	Object.defineProperty(globalThis, "WebSocket", {
+		configurable: true,
+		writable: true,
+		value: MockWebSocket,
+	});
 	return MockWebSocket;
 }
 

@@ -49,8 +49,11 @@ export class MockResizeObserver {
 export function installMockResizeObserver(): typeof MockResizeObserver {
 	MockResizeObserver.live = new Set();
 	MockResizeObserver.instances = [];
-	// biome-ignore lint/suspicious/noExplicitAny: test-only global swap
-	(globalThis as any).ResizeObserver = MockResizeObserver;
+	Object.defineProperty(globalThis, "ResizeObserver", {
+		configurable: true,
+		writable: true,
+		value: MockResizeObserver,
+	});
 	return MockResizeObserver;
 }
 

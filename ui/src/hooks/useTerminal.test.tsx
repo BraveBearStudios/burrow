@@ -50,7 +50,12 @@ describe("useTerminal — happy path (TERM-05)", () => {
 		const first = socket.sent[0];
 		const text =
 			typeof first === "string" ? first : new TextDecoder().decode(first);
-		expect(JSON.parse(text)).toMatchObject({ AuthToken: "", columns: 80 });
+		// Init reflects the fitted grid (the hook fits before connecting), so
+		// assert the shape — AuthToken "" + numeric columns/rows — not stuck 80x24.
+		const init = JSON.parse(text);
+		expect(init).toMatchObject({ AuthToken: "" });
+		expect(typeof init.columns).toBe("number");
+		expect(typeof init.rows).toBe("number");
 	});
 
 	it("writes stripped OUTPUT text to the terminal", () => {
