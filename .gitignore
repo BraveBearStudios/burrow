@@ -1,0 +1,42 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# ── Secrets / local config ────────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Design handoff bundle (contains internal references; keep out of the
+#    public repo). The scrubbed prompt + mockup live in docs/design/. ────
+design/Burrow-handoff.zip
+design/*.zip
+
+# ── Python ────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.egg-info/
+
+# ── Node / frontend ───────────────────────────────────────────────────
+node_modules/
+dist/
+.vite/
+*.local
+
+# ── Databases / runtime state ─────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+/data/
+
+# ── Editor / OS ───────────────────────────────────────────────────────
+.DS_Store
+.idea/
+.vscode/
+*.swp

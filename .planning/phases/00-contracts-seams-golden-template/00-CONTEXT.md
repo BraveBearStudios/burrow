@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Phase 0: Contracts, Seams & Golden Template - Context
 
 **Gathered:** 2026-06-09

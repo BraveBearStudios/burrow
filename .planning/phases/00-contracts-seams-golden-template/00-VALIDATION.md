@@ -7,6 +7,11 @@ wave_0_complete: false
 created: 2026-06-09
 ---
 
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Phase 0 — Validation Strategy
 
 > Per-phase validation contract for feedback sampling during execution. Splits cleanly into **CI-provable** (contracts, envelope, Fake provider, static gates, models) and **NOT CI-provable** (real Proxmox/ttyd → dev-homelab smoke, deferred).

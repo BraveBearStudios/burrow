@@ -1,0 +1,38 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# REUSE 3.x license declaration for files that CANNOT carry an inline SPDX
+# comment header (lockfiles, comment-less JSON config, generated/binary design
+# assets). Every source file that CAN hold a comment keeps its own two-line
+# inline header in the correct syntax — those are deliberately NOT listed here.
+# (CICD-06: a missing inline header on a real source must surface, not be
+#  papered over by a blanket glob.)
+
+version = 1
+
+# ── Lockfiles ──────────────────────────────────────────────────────────
+[[annotations]]
+path = ["api/uv.lock", "ui/package-lock.json"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Brave Bear Studios"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+# ── Comment-less JSON config (JSON has no comment syntax) ───────────────
+[[annotations]]
+path = [
+  ".planning/config.json",
+  "ui/package.json",
+  "ui/tsconfig.json",
+  "ui/biome.json",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Brave Bear Studios"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+# ── Design handoff bundle (generated/binary assets from the design tool:
+#    screenshots, bundled JS/CSS/HTML, manifests, the zip) ───────────────
+[[annotations]]
+path = ["design/Burrow-handoff.zip", "design/Burrow-handoff/**"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Brave Bear Studios"
+SPDX-License-Identifier = "AGPL-3.0-or-later"

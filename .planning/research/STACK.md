@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Stack Research
 
 **Domain:** Self-hosted browser control-plane for ephemeral Claude Code worker LXCs (FastAPI control plane + Vite/React tiling terminal UI + Proxmox compute)
