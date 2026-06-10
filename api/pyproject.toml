@@ -33,6 +33,14 @@ line-length = 100
 python_version = "3.12"
 strict = true
 
+# proxmoxer ships no type stubs / py.typed marker. Confine the missing-imports
+# allowance to that one third-party module so strict mode stays in force on all
+# first-party code (the proxmoxer symbol is itself confined to proxmoxProvider.py
+# by the seam-leakage discipline).
+[[tool.mypy.overrides]]
+module = "proxmoxer.*"
+ignore_missing_imports = true
+
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
