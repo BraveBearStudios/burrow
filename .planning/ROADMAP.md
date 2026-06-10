@@ -53,7 +53,14 @@ Decimal phases appear between their surrounding integers in numeric order.
   4. CI static gates run green: ruff + biome (lint/format), mypy strict + `tsc --noEmit`, SPDX two-line header check, Conventional Commit validation, and lockfile freshness — and every source file carries the SPDX header.
   5. `provision-template.sh` + `burrow-boot.sh` exist in `cc-worker-config` with a persistent ttyd (no `--once`) bound to the worker LAN interface; the template provisions Ubuntu 24.04 + Node 22 + `@anthropic-ai/claude-code` + ttyd reproducibly.
   6. A re-runnable `cc-worker-config/lxc/host-prime/` kit + `PRIMING.md` runbook prime a bare Proxmox host (least-privilege `burrow@pve` user + `BurrowProvisioner` role + privsep token scoped to the worker pool/storage/node, CT template downloaded and `pct template`-converted, control-plane box provisioned) such that the operator can reach `GET /api/v1/health` → `compute: ok` and clone the template by hand with `--full`.
-**Plans**: TBD
+**Plans**: 7 plans
+- [ ] 00-01-PLAN.md — Backend foundation: uv project, pydantic-settings config, response envelope (PLAT-02), camelCase models + compute DTOs (PLAT-09)
+- [ ] 00-02-PLAN.md — Provider seams: ComputeProvider ABC + FakeComputeProvider + Proxmox skeleton (PLAT-07/08), DbProvider ABC + SqliteProvider + 001_init.sql + Postgres stub (PLAT-06)
+- [ ] 00-03-PLAN.md — App factory DI by env + test substrate (conftest, envelope/models/fake-compute/db unit tests, seam-leakage guard)
+- [ ] 00-04-PLAN.md — Static CI gates (CICD-01) + REUSE/SPDX (CICD-06) + minimal ui/ scaffold
+- [ ] 00-05-PLAN.md — Eight Nygard ADRs (pull-at-boot, ACL scoping, static-IP, --full, ttyd persistent, ttyd LAN bind/WORK-04, stack bumps)
+- [ ] 00-06-PLAN.md — Proxmox host-prime kit + PRIMING.md runbook (SETUP-01..05)
+- [ ] 00-07-PLAN.md — Golden-template provisioner + SC-corrected burrow-boot.sh + systemd unit (WORK-01, WORK-04)
 **Infra note**: The template half (WORK-01), ttyd LAN reachability (WORK-04), and the host-prime kit (SETUP-01..05) can only be validated against real Proxmox + a real worker in the dev homelab — CI cannot prove them. Decisions are frozen here even though boot validation lands in Phase 1/3 dev smoke. **ADR candidates (decide in Phase 0):** (1) boot-config injection mechanism — pull-at-boot recommended vs SSH-push (`pct exec`/`pct push` are not in the HTTPS API); (2) Proxmox ACL scoping — `/pool/burrow-workers` (tight) vs `/vms` (simple, broad); (3) static-IP-from-VMID; (4) clone mode `--full`; plus SC-8 (`--once`) and SC-9 (ttyd binding).
 
 ### Phase 1: Control Plane API
@@ -125,7 +132,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 0. Contracts, Seams & Golden Template | 0/TBD | Not started | - |
+| 0. Contracts, Seams & Golden Template | 0/7 | Not started | - |
 | 1. Control Plane API | 0/TBD | Not started | - |
 | 2. Terminal Proxy + React UI | 0/TBD | Not started | - |
 | 3. Reproducible Workers | 0/TBD | Not started | - |
