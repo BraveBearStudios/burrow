@@ -24,9 +24,10 @@ from typing import Any
 
 import aiosqlite
 
+from models.event import WorkspaceEvent
 from models.workspace import Workspace
 
-from db.provider import DbProvider
+from db.provider import DbProvider, VmidTakenError
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -105,23 +106,36 @@ class SqliteProvider(DbProvider):
         await self._ensure_migrated()
         workspace_id = data.get("id") or uuid.uuid4().hex
         async with self._connect() as conn:
-            await conn.execute(
-                "INSERT INTO workspaces "
-                "(id, name, status, vmid, node, lxcIp, projectRepo, projectBranch, pluginSet) "
-                "VALUES (:id, :name, :status, :vmid, :node, :lxcIp, "
-                ":projectRepo, :projectBranch, :pluginSet)",
-                {
-                    "id": workspace_id,
-                    "name": data["name"],
-                    "status": data.get("status", "creating"),
-                    "vmid": data.get("vmid"),
-                    "node": data["node"],
-                    "lxcIp": data.get("lxc_ip"),
-                    "projectRepo": data["project_repo"],
-                    "projectBranch": data.get("project_branch", "main"),
-                    "pluginSet": data.get("plugin_set", "default"),
-                },
-            )
+            try:
+                await conn.execute(
+                    "INSERT INTO workspaces "
+                    "(id, name, status, vmid, node, lxcIp, projectRepo, projectBranch, pluginSet) "
+                    "VALUES (:id, :name, :status, :vmid, :node, :lxcIp, "
+                    ":projectRepo, :projectBranch, :pluginSet)",
+                    {
+                        "id": workspace_id,
+                        "name": data["name"],
+                        "status": data.get("status", "creating"),
+                        "vmid": data.get("vmid"),
+                        "node": data["node"],
+                        "lxcIp": data.get("lxc_ip"),
+                        "projectRepo": data["project_repo"],
+                        "projectBranch": data.get("project_branch", "main"),
+                        "pluginSet": data.get("plugin_set", "default"),
+                    },
+                )
+            except aiosqlite.IntegrityError as exc:
+                # The 002 partial unique index is the reservation arbiter: a
+                # duplicate-active-vmid INSERT is "lost the race" (SC-3), surfaced
+                # as the typed VmidTakenError so the service can retry. SQLite
+                # reports the violated UNIQUE as the column ("UNIQUE constraint
+                # failed: workspaces.vmid"), not the index name — and the partial
+                # index is the ONLY uniqueness on workspaces.vmid (001 declares
+                # none), so that column phrase is the reliable discriminator. Any
+                # other IntegrityError (e.g. the events FK) propagates unchanged.
+                if "workspaces.vmid" in str(exc):
+                    raise VmidTakenError(str(exc)) from exc
+                raise
             await conn.commit()
         created = await self.getWorkspace(workspace_id)
         if created is None:  # pragma: no cover - insert just succeeded
@@ -209,6 +223,33 @@ class SqliteProvider(DbProvider):
                 (uuid.uuid4().hex, workspaceId, eventType, json.dumps(data)),
             )
             await conn.commit()
+
+    async def getEvents(self, workspaceId: str) -> list[WorkspaceEvent]:
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT id, workspaceId AS workspace_id, type, data, "
+                "createdAt AS created_at FROM events WHERE workspaceId = ? "
+                "ORDER BY createdAt",
+                (workspaceId,),
+            )
+            rows = await cursor.fetchall()
+            await cursor.close()
+        # WorkspaceEvent's before-validator decodes the TEXT JSON `data` column.
+        return [WorkspaceEvent.model_validate(dict(row)) for row in rows]
+
+    async def getByVmid(self, vmid: int) -> Workspace | None:
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                f"SELECT {_WORKSPACE_COLUMNS} FROM workspaces WHERE vmid = ? AND deletedAt IS NULL",
+                (vmid,),
+            )
+            row = await cursor.fetchone()
+            await cursor.close()
+        return self._row_to_workspace(row) if row is not None else None
 
     async def healthcheck(self) -> bool:
         async with self._connect() as conn:

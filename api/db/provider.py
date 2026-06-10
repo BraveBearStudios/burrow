@@ -20,7 +20,19 @@ discipline); this ABC names none of them.
 from abc import ABC, abstractmethod
 from typing import Any
 
+from models.event import WorkspaceEvent
 from models.workspace import Workspace
+
+
+class VmidTakenError(Exception):
+    """Raised when a workspace INSERT collides on the active-vmid unique index.
+
+    The DB-seam analogue of "lost the VMID race": the ``002`` partial unique
+    index (``WHERE deletedAt IS NULL``) is the cross-process reservation arbiter
+    (SC-3/SC-4), so a duplicate-active-vmid INSERT surfaces here. Declared on the
+    ABC module so the service can catch it ("collision → retry the scan") without
+    importing the ``aiosqlite`` driver — preserving the seam.
+    """
 
 
 class DbProvider(ABC):
@@ -59,6 +71,20 @@ class DbProvider(ABC):
     @abstractmethod
     async def logEvent(self, workspaceId: str, eventType: str, data: dict[str, Any]) -> None:
         """Append an event row for a workspace."""
+        ...
+
+    @abstractmethod
+    async def getEvents(self, workspaceId: str) -> list[WorkspaceEvent]:
+        """Return a workspace's event log oldest-first (WS-11)."""
+        ...
+
+    @abstractmethod
+    async def getByVmid(self, vmid: int) -> Workspace | None:
+        """Return the active workspace owning ``vmid``, or ``None``.
+
+        Excludes soft-deleted rows so a recycled vmid resolves to the live owner
+        (feeds the bootconfig router + saga compensation lookups).
+        """
         ...
 
     @abstractmethod
