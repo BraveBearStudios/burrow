@@ -16,7 +16,7 @@ import {
 	waitFor,
 	within,
 } from "@testing-library/react";
-import { http, HttpResponse } from "msw";
+import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server } from "../../tests/msw/server";
@@ -24,7 +24,11 @@ import { useLayoutStore } from "../store/layoutStore";
 import { WorkspaceList } from "./WorkspaceList";
 
 function renderList() {
-	const client = new QueryClient();
+	// Disable retry so a forced poll error surfaces isError immediately in the
+	// test (the production hook keeps TanStack Query's default backoff retries).
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={client}>{children}</QueryClientProvider>
 	);
@@ -58,9 +62,7 @@ describe("WorkspaceList — rows + status mapping (UI-01)", () => {
 			expect(screen.getByText("project-eta")).toBeInTheDocument(),
 		);
 		// projectRepo · projectBranch (02-UI-SPEC sidebar row second line).
-		expect(
-			screen.getByText("github.com/acme/eta · main"),
-		).toBeInTheDocument();
+		expect(screen.getByText("github.com/acme/eta · main")).toBeInTheDocument();
 	});
 
 	it("maps status → dot color token (criterion 7) and only non-running rows carry an overline", async () => {
@@ -181,9 +183,7 @@ describe("WorkspaceList — empty + error states (UI-01)", () => {
 	});
 
 	it("shows the poll-error strip when the list query fails", async () => {
-		server.use(
-			http.get("/api/v1/workspaces", () => HttpResponse.error()),
-		);
+		server.use(http.get("/api/v1/workspaces", () => HttpResponse.error()));
 		renderList();
 		expect(
 			await screen.findByText("Couldn't reach the control plane. Retrying…"),
