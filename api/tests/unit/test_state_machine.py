@@ -111,15 +111,11 @@ async def service(
 
 async def _running_workspace(service: WorkspaceService) -> Workspace:
     return await service.createWorkspace(
-        WorkspaceCreate(
-            name="lc", project_repo="git@example.com:acme/lc.git", node="pve1"
-        )
+        WorkspaceCreate(name="lc", project_repo="git@example.com:acme/lc.git", node="pve1")
     )
 
 
-async def test_stop_running_to_stopped(
-    service: WorkspaceService, db: SqliteProvider
-) -> None:
+async def test_stop_running_to_stopped(service: WorkspaceService, db: SqliteProvider) -> None:
     ws = await _running_workspace(service)
     stopped = await service.stopWorkspace(ws.id)
     assert stopped.status == "stopped"
@@ -128,9 +124,7 @@ async def test_stop_running_to_stopped(
     assert any(e.type == "workspace.stopped" for e in events)
 
 
-async def test_start_stopped_to_running(
-    service: WorkspaceService, db: SqliteProvider
-) -> None:
+async def test_start_stopped_to_running(service: WorkspaceService, db: SqliteProvider) -> None:
     ws = await _running_workspace(service)
     await service.stopWorkspace(ws.id)
     started = await service.startWorkspace(ws.id)
@@ -161,9 +155,7 @@ async def test_destroy_stopped_workspace(service: WorkspaceService) -> None:
     assert await service.db.getWorkspace(ws.id) is None
 
 
-async def test_stop_on_creating_raises(
-    service: WorkspaceService, db: SqliteProvider
-) -> None:
+async def test_stop_on_creating_raises(service: WorkspaceService, db: SqliteProvider) -> None:
     """WS-09: a still-booting (creating) workspace cannot be stopped."""
     row = await db.createWorkspace(
         {

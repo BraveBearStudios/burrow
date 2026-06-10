@@ -18,6 +18,7 @@ not provider concerns.
 
 import asyncio
 import re
+from datetime import datetime, timezone
 
 import httpx
 
@@ -31,7 +32,9 @@ from lib.errors import (
     CapacityError,
     NoFreeVmidError,
     WorkspaceBootError,
+    WorkspaceNotFoundError,
 )
+from lib.statemachine import assert_transition
 
 # Bounded reservation retries: each loss re-scans the (DB ∪ compute) used-set and
 # tries the next free VMID. 10 is generous for a single operator on a ~100-id pool.
@@ -81,6 +84,11 @@ class WorkspaceService:
         self.compute = compute
         self.db = db
         self.settings = settings
+        # Per-workspace in-flight lock: serializes concurrent mutations on a single
+        # workspace id within this process (SC-12, A2). Created lazily per id. The
+        # DB status-guarded read-then-act inside the lock is the cross-process
+        # backstop (the reservation index covers create-create).
+        self._locks: dict[str, asyncio.Lock] = {}
 
     # ── create saga (WS-01/02/03, CAP-01/04) ──────────────────────────────
     async def createWorkspace(self, payload: WorkspaceCreate) -> Workspace:
@@ -177,6 +185,83 @@ class WorkspaceService:
             await self.compute.destroyCt(node, vmid)
         except Exception:
             pass  # best-effort: destroy of a missing CT is a no-op
+
+    # ── stop / start / destroy (WS-06/07/08/09) ───────────────────────────
+    async def stopWorkspace(self, workspace_id: str) -> Workspace:
+        """Stop a running workspace; state preserved (WS-06).
+
+        Guarded by ``assert_transition(running, stop)``; the provider blocks on the
+        UPID. Sets ``stoppedAt`` and logs ``workspace.stopped``.
+        """
+        async with self._lock_for(workspace_id):
+            ws = await self._get_or_raise(workspace_id)
+            assert_transition(ws.status, "stop")  # WS-09 guard (running only)
+            assert ws.vmid is not None
+            await self.compute.stopCt(ws.node, ws.vmid)
+            updated = await self.db.updateWorkspace(
+                ws.id, {"status": "stopped", "stopped_at": self._now()}
+            )
+            await self.db.logEvent(ws.id, "workspace.stopped", {})
+            return updated
+
+    async def startWorkspace(self, workspace_id: str) -> Workspace:
+        """Start a stopped workspace and await ttyd health (WS-07).
+
+        Guarded by ``assert_transition(stopped, start)``; re-resolves the IP and
+        awaits ttyd before marking ``running``. Logs ``workspace.started``.
+        """
+        async with self._lock_for(workspace_id):
+            ws = await self._get_or_raise(workspace_id)
+            assert_transition(ws.status, "start")  # WS-09 guard (stopped only)
+            assert ws.vmid is not None
+            await self.compute.startCt(ws.node, ws.vmid)
+            ip = await self.compute.getIp(ws.node, ws.vmid)
+            await self.db.updateWorkspace(ws.id, {"lxc_ip": ip})
+            await self._wait_ttyd(ip)  # WS-07: await ttyd health
+            updated = await self.db.updateWorkspace(ws.id, {"status": "running"})
+            await self.db.logEvent(ws.id, "workspace.started", {})
+            return updated
+
+    async def destroyWorkspace(self, workspace_id: str) -> None:
+        """Stop (if running) then destroy the CT and soft-delete the row (WS-08).
+
+        Guarded by ``assert_transition(<state>, destroy)`` (legal from running /
+        stopped / error). ``destroyCt`` is idempotent (no-op on a missing CT). Sets
+        ``destroyedAt``, logs ``workspace.destroyed``, then soft-deletes the row.
+        """
+        async with self._lock_for(workspace_id):
+            ws = await self._get_or_raise(workspace_id)
+            assert_transition(ws.status, "destroy")  # WS-09 guard
+            assert ws.vmid is not None
+            if ws.status == "running":
+                await self.compute.stopCt(ws.node, ws.vmid)
+            await self.compute.destroyCt(ws.node, ws.vmid)  # idempotent
+            await self.db.updateWorkspace(
+                ws.id, {"status": "destroyed", "destroyed_at": self._now()}
+            )
+            await self.db.logEvent(ws.id, "workspace.destroyed", {})
+            await self.db.softDeleteWorkspace(ws.id)
+
+    # ── lifecycle helpers ──────────────────────────────────────────────────
+    def _lock_for(self, workspace_id: str) -> asyncio.Lock:
+        """Return the per-workspace in-flight lock, creating it on first use."""
+        lock = self._locks.get(workspace_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._locks[workspace_id] = lock
+        return lock
+
+    async def _get_or_raise(self, workspace_id: str) -> Workspace:
+        """Load an active workspace or raise ``WorkspaceNotFoundError``."""
+        ws = await self.db.getWorkspace(workspace_id)
+        if ws is None:
+            raise WorkspaceNotFoundError(workspace_id)
+        return ws
+
+    @staticmethod
+    def _now() -> str:
+        """ISO-8601 UTC timestamp for the lifecycle ``*_at`` columns."""
+        return datetime.now(timezone.utc).isoformat()
 
     def _boot_config(self, payload: WorkspaceCreate) -> BootConfig:
         """Build the non-secret boot intent (no credential — pull-at-boot)."""
