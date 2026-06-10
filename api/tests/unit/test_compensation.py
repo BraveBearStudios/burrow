@@ -75,9 +75,7 @@ async def _assert_compensated(
     assert boot_errors, "expected a boot.error event after compensation"
 
 
-def _make_service(
-    compute: FakeComputeProvider, db: SqliteProvider
-) -> WorkspaceService:
+def _make_service(compute: FakeComputeProvider, db: SqliteProvider) -> WorkspaceService:
     return WorkspaceService(compute=compute, db=db, settings=real_settings)
 
 
