@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 02-01-PLAN.md (Phase-2 backend: tty-subprotocol WS terminal bridge /ws/workspaces/{id}/terminal — opaque type-preserving relay, FIRST_COMPLETED teardown, pre-accept access gate (1008), Origin/CSWSH gate, SSRF-safe upstream dial, LXC_NOT_READY error frame, {}-only connect/disconnect logging (TERM-01..04); plus GET /api/v1/nodes degrade-not-500 per-node capacity endpoint (UI-04 backend) and websockets==16.0 pin. Proven over a protocol-accurate stub ttyd that makes the SC-7 .encode() bug fail CI. UI half of UI-04 lands in 02-05.)"
-last_updated: "2026-06-10T18:20:00.000Z"
+stopped_at: "Completed 02-02-PLAN.md (Phase-2 UI foundation: real Vite 8 + React 19 + Tailwind v4 project on the Phase-0 scaffold — pinned stack (react-mosaic 6.2.0 EXACT, @xterm 6, @tanstack/react-query 5, zustand 5, vitest 4 + Testing Library + MSW, Playwright); typed envelope client.ts (api<T> unwrap + ApiError) + camelCase types (Workspace/WorkspaceStatus/WorkspaceCreate/NodeCapacity/ApiEnvelope/TerminalState); verified ttyd frame builders lib/ttyd.ts (init JSON, '0'+input, '1'+resize); four-theme @theme token sheet (dark/dark-soft/medium/light) + self-hosted-font infra (CDN-free, system-stack fallback); MSW /api/v1 handlers. Green build/tsc/biome/vitest (11 tests); no CDN; reuse 185/185. No business components — those are Waves 2-4.)"
+last_updated: "2026-06-10T18:55:00.000Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 18
-  completed_plans: 13
-  percent: 24
+  completed_plans: 14
+  percent: 26
 ---
 
 <!--
@@ -31,19 +31,19 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 2 of 4 (Terminal Proxy + React UI)
-Plan: 1 of 6 complete in current phase
-Status: Phase 2 in progress — backend WS bridge + nodes capacity endpoint shipped (02-01); next is the UI foundation (02-02)
+Plan: 2 of 6 complete in current phase
+Status: Phase 2 in progress — backend WS bridge + nodes endpoint (02-01) and the UI foundation (02-02) shipped; next is the MVP terminal vertical slice (02-03)
 Last activity: 2026-06-10
 
-Progress: [██░░░░░░░░] 17% (Phase 2: 1/6 plans)
+Progress: [███░░░░░░░] 33% (Phase 2: 2/6 plans)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 12
+- Total plans completed: 13
 - Average duration: 16 min
-- Total execution time: 2.95 hours
+- Total execution time: 3.35 hours
 
 **By Phase:**
 
@@ -74,6 +74,7 @@ Progress: [██░░░░░░░░] 17% (Phase 2: 1/6 plans)
 | Phase 1 P04 | 12 | 3 tasks | 14 files |
 | Phase 1 P05 | 9 min | 3 tasks | 5 files |
 | Phase 2 P01 | 14 min | 3 tasks | 8 files |
+| Phase 2 P02 | 24 min | 3 tasks | 22 files |
 
 ## Accumulated Context
 
@@ -126,6 +127,8 @@ Recent decisions affecting current work:
 - [Plan 02-01]: The terminal bridge is an OPAQUE, type-preserving relay — forward every frame verbatim (str→send_text, bytes→send_bytes) on BOTH legs, NEVER .encode() (SC-7). It lives OUTSIDE /api/v1 at prefix /ws (CLAUDE.md /ws/* convention). Teardown races the two pump directions under asyncio.wait(FIRST_COMPLETED), cancels + gather(return_exceptions=True)s the loser, and dials upstream with ping_interval keepalive so a dead browser leg can never leave a half-open upstream (T-02-04). Pre-accept access gate (getWorkspace + status==running + lxc_ip) closes 1008 before accept (T-02-02); an explicit Origin gate vs settings.allowed_origin handles CSWSH since Starlette WS bypasses CORS (T-02-03); the upstream URL is built ONLY from the DB row's lxc_ip via a single _ttyd_url() (SSRF, T-02-01); connect/disconnect events carry {} only (T-02-05).
 - [Plan 02-01]: The protocol-accurate stub_ttyd_ws fixture (websockets.serve, asserts the tty subprotocol + JSON init, echoes preserving frame type) is what makes the SC-7 bug un-hideable — a bare echo would pass a relay that drops the subprotocol or re-encodes a text frame. Tests redirect the production ws://{lxc_ip}:7681/ws dial at the stub by monkeypatching routers.terminal._ttyd_url (test-only seam; production construction unchanged).
 - [Plan 02-01]: GET /api/v1/nodes returns per-node {node, memoryUsedFraction, capacityThreshold, overThreshold} over the Fake's real getNodeMemory fraction — no fabricated "free GB". overThreshold is the strict CAP-01 guard (fraction > threshold; boundary == is NOT over), and capacity_threshold is read LIVE per request. Degrade-not-500 (mirrors health.py): a raising getNodeMemory yields a null fraction + overThreshold=false at HTTP 200, never a 500 oracle (T-02-06). Backend half of UI-04; the UI capacity chip lands in 02-05. Full gate green: 127 pytest + ruff + format + mypy --strict + reuse.
+- [Plan 02-02]: UI foundation stands the real Vite 8 + React 19 + Tailwind v4 (CSS-first @theme, no tailwind.config.ts — ADR-0008) project on the bare Phase-0 scaffold. react-mosaic-component pinned EXACT 6.2.0 (no caret) so a future npm install can never resolve the 7.0.0-beta on `latest`; lockfile verified to hold zero 7.x. client.ts (api<T> envelope unwrap + typed ApiError on error!=null), types/workspace.ts (camelCase mirror of the CamelModel JSON: lxcIp/projectRepo/…), and lib/ttyd.ts (the single source of the verified ttyd opcodes + initFrame/inputFrame/resizeFrame) are the importable blueprints every later UI plan consumes without re-deriving the envelope, types, or protocol. The four-theme token sheet is lifted VERBATIM from 02-UI-SPEC; each [data-theme] block defines the full token set so a swap is complete.
+- [Plan 02-02]: Fonts ship CDN-free. No woff2 was vendorable at build time (no font package, none in the design bundle, no network), so per the UI-SPEC's sanctioned fallback the --font-* tokens resolve to the _ds system stacks (ui-sans-serif… / ui-monospace…) and the @font-face blocks stay commented; public/fonts/README.md is the drop-in activation contract. The CSP comment + README were reworded to not embed the literal forbidden CDN hostnames because Vite copies public/ into dist/, which would otherwise trip the binding `grep googleapis|gstatic|jsdelivr` assert (UI-SPEC criterion 6). Shipped src/dist are CDN-clean. MSW handlers mock the /api/v1 surface in the {data,meta,error} envelope, wired into tests/setup.ts (listen/reset/close, onUnhandledRequest:error). Green build/tsc/biome (15 files) + 11 vitest; reuse 185/185. App.tsx is an intentional placeholder — the real shell is Waves 2-4.
 
 ### Pending Todos
 
@@ -150,7 +153,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T18:20:00.000Z
-Stopped at: Completed 02-01-PLAN.md (Phase-2 backend: tty-subprotocol WS terminal bridge /ws/workspaces/{id}/terminal — opaque type-preserving relay, FIRST_COMPLETED teardown, pre-accept access gate (1008), Origin/CSWSH gate, SSRF-safe upstream dial, LXC_NOT_READY error frame, {}-only connect/disconnect logging (TERM-01..04); plus GET /api/v1/nodes degrade-not-500 per-node capacity endpoint (UI-04 backend) and websockets==16.0 pin. Proven over a protocol-accurate stub ttyd that makes the SC-7 .encode() bug fail CI. Full gate green: 127 pytest + ruff + format + mypy --strict + reuse). Commits: dbb3bfe, 7297e98, a53d640, 7a9e644.
+Last session: 2026-06-10T18:55:00.000Z
+Stopped at: Completed 02-02-PLAN.md (Phase-2 UI foundation: real Vite 8 + React 19 + Tailwind v4 project on the Phase-0 scaffold — pinned stack (react-mosaic 6.2.0 EXACT, @xterm 6, @tanstack/react-query 5, zustand 5, vitest 4 + Testing Library + MSW, Playwright); typed envelope client.ts + camelCase types/workspace.ts + verified ttyd frame builders lib/ttyd.ts; four-theme @theme token sheet + CDN-free self-hosted-font infra; MSW /api/v1 handlers. Green build/tsc/biome (15 files) + 11 vitest; no CDN refs; reuse 185/185. No business components — Waves 2-4). Commits: f5b220d, 02b0e22, c41999b, 3462625.
 Resume file: None
-Next plan: 02-02-PLAN.md — UI foundation (pinned stack, Vite/Tailwind v4/vitest/Playwright, typed envelope client + types + ttyd frame lib + four-theme tokens + self-host fonts + MSW). Note: the UI half of UI-04 (capacity chip) lands in 02-05; this plan delivered only the backend half. Open item (carried): A3 operator-confirm of the real git-credential-minting mechanism before Phase 3.
+Next plan: 02-03-PLAN.md — MVP vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App (render/echo/fit/reconnect/dispose) (TERM-05/06/07, UI-01), importing client.ts/types/ttyd.ts + the token sheet + MSW harness from 02-02. Open items (carried): UI half of UI-04 (capacity chip) lands in 02-05; A3 operator-confirm of the real git-credential-minting mechanism before Phase 3; Playwright browser binaries install in CI (02-06).

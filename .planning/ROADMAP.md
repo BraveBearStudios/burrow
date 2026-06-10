@@ -117,7 +117,7 @@ Plans:
 Plans:
 
 - [x] 02-01-PLAN.md — Backend tty-subprotocol WS bridge + protocol-accurate stub ttyd + GET /api/v1/nodes (TERM-01..04, UI-04 backend half)
-- [ ] 02-02-PLAN.md — UI foundation: pinned stack, Vite/Tailwind v4/vitest/Playwright, typed envelope client + types + ttyd frame lib + four-theme tokens + self-host fonts + MSW
+- [x] 02-02-PLAN.md — UI foundation: pinned stack, Vite/Tailwind v4/vitest/Playwright, typed envelope client + types + ttyd frame lib + four-theme tokens + self-host fonts + MSW
 - [ ] 02-03-PLAN.md — MVP vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App (render/echo/fit/reconnect/dispose) (TERM-05/06/07, UI-01)
 - [ ] 02-04-PLAN.md — Tiling: layoutStore (Mosaic tree + persist + reconcile) + WorkspaceLayout + restore-after-refresh (UI-02, UI-05)
 - [ ] 02-05-PLAN.md — Surfaces: WorkspaceList sidebar + Navbar capacity chips + NewWorkspaceModal + StatusBar (UI-01, UI-03, UI-04)
@@ -171,6 +171,6 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 |-------|----------------|--------|-----------|
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
-| 2. Terminal Proxy + React UI | 1/6 | In progress | - |
+| 2. Terminal Proxy + React UI | 2/6 | In progress | - |
 | 3. Reproducible Workers | 0/TBD | Not started | - |
 | 4. Hardening & Release | 0/TBD | Not started | - |
