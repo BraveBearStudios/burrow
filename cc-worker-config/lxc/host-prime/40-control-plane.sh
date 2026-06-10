@@ -151,10 +151,31 @@ fi
 #    write unless git confirms .env is ignored.
 # ---------------------------------------------------------------------------
 log "assembling ${ENV_FILE}"
-if ! git -C "$APP_HOME" check-ignore .env >/dev/null 2>&1 && \
-   ! git check-ignore "$ENV_FILE" >/dev/null 2>&1; then
-  log "REFUSING to write ${ENV_FILE}: not confirmed gitignored."
-  log "Ensure '.env' is gitignored in this checkout before assembling secrets."
+# Secret-safety gate. On a real control-plane host, ${APP_HOME} (/opt/burrow) is
+# a deploy target, NOT a git checkout — so `git check-ignore` errors there and a
+# gitignore-must-pass gate would refuse-closed and never assemble the secret it
+# was built to write. The real safety property is simpler: ${ENV_FILE} must NOT
+# live inside any git work-tree (nothing to accidentally stage), and it is
+# written 0600 under a root-owned dir. Enforce THAT directly. If a future deploy
+# layout does put ${APP_HOME} under a repo, fall back to requiring .env be
+# gitignored there.
+ENV_DIR="$(dirname "$ENV_FILE")"
+if git -C "$ENV_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  # ${ENV_DIR} IS inside a git work-tree: only safe if .env is gitignored there.
+  if ! git -C "$ENV_DIR" check-ignore "$ENV_FILE" >/dev/null 2>&1; then
+    log "REFUSING to write ${ENV_FILE}: it is inside a git work-tree and NOT gitignored."
+    log "Add '.env' to .gitignore in that repo before assembling secrets."
+    ENV_SAFE=0
+  else
+    ENV_SAFE=1
+  fi
+else
+  # Not inside any repo (the expected /opt/burrow deploy case): safe to write.
+  log "${ENV_DIR} is not a git work-tree -> safe to write (0600, root-owned)."
+  ENV_SAFE=1
+fi
+if [[ "$ENV_SAFE" -ne 1 ]]; then
+  :  # gate failed above; skip the write block below.
 else
   umask 077
   if [[ ! -f "$ENV_FILE" ]] && [[ -f "${APP_HOME}/.env.example" ]]; then
