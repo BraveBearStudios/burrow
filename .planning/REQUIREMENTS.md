@@ -90,7 +90,7 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 
 ### Capacity & Hardening (CAP)
 
-- [ ] **CAP-01**: Workspace creation is refused when the target node's memory exceeds the capacity threshold
+- [x] **CAP-01**: Workspace creation is refused when the target node's memory exceeds the capacity threshold
 - [ ] **CAP-02**: Idle workspaces (no active terminal connection beyond a configured window) are auto-stopped
 - [ ] **CAP-03**: A reaper reconciles and destroys orphaned LXCs and frees leaked VMIDs (SC-9)
 - [ ] **CAP-04**: Operator can select the worker node at create time
@@ -98,8 +98,8 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 ### CI/CD & Supply Chain (CICD)
 
 - [x] **CICD-01**: CI static gates run ruff + biome (lint/format), mypy (strict) + `tsc --noEmit`, SPDX header check, Conventional Commit validation, and lockfile freshness
-- [ ] **CICD-02**: CI runs the test pyramid — unit → integration (real SQLite, mocked Proxmox, protocol-accurate stub ttyd) → e2e (FakeComputeProvider + Playwright) → container smoke
-- [ ] **CICD-03**: Every bug fix lands a failing-first regression test in the appropriate tier
+- [x] **CICD-02**: CI runs the test pyramid — unit → integration (real SQLite, mocked Proxmox, protocol-accurate stub ttyd) → e2e (FakeComputeProvider + Playwright) → container smoke
+- [x] **CICD-03**: Every bug fix lands a failing-first regression test in the appropriate tier
 - [ ] **CICD-04**: CI builds both images (`burrow-api`, `burrow-ui`) multi-stage, digest-pinned, non-root, with HEALTHCHECKs; image scan fails on HIGH/CRITICAL
 - [ ] **CICD-05**: The release path emits an SBOM (syft), a cosign keyless signature, and SLSA build provenance, and publishes to GHCR
 - [x] **CICD-06**: Every source file carries the SPDX two-line header
@@ -194,13 +194,13 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | WORK-03 | Phase 1 | Pending |
 | WORK-04 | Phase 0 | Pending (ADR-0007 records the ttyd LAN-bind decision; impl/validation half lands with burrow-boot.sh in 00-07 + dev-homelab smoke) |
 | WORK-05 | Phase 3 | Pending |
-| CAP-01 | Phase 1 | Pending |
+| CAP-01 | Phase 1 | Complete |
 | CAP-02 | Phase 4 | Pending |
 | CAP-03 | Phase 4 | Pending |
 | CAP-04 | Phase 1 | Pending |
 | CICD-01 | Phase 0 | Complete |
-| CICD-02 | Phase 1 | Pending |
-| CICD-03 | Phase 1 | Pending |
+| CICD-02 | Phase 1 | Complete |
+| CICD-03 | Phase 1 | Complete |
 | CICD-04 | Phase 4 | Pending |
 | CICD-05 | Phase 4 | Pending |
 | CICD-06 | Phase 0 | Complete |

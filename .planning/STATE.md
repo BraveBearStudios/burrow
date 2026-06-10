@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 01-01-PLAN.md (DB foundation: 002 partial-unique index + ordered migrate() ledger, VmidTakenError reservation, getEvents/getByVmid, all Phase-1 Settings keys; WS-10/WS-11 CI-proven)
-last_updated: "2026-06-10T15:19:24Z"
+stopped_at: "Completed 01-02-PLAN.md (real ProxmoxComputeProvider: UPID-blocked clone/start/stop/destroy in asyncio.to_thread, CA-pinned TLS, net0 static IP + pool-add, node memory; responses-mocked CI proof; PLAT-07/CAP-01/CICD-02/03)"
+last_updated: "2026-06-10T15:44:23.229Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 12
-  completed_plans: 8
-  percent: 22
+  completed_plans: 9
+  percent: 20
 ---
 
 <!--
@@ -31,26 +31,26 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 1 of 4 (Control Plane API)
-Plan: 1 of 5 complete in current phase
+Plan: 2 of 5 complete in current phase
 Status: Executing Phase 1
-Last activity: 2026-06-10 — Plan 01-01 complete: the DB foundation for the Phase-1 saga. `002_vmid_unique.sql` adds a partial unique index on `workspaces(vmid) WHERE deletedAt IS NULL AND vmid IS NOT NULL` — the cross-process VMID reservation arbiter (SC-3/SC-4) that survives destroy-then-recreate. `migrate()` is now an ordered, idempotent `schema_migrations`-ledger runner applying every `migrations/*.sql` by stem (fixes the Phase-0 landmine where it ran only 001). `SqliteProvider.createWorkspace` maps a vmid-uniqueness IntegrityError to a typed `VmidTakenError` (the "lost the race, retry" signal the saga will catch without an aiosqlite dep); `getEvents` (WS-11, oldest-first via createdAt+rowid) and `getByVmid` (active vmid owner) added to the ABC + SqliteProvider, with the Postgres stub kept concrete. All Phase-1 `Settings` keys landed in one config edit (capacity threshold, ttyd/clone/task timeouts, net0 params, allowed_origin, git credential token, source-IP gate) with safe non-secret defaults mirrored into `.env.example`. WS-10 is CI-proven over real SQLite. Full gate green: 38 pytest passed, ruff + ruff format + mypy --strict (28 files) + uv lock --check + reuse lint (122/122).
+Last activity: 2026-06-10 — Plan 01-02 complete: the frozen Phase-0 `ProxmoxComputeProvider` skeleton filled with real `proxmoxer` bodies behind the ABC (PLAT-07). Every mutating call (clone/start/stop/destroy) returns a Proxmox UPID and is blocked on via `Tasks.blocking_status` (assert `exitstatus == "OK"`) before returning (SC-1); every blocking `proxmoxer` call runs in `asyncio.to_thread` so no synchronous call stalls the event loop (Pitfall 2). `cloneCt` does a `--full` clone, adds the new VMID to `/pool/burrow-workers` (ADR-0003), and sets the static `net0` IP from the VMID (ADR-0004), then blocks on the clone UPID; proxmoxer request errors map to typed `CloneError`. `getNodeMemory` returns the `mem/maxmem` fraction (CAP-01 data source); `getIp` computes the address from the VMID (ADR-0004, SC-6 — no DHCP/agent poll); `destroyCt` of an absent CT is an idempotent no-op success (compensation-safe). CA-pinned TLS via `verify_ssl=proxmox_ca_cert_path` — verification never disabled (block_on=high gate; comment-stripped grep returns 0). All `proxmoxer` symbols stay confined to `proxmoxProvider.py` (seam guard green). `responses` + `respx` added as dev deps; a `responses`-mocked integration test proves UPID-block + pool-add PUT + net0 PUT + node-memory + the non-OK/timeout failure paths hermetically. Real-Proxmox clone/boot acceptance is the deferred dev-homelab smoke gate (no Proxmox reachable). Full gate green: 45 pytest passed, ruff + ruff format + mypy --strict (29 files) + uv lock --check + reuse lint (125/125).
 
-Progress: [██░░░░░░░░] 20% (Phase 1: 1/5 plans)
+Progress: [████░░░░░░] 40% (Phase 1: 2/5 plans)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 6
-- Average duration: 18 min
-- Total execution time: 1.80 hours
+- Total plans completed: 9
+- Average duration: 19 min
+- Total execution time: 2.52 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 0 | 5 | 86 min | 17 min |
-| 1 | 1 | 22 min | 22 min |
+| 1 | 2 | 43 min | 22 min |
 
 **Per-plan:**
 
@@ -69,6 +69,7 @@ Progress: [██░░░░░░░░] 20% (Phase 1: 1/5 plans)
 *Updated after each plan completion*
 | Phase 0 P04 | 20 min | 3 tasks | 22 files |
 | Phase 0 P03 | 18 min | 3 tasks | 9 files |
+| Phase 01 P02 | 21min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -106,6 +107,9 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 00-03]: App factory is the lone composition root — get_compute()/get_db() in main.py are the ONLY place concrete impls are named; BURROW_COMPUTE/BURROW_DB flip the backend with no service edit (both branches verified at runtime).
 - [Phase ?]: [Plan 00-03]: Envelope shipped this phase as an ASGI error boundary only (Exception -> respond_error); success-wrapping middleware + routers are Phase 1 per plan.
 - [Phase ?]: [Plan 00-03]: Seam-leakage guard uses Python tokenize to drop COMMENT + STRING tokens so seam-contract prose in docstrings is exempt while real driver usage is caught; negative-tested red on an injected leak, green on the tree (PLAT-06/07).
+- [Phase ?]: [Plan 01-02]: ProxmoxComputeProvider blocks on every UPID via Tasks.blocking_status (assert exitstatus OK) before returning (SC-1); each proxmoxer call wrapped in asyncio.to_thread so no sync call runs on the event loop (Pitfall 2).
+- [Phase ?]: [Plan 01-02]: cloneCt adds the new VMID to /pool/burrow-workers (ADR-0003) and sets net0 static IP from the VMID (ADR-0004) before blocking on the clone UPID; CA-pinned TLS via verify_ssl=proxmox_ca_cert_path, verification never disabled (block_on=high).
+- [Phase ?]: [Plan 01-02]: proxmoxer's requests leg is mocked with responses (NOT respx, which is httpx-only); respx reserved for the httpx ttyd-health leg in Plan 04. destroyCt is idempotent (404 -> no-op success) for compensation safety.
 
 ### Pending Todos
 
@@ -130,7 +134,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T15:19:24Z
-Stopped at: Completed 01-01-PLAN.md (DB foundation: 002 partial-unique index + ordered migrate() ledger, VmidTakenError reservation, getEvents/getByVmid, all Phase-1 Settings keys; WS-10/WS-11 CI-proven)
+Last session: 2026-06-10T15:42:51.943Z
+Stopped at: Completed 01-02-PLAN.md (real ProxmoxComputeProvider: UPID-blocked clone/start/stop/destroy in asyncio.to_thread, CA-pinned TLS, net0 static IP + pool-add, node memory; responses-mocked CI proof; PLAT-07/CAP-01/CICD-02/03)
 Resume file: None
-Next plan: 01-02-PLAN.md (Real ProxmoxComputeProvider — UPID-blocked clone/start/stop/destroy in asyncio.to_thread, CA-pinned TLS, net0 static IP + pool-add, node memory, responses-mock integration test). 01-03 (saga) reserves VMIDs through this index + VmidTakenError; 01-04 (routers) reads events via getEvents; 01-05 (bootconfig) looks up workspaces via getByVmid and reads git_credential_token/allowed_origin/net0 from Settings.
+Next plan: 01-03-PLAN.md (WorkspaceService create/stop/start/destroy saga — persist-before-clone, per-step reverse compensation, state machine, capacity guard over the now-real ComputeProvider; reserves VMIDs through the 002 index + VmidTakenError from 01-01, calls the UPID-blocked clone/start/stop/destroy + getNodeMemory + getIp from 01-02). 01-04 (routers) reads events via getEvents; 01-05 (bootconfig) looks up workspaces via getByVmid.

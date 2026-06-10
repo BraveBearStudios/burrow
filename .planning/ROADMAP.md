@@ -88,11 +88,13 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 5 plans
 
 Plans:
+
 - [x] 01-01-PLAN.md — DB foundation: 002 partial-unique-index + ordered migrate(), VmidTakenError reservation, getEvents/getByVmid, all Phase-1 Settings keys (WS-10, WS-11)
-- [ ] 01-02-PLAN.md — Real ProxmoxComputeProvider (UPID-blocked, asyncio.to_thread, CA-pinned, net0+pool-add, node memory) + responses-mock integration test (PLAT-07, CAP-01, CICD-02/03)
+- [x] 01-02-PLAN.md — Real ProxmoxComputeProvider (UPID-blocked, asyncio.to_thread, CA-pinned, net0+pool-add, node memory) + responses-mock integration test (PLAT-07, CAP-01, CICD-02/03)
 - [ ] 01-03-PLAN.md — WorkspaceService create→stop→start→destroy saga + state machine + compensation + capacity guard over the Fake (WS-01/02/03/06/07/08/09, CAP-01/04)
 - [ ] 01-04-PLAN.md — /api/v1 routers (CRUD + stop/start/destroy/events, templates, degrade-not-500 health) + JSON logging + security headers + non-* CORS + integration tier (PLAT-01/03/04/05, WS-04/05/11, CICD-02)
 - [ ] 01-05-PLAN.md — Pull-at-boot bootconfig endpoint (vmid-in-pool gate, non-secret payload, no-cred-in-logs, pluggable credential seam) + integration test (WORK-03)
+
 **Infra note**: `ProxmoxComputeProvider` (UPID waits, static-IP `net0` set, `injectBootConfig`, capacity query) is mocked in CI and validated against real Proxmox only in the dev homelab — the real-clone create path is a dev-only smoke gate. Needs ADRs for SC-5 (injection mechanism) and SC-6 (static-IP-from-VMID). Likely `--research-phase` during planning (UPID task-wait semantics, `/cluster/nextid` interplay, static-IP edge cases against the actual cluster).
 
 ### Phase 2: Terminal Proxy + React UI
@@ -158,7 +160,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
-| 1. Control Plane API | 1/5 | In progress | - |
+| 1. Control Plane API | 2/5 | In Progress|  |
 | 2. Terminal Proxy + React UI | 0/TBD | Not started | - |
 | 3. Reproducible Workers | 0/TBD | Not started | - |
 | 4. Hardening & Release | 0/TBD | Not started | - |
