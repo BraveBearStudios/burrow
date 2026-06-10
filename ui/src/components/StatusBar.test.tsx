@@ -1,0 +1,91 @@
+// SPDX-FileCopyrightText: 2026 Brave Bear Studios
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+// StatusBar tests (UI-04). Renders the bar over the MSW seed and proves the
+// binding 02-UI-SPEC contract: running/stopped/error counts derived from the live
+// workspace list (gold mono numbers), a session-uptime readout, a zero-workspaces
+// state rendering 0s, and the fixed 32px height that never grows (chrome invariant
+// criterion 15). MSW serves /api/v1/workspaces + /api/v1/nodes.
+
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import { http, HttpResponse } from "msw";
+import type { ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { server } from "../../tests/msw/server";
+import { StatusBar } from "./StatusBar";
+
+function renderBar() {
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	const wrapper = ({ children }: { children: ReactNode }) => (
+		<QueryClientProvider client={client}>{children}</QueryClientProvider>
+	);
+	return render(<StatusBar />, { wrapper });
+}
+
+beforeEach(() => {
+	vi.useFakeTimers();
+});
+
+afterEach(() => {
+	vi.useRealTimers();
+	vi.restoreAllMocks();
+});
+
+describe("StatusBar — counts derived from the list (UI-04)", () => {
+	it("shows running / stopped / error counts from the live workspace list", async () => {
+		renderBar();
+		// Seed: 1 running, 1 creating, 1 stopped, 1 error.
+		const running = await screen.findByTestId("count-running");
+		expect(within(running).getByText("1")).toBeInTheDocument();
+		expect(within(screen.getByTestId("count-stopped")).getByText("1")).toBeInTheDocument();
+		expect(within(screen.getByTestId("count-error")).getByText("1")).toBeInTheDocument();
+	});
+
+	it("each count number is gold mono and paired with a text label (a11y, gold discipline)", async () => {
+		renderBar();
+		const running = await screen.findByTestId("count-running");
+		const number = within(running).getByText("1");
+		expect(number).toHaveStyle({ color: "var(--gold)" });
+		// Status is never color-only — a text label accompanies the count.
+		expect(running).toHaveTextContent(/running/);
+	});
+
+	it("renders the session uptime readout (gold mono Xh Ym)", async () => {
+		renderBar();
+		await screen.findByTestId("count-running");
+		const uptime = screen.getByTestId("uptime");
+		expect(uptime).toHaveTextContent(/uptime/);
+		// Formatted Xh Ym (0h 0m at mount).
+		expect(within(uptime).getByText(/\dh \dm/)).toBeInTheDocument();
+	});
+});
+
+describe("StatusBar — zero state (UI-04)", () => {
+	it("renders 0 for every count when there are no workspaces", async () => {
+		server.use(
+			http.get("/api/v1/workspaces", () =>
+				HttpResponse.json({
+					data: [],
+					meta: { requestId: "t", timestamp: "2026-06-10T00:00:00Z" },
+					error: null,
+				}),
+			),
+		);
+		renderBar();
+		const running = await screen.findByTestId("count-running");
+		expect(within(running).getByText("0")).toBeInTheDocument();
+		expect(within(screen.getByTestId("count-stopped")).getByText("0")).toBeInTheDocument();
+		expect(within(screen.getByTestId("count-error")).getByText("0")).toBeInTheDocument();
+	});
+});
+
+describe("StatusBar — chrome invariant (criterion 15)", () => {
+	it("is a fixed 32px-high bar that never grows", () => {
+		renderBar();
+		const bar = screen.getByRole("contentinfo");
+		expect(bar).toHaveStyle({ height: "var(--h-statusbar)" });
+	});
+});
