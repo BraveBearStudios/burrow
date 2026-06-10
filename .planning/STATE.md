@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 01-02-PLAN.md (real ProxmoxComputeProvider: UPID-blocked clone/start/stop/destroy in asyncio.to_thread, CA-pinned TLS, net0 static IP + pool-add, node memory; responses-mocked CI proof; PLAT-07/CAP-01/CICD-02/03)"
-last_updated: "2026-06-10T15:44:23.229Z"
+stopped_at: "Completed 01-03-PLAN.md (WorkspaceService: SC-corrected 8-step create saga with per-step compensation, server-enforced state machine, per-workspace in-flight lock, race-safe VMID reservation, capacity guard — over the two provider ABCs only; WS-01/02/03/06/07/08/09 + CAP-01/04 unit-proven over the Fake)"
+last_updated: "2026-06-10T16:03:05.347Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 12
-  completed_plans: 9
-  percent: 20
+  completed_plans: 10
+  percent: 83
 ---
 
 <!--
@@ -31,31 +31,32 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 1 of 4 (Control Plane API)
-Plan: 2 of 5 complete in current phase
+Plan: 3 of 5 complete in current phase
 Status: Executing Phase 1
-Last activity: 2026-06-10 — Plan 01-02 complete: the frozen Phase-0 `ProxmoxComputeProvider` skeleton filled with real `proxmoxer` bodies behind the ABC (PLAT-07). Every mutating call (clone/start/stop/destroy) returns a Proxmox UPID and is blocked on via `Tasks.blocking_status` (assert `exitstatus == "OK"`) before returning (SC-1); every blocking `proxmoxer` call runs in `asyncio.to_thread` so no synchronous call stalls the event loop (Pitfall 2). `cloneCt` does a `--full` clone, adds the new VMID to `/pool/burrow-workers` (ADR-0003), and sets the static `net0` IP from the VMID (ADR-0004), then blocks on the clone UPID; proxmoxer request errors map to typed `CloneError`. `getNodeMemory` returns the `mem/maxmem` fraction (CAP-01 data source); `getIp` computes the address from the VMID (ADR-0004, SC-6 — no DHCP/agent poll); `destroyCt` of an absent CT is an idempotent no-op success (compensation-safe). CA-pinned TLS via `verify_ssl=proxmox_ca_cert_path` — verification never disabled (block_on=high gate; comment-stripped grep returns 0). All `proxmoxer` symbols stay confined to `proxmoxProvider.py` (seam guard green). `responses` + `respx` added as dev deps; a `responses`-mocked integration test proves UPID-block + pool-add PUT + net0 PUT + node-memory + the non-OK/timeout failure paths hermetically. Real-Proxmox clone/boot acceptance is the deferred dev-homelab smoke gate (no Proxmox reachable). Full gate green: 45 pytest passed, ruff + ruff format + mypy --strict (29 files) + uv lock --check + reuse lint (125/125).
+Last activity: 2026-06-10 — Plan 01-03 complete: the `WorkspaceService` orchestration core. `createWorkspace` runs the SC-corrected 8-step saga over the provider ABCs only — capacity guard (refuse node mem > 0.80, CAP-01/04), reserve a VMID by the DB partial-unique INSERT and persist the `creating` row BEFORE the clone (SC-2), then clone (`--full`, UPID-blocked), `injectBootConfig` (DB write, pull-at-boot), start (UPID-blocked), resolve the static IP from the VMID, await ttyd health, mark `running` (SC-1, WS-01/02). Any post-reservation failure runs idempotent reverse compensation (stop+destroy frees the VMID, no orphan), logs a redacted `boot.error` (`_safe` scrubs git/CI tokens + URL userinfo, T-01-09), and lands the row in `error` — never stuck `creating` (SC-11, WS-03); proven by `FakeFailures` at clone/start/getIp/ttyd. `lib/statemachine.py` (TRANSITIONS + `assert_transition`, SC-12) rejects illegal transitions (stop-on-creating, start-on-destroyed, double-destroy, running->start) with a typed `IllegalTransitionError`; `error` exits only via destroy (A4). `stop/start/destroy` each load-or-raise `WorkspaceNotFoundError`, acquire a per-workspace `asyncio.Lock`, `assert_transition` BEFORE mutating, UPID-block the provider, set the timestamp, and log the lifecycle event (WS-06/07/08); destroy stops-if-running then idempotently destroys then soft-deletes. VMID reservation unions `compute.usedVmids()` with DB-used vmids, scans `getNextVmid`, INSERTs, and retries on `VmidTakenError` (exhaustion -> `NoFreeVmidError`). The service imports neither `aiosqlite` nor `proxmoxer` (seam guard green). Full gate green: 81 pytest passed, ruff + ruff format + mypy --strict (37 files) + uv lock --check + reuse lint (135/135).
 
-Progress: [████░░░░░░] 40% (Phase 1: 2/5 plans)
+Progress: [██████░░░░] 60% (Phase 1: 3/5 plans)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 9
-- Average duration: 19 min
-- Total execution time: 2.52 hours
+- Total plans completed: 10
+- Average duration: 16 min
+- Total execution time: 2.70 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 0 | 5 | 86 min | 17 min |
-| 1 | 2 | 43 min | 22 min |
+| 1 | 3 | 54 min | 18 min |
 
 **Per-plan:**
 
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
+| Phase 1 P03 | 11 min | 3 tasks | 8 files |
 | Phase 1 P01 | 22 min | 4 tasks | 8 files |
 | Phase 0 P06 | 35 min | 4 tasks | 7 files |
 | Phase 0 P07 | 20 min | 3 tasks | 4 files |
@@ -110,6 +111,11 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 01-02]: ProxmoxComputeProvider blocks on every UPID via Tasks.blocking_status (assert exitstatus OK) before returning (SC-1); each proxmoxer call wrapped in asyncio.to_thread so no sync call runs on the event loop (Pitfall 2).
 - [Phase ?]: [Plan 01-02]: cloneCt adds the new VMID to /pool/burrow-workers (ADR-0003) and sets net0 static IP from the VMID (ADR-0004) before blocking on the clone UPID; CA-pinned TLS via verify_ssl=proxmox_ca_cert_path, verification never disabled (block_on=high).
 - [Phase ?]: [Plan 01-02]: proxmoxer's requests leg is mocked with responses (NOT respx, which is httpx-only); respx reserved for the httpx ttyd-health leg in Plan 04. destroyCt is idempotent (404 -> no-op success) for compensation safety.
+- [Plan 01-03]: createWorkspace runs the SC-corrected 8-step saga (capacity guard -> reserve VMID + creating row BEFORE clone -> clone -> injectBootConfig -> start -> resolve IP -> ttyd health -> running) over the two provider ABCs only; any post-reservation failure runs idempotent stop+destroy compensation, frees the VMID, logs a redacted boot.error, and lands the row in error (never creating, no orphan) — SC-1/2/11, proven by FakeFailures at clone/start/getIp/ttyd.
+- [Plan 01-03]: lib/statemachine.py is the policy authority — a single TRANSITIONS table + assert_transition called BEFORE every stop/start/destroy mutation; creating is internal-only (never an action target) and error exits only via destroy (A4). Illegal transitions raise a typed IllegalTransitionError at the service boundary (WS-09).
+- [Plan 01-03]: lib/errors.py service-tier errors each carry a stable .code class attribute (illegal_transition / capacity_exceeded / no_free_vmid / boot_failed / not_found) so the Plan-04 router maps error.code without an isinstance ladder. NoFreeVmidError is a distinct service error (not the compute one) so it carries the policy code.
+- [Plan 01-03]: In-flight serialization = a per-workspace asyncio.Lock (lazily created, keyed by id) with the transition read done INSIDE the lock; the DB partial-unique index covers create-create and the in-lock status read-then-act covers stop/destroy double-fire. A cross-process status-CAS UPDATE is deferred to the DB/router layer if --workers >1 is confirmed at deploy (A2).
+- [Plan 01-03]: Capacity guard refuses strictly ABOVE the threshold (node mem > 0.80); a node at exactly 0.80 is allowed (boundary-tested). _safe() redacts git/CI tokens, URL userinfo, and long opaque tokens from event/log text and caps length, preserving the exception type for triage (ASVS V7, T-01-09).
 
 ### Pending Todos
 
@@ -134,7 +140,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T15:42:51.943Z
-Stopped at: Completed 01-02-PLAN.md (real ProxmoxComputeProvider: UPID-blocked clone/start/stop/destroy in asyncio.to_thread, CA-pinned TLS, net0 static IP + pool-add, node memory; responses-mocked CI proof; PLAT-07/CAP-01/CICD-02/03)
+Last session: 2026-06-10T16:03:05.347Z
+Stopped at: Completed 01-03-PLAN.md (WorkspaceService: SC-corrected 8-step create saga with per-step compensation, server-enforced state machine, per-workspace in-flight lock, race-safe VMID reservation, capacity guard — over the two provider ABCs only; WS-01/02/03/06/07/08/09 + CAP-01/04 unit-proven over the Fake)
 Resume file: None
-Next plan: 01-03-PLAN.md (WorkspaceService create/stop/start/destroy saga — persist-before-clone, per-step reverse compensation, state machine, capacity guard over the now-real ComputeProvider; reserves VMIDs through the 002 index + VmidTakenError from 01-01, calls the UPID-blocked clone/start/stop/destroy + getNodeMemory + getIp from 01-02). 01-04 (routers) reads events via getEvents; 01-05 (bootconfig) looks up workspaces via getByVmid.
+Next plan: 01-04-PLAN.md (routers — wire /api/v1/workspaces CRUD + stop/start/destroy/events to WorkspaceService, map error.code onto the envelope, /health degrade-not-500, security headers + non-* CORS, structured JSON logging; integration tier over real SQLite + responses-mocked Proxmox + stub ttyd). 01-05 (bootconfig) looks up workspaces via getByVmid and mints the short-lived repo-scoped credential (A3).

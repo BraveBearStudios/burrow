@@ -49,15 +49,15 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 
 ### Workspace Lifecycle (WS)
 
-- [ ] **WS-01**: Operator can create a workspace from name, git repo, branch (default `main`), plugin set, and node
-- [ ] **WS-02**: Create runs the full saga — persist `creating` row + reserved VMID *before* clone (SC-2) → clone golden template → inject boot config → start → await IP → await ttyd health → mark `running` — awaiting each Proxmox UPID task to completion (SC-1)
-- [ ] **WS-03**: Create compensates on any failure (tear down partial clone, free the VMID, mark `error`), leaving no orphaned LXC (SC-9)
+- [x] **WS-01**: Operator can create a workspace from name, git repo, branch (default `main`), plugin set, and node
+- [x] **WS-02**: Create runs the full saga — persist `creating` row + reserved VMID *before* clone (SC-2) → clone golden template → inject boot config → start → await IP → await ttyd health → mark `running` — awaiting each Proxmox UPID task to completion (SC-1)
+- [x] **WS-03**: Create compensates on any failure (tear down partial clone, free the VMID, mark `error`), leaving no orphaned LXC (SC-9)
 - [ ] **WS-04**: Operator can list workspaces, filterable by `status`
 - [ ] **WS-05**: Operator can fetch a single workspace by id
-- [ ] **WS-06**: Operator can stop a running workspace (LXC stopped, disk state preserved)
-- [ ] **WS-07**: Operator can start a stopped workspace (awaits ttyd health)
-- [ ] **WS-08**: Operator can destroy a workspace (stop + destroy LXC, soft-delete the row)
-- [ ] **WS-09**: Workspace status follows the enforced state machine (creating→running|error; running→stopped|destroyed; stopped→running|destroyed)
+- [x] **WS-06**: Operator can stop a running workspace (LXC stopped, disk state preserved)
+- [x] **WS-07**: Operator can start a stopped workspace (awaits ttyd health)
+- [x] **WS-08**: Operator can destroy a workspace (stop + destroy LXC, soft-delete the row)
+- [x] **WS-09**: Workspace status follows the enforced state machine (creating→running|error; running→stopped|destroyed; stopped→running|destroyed)
 - [x] **WS-10**: VMID allocation is race-safe across uvicorn workers via a DB unique reservation using a partial unique index that excludes soft-deleted rows (SC-3)
 - [ ] **WS-11**: Operator can read a workspace's event log (created/started/stopped/destroyed/terminal.connected/terminal.disconnected/boot.error) — DB read path (`getEvents`) landed in 01-01; `GET .../{id}/events` endpoint in 01-04
 
@@ -93,7 +93,7 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 - [x] **CAP-01**: Workspace creation is refused when the target node's memory exceeds the capacity threshold
 - [ ] **CAP-02**: Idle workspaces (no active terminal connection beyond a configured window) are auto-stopped
 - [ ] **CAP-03**: A reaper reconciles and destroys orphaned LXCs and frees leaked VMIDs (SC-9)
-- [ ] **CAP-04**: Operator can select the worker node at create time
+- [x] **CAP-04**: Operator can select the worker node at create time
 
 ### CI/CD & Supply Chain (CICD)
 
@@ -165,15 +165,15 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | PLAT-07 | Phase 0 | Complete |
 | PLAT-08 | Phase 0 | Complete |
 | PLAT-09 | Phase 0 | Done (00-01) |
-| WS-01 | Phase 1 | Pending |
-| WS-02 | Phase 1 | Pending |
-| WS-03 | Phase 1 | Pending |
+| WS-01 | Phase 1 | Complete |
+| WS-02 | Phase 1 | Complete |
+| WS-03 | Phase 1 | Complete |
 | WS-04 | Phase 1 | Pending |
 | WS-05 | Phase 1 | Pending |
-| WS-06 | Phase 1 | Pending |
-| WS-07 | Phase 1 | Pending |
-| WS-08 | Phase 1 | Pending |
-| WS-09 | Phase 1 | Pending |
+| WS-06 | Phase 1 | Complete |
+| WS-07 | Phase 1 | Complete |
+| WS-08 | Phase 1 | Complete |
+| WS-09 | Phase 1 | Complete |
 | WS-10 | Phase 1 | Done (01-01) |
 | WS-11 | Phase 1 | In progress (01-01 DB read path; endpoint 01-04) |
 | TERM-01 | Phase 2 | Pending |
@@ -197,7 +197,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | CAP-01 | Phase 1 | Complete |
 | CAP-02 | Phase 4 | Pending |
 | CAP-03 | Phase 4 | Pending |
-| CAP-04 | Phase 1 | Pending |
+| CAP-04 | Phase 1 | Complete |
 | CICD-01 | Phase 0 | Complete |
 | CICD-02 | Phase 1 | Complete |
 | CICD-03 | Phase 1 | Complete |
