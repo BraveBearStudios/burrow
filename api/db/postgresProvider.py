@@ -12,6 +12,7 @@ image carries no Postgres dependency.
 from typing import Any
 
 from models.event import WorkspaceEvent
+from models.template import Template
 from models.workspace import Workspace
 
 from db.provider import DbProvider
@@ -46,6 +47,9 @@ class PostgresProvider(DbProvider):
 
     async def getByVmid(self, vmid: int) -> Workspace | None:
         raise NotImplementedError("PostgresProvider.getByVmid — hosted path")
+
+    async def listTemplates(self) -> list[Template]:
+        raise NotImplementedError("PostgresProvider.listTemplates — hosted path")
 
     async def healthcheck(self) -> bool:
         raise NotImplementedError("PostgresProvider.healthcheck — hosted path")

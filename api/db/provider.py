@@ -21,6 +21,7 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 from models.event import WorkspaceEvent
+from models.template import Template
 from models.workspace import Workspace
 
 
@@ -85,6 +86,11 @@ class DbProvider(ABC):
         Excludes soft-deleted rows so a recycled vmid resolves to the live owner
         (feeds the bootconfig router + saga compensation lookups).
         """
+        ...
+
+    @abstractmethod
+    async def listTemplates(self) -> list[Template]:
+        """Return the seeded golden templates (feeds ``GET /api/v1/templates``)."""
         ...
 
     @abstractmethod

@@ -21,15 +21,44 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from compute.fakeProvider import FakeComputeProvider
-from compute.provider import ComputeProvider
+from compute.provider import ComputeError, ComputeProvider
 from compute.proxmoxProvider import ProxmoxComputeProvider
 from config import settings
 from db.provider import DbProvider
 from db.sqliteProvider import SqliteProvider
 from lib.envelope import respond_error
+from lib.errors import (
+    CapacityError,
+    IllegalTransitionError,
+    NoFreeVmidError,
+    ServiceError,
+    WorkspaceBootError,
+    WorkspaceNotFoundError,
+)
 from lib.logging import setup_logging
 from lib.middleware import SecurityHeadersMiddleware
 from services.workspaceService import WorkspaceService
+
+# Service-tier error type -> HTTP status. The envelope ``error.code`` comes from
+# the error's own ``.code`` attribute; this table only fixes the status (PLAT-02).
+_SERVICE_ERROR_STATUS: dict[type[ServiceError], int] = {
+    IllegalTransitionError: 409,
+    CapacityError: 409,
+    NoFreeVmidError: 409,
+    WorkspaceNotFoundError: 404,
+    WorkspaceBootError: 502,
+}
+# Operator-facing fallback messages keyed by code, so a router never echoes an
+# internal exception string into the envelope (ASVS V7, T-01-14).
+_SAFE_ERROR_MESSAGES: dict[str, str] = {
+    "illegal_transition": "The requested action is not allowed in the current state.",
+    "capacity_exceeded": "The selected node is over capacity.",
+    "no_free_vmid": "No free workspace slot is available.",
+    "not_found": "Workspace not found.",
+    "boot_failed": "The workspace failed to boot.",
+    "compute_error": "The compute backend is unavailable.",
+    "service_error": "The request could not be completed.",
+}
 
 
 def get_compute() -> ComputeProvider:
@@ -72,6 +101,25 @@ def _envelope_exception_handler(request: Request, exc: Exception) -> JSONRespons
     return JSONResponse(status_code=500, content=body)
 
 
+def _service_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Map a typed :class:`ServiceError` to its deterministic status + envelope.
+
+    The wire ``code`` is the error's stable ``.code``; the message is a safe,
+    operator-facing string (never the raw exception text, T-01-14). Unmapped
+    service errors fall back to 400.
+    """
+    assert isinstance(exc, ServiceError)
+    status = _SERVICE_ERROR_STATUS.get(type(exc), 400)
+    message = _SAFE_ERROR_MESSAGES.get(exc.code, _SAFE_ERROR_MESSAGES["service_error"])
+    return JSONResponse(status_code=status, content=respond_error(code=exc.code, message=message))
+
+
+def _compute_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Map a compute-seam :class:`ComputeError` to a 502 envelope (no internals)."""
+    body = respond_error(code="compute_error", message=_SAFE_ERROR_MESSAGES["compute_error"])
+    return JSONResponse(status_code=502, content=body)
+
+
 def create_app() -> FastAPI:
     """Build and configure the Burrow control-plane FastAPI app.
 
@@ -87,6 +135,8 @@ def create_app() -> FastAPI:
     setup_logging()
     app = FastAPI(title="Burrow Control Plane", version="0.1.0")
     app.add_exception_handler(Exception, _envelope_exception_handler)
+    app.add_exception_handler(ServiceError, _service_error_handler)
+    app.add_exception_handler(ComputeError, _compute_error_handler)
 
     # Inner→outer add order: SecurityHeaders first, CORS last (outermost).
     app.add_middleware(SecurityHeadersMiddleware)
@@ -97,6 +147,15 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Deferred import: routers import the DI seams (get_service/get_compute/get_db)
+    # from this module, so they are imported here — after those names are defined —
+    # to avoid a circular import at module load.
+    from routers import health, templates, workspaces
+
+    app.include_router(workspaces.router)
+    app.include_router(templates.router)
+    app.include_router(health.router)
     return app
 
 

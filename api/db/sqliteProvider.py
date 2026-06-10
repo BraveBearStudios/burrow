@@ -25,6 +25,7 @@ from typing import Any
 import aiosqlite
 
 from models.event import WorkspaceEvent
+from models.template import Template
 from models.workspace import Workspace
 
 from db.provider import DbProvider, VmidTakenError
@@ -253,6 +254,20 @@ class SqliteProvider(DbProvider):
             row = await cursor.fetchone()
             await cursor.close()
         return self._row_to_workspace(row) if row is not None else None
+
+    async def listTemplates(self) -> list[Template]:
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT id, name, proxmoxTid AS proxmox_tid, "
+                "pluginManifest AS plugin_manifest, createdAt AS created_at "
+                "FROM templates ORDER BY name"
+            )
+            rows = await cursor.fetchall()
+            await cursor.close()
+        # Template's before-validator decodes the TEXT JSON `pluginManifest` column.
+        return [Template.model_validate(dict(row)) for row in rows]
 
     async def healthcheck(self) -> bool:
         async with self._connect() as conn:
