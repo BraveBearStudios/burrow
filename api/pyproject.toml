@@ -23,6 +23,11 @@ dev = [
     "pytest==9.0.3",
     "pytest-asyncio==1.4.0",
     "reuse==6.2.0",
+    # responses mocks proxmoxer's underlying `requests` calls (proxmoxer is
+    # requests-based, NOT httpx — respx cannot intercept it; see RESEARCH Pitfall 5).
+    "responses==0.26.1",
+    # respx mocks the httpx ttyd-health leg used by the Plan-04 saga integration tests.
+    "respx==0.23.1",
 ]
 
 [tool.ruff]
