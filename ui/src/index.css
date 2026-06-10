@@ -3,6 +3,223 @@
  * SPDX-License-Identifier: AGPL-3.0-or-later
  */
 
-/* Tailwind v4, CSS-first (ADR-0008): no tailwind.config.ts. The four-theme
- * @theme token sheet + self-hosted @font-face declarations are added in Task 3. */
+/*
+ * Burrow design tokens — Tailwind v4 CSS-first (ADR-0008): no tailwind.config.ts.
+ * Color values are lifted VERBATIM from 02-UI-SPEC.md "Color Tokens" (the binding
+ * contract). The `dark` theme seeds @theme (default); each [data-theme="…"] block
+ * overrides the full token set so switching data-theme on <html> swaps every color.
+ * Components read --tokens only — no hard-coded hex anywhere.
+ */
 @import "tailwindcss";
+
+/*
+ * Self-hosted faces (NO external CDN — CLAUDE.md / PLAT-05). The woff2 files are
+ * not vendored in this commit (none available to copy at build time), so these
+ * blocks stay commented and the --font-* tokens fall back to the _ds system
+ * stacks below. To activate: drop the woff2 into ui/public/fonts/ and uncomment.
+ * See ui/public/fonts/README.md.
+ *
+ * @font-face { font-family: "Space Grotesk"; font-weight: 500; font-display: swap;
+ *   src: url("/fonts/SpaceGrotesk-Medium.woff2") format("woff2"); }
+ * @font-face { font-family: "Inter"; font-weight: 400; font-display: swap;
+ *   src: url("/fonts/Inter-Regular.woff2") format("woff2"); }
+ * @font-face { font-family: "Inter"; font-weight: 500; font-display: swap;
+ *   src: url("/fonts/Inter-Medium.woff2") format("woff2"); }
+ * @font-face { font-family: "JetBrains Mono"; font-weight: 400; font-display: swap;
+ *   src: url("/fonts/JetBrainsMono-Regular.woff2") format("woff2"); }
+ */
+
+@theme {
+	/* ── Fonts (system-stack fallback; prepend the Burrow family once vendored) ── */
+	--font-display: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	--font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+	--font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+	/* ── Spacing scale (4px base; 02-UI-SPEC Spacing Scale) ── */
+	--space-xs: 4px;
+	--space-sm: 8px;
+	--space-md: 16px;
+	--space-lg: 24px;
+	--space-xl: 32px;
+	--space-2xl: 48px;
+	--space-3xl: 64px;
+
+	/* ── Fixed chrome dimensions (load-bearing, from the mockup) ── */
+	--h-topbar: 52px;
+	--h-statusbar: 32px;
+	--w-sidebar: 228px;
+	--h-panel-header: 36px;
+	--w-modal: 400px;
+	--h-input: 36px;
+	--sz-status-dot: 7px;
+	--sz-avatar: 30px;
+	--sz-brand-mark: 28px;
+
+	/* ── Radius (02-UI-SPEC Radius) ── */
+	--radius-card: 12px;
+	--radius-panel: 10px;
+	--radius-control: 8px;
+	--radius-chip: 6px;
+	--radius-full: 9999px;
+
+	/* ── Motion (02-UI-SPEC Motion) ── */
+	--ease-ui: cubic-bezier(0.16, 1, 0.3, 1);
+	--dur-hover: 120ms;
+
+	/* ── dark (default / hero) — seeds @theme so unthemed renders use it ── */
+	--color-bg: #1a1c1a;
+	--color-bg-surf: #212321;
+	--color-bg-panel: #272927;
+	--color-bg-panel-alt: #2e302e;
+	--color-bg-hover: #2e302e;
+	--color-border: rgba(255, 255, 255, 0.08);
+	--color-border-mid: rgba(255, 255, 255, 0.14);
+	--color-text: #ccd8cc;
+	--color-text-sub: #7a8e7a;
+	--color-text-muted: #546654;
+	--color-accent: #344734;
+	--color-accent-bg: rgba(52, 71, 52, 0.22);
+	--color-accent-line: #5e7d5e;
+	--color-gold: #f0a737;
+	--color-gold-bg: rgba(240, 167, 55, 0.12);
+	--color-ok: #4ade80;
+	--color-warn: #fbbf24;
+	--color-err: #e05050;
+}
+
+/*
+ * Per-theme token blocks. Each defines the FULL set so any data-theme swap is
+ * complete (no orphaned hue). Values verbatim from 02-UI-SPEC Color Tokens.
+ * The bare --token aliases (e.g. --bg) are the names components consume; they
+ * mirror Tailwind's --color-* so utility classes and inline var() agree.
+ */
+
+:root,
+[data-theme="dark"] {
+	--bg: #1a1c1a;
+	--bg-surf: #212321;
+	--bg-panel: #272927;
+	--bg-panel-alt: #2e302e;
+	--bg-hover: #2e302e;
+	--border: rgba(255, 255, 255, 0.08);
+	--border-mid: rgba(255, 255, 255, 0.14);
+	--text: #ccd8cc;
+	--text-sub: #7a8e7a;
+	--text-muted: #546654;
+	--accent: #344734;
+	--accent-bg: rgba(52, 71, 52, 0.22);
+	--accent-line: #5e7d5e;
+	--gold: #f0a737;
+	--gold-bg: rgba(240, 167, 55, 0.12);
+	--ok: #4ade80;
+	--warn: #fbbf24;
+	--err: #e05050;
+	--btn-pri-text: #bdd4bd;
+}
+
+[data-theme="dark-soft"] {
+	--bg: #3a4740;
+	--bg-surf: #424f47;
+	--bg-panel: #485550;
+	--bg-panel-alt: #505d56;
+	--bg-hover: #505d56;
+	--border: rgba(255, 255, 255, 0.07);
+	--border-mid: rgba(255, 255, 255, 0.12);
+	--text: #e0e6dc;
+	--text-sub: #aab5a4;
+	--text-muted: #7c887a;
+	--accent: #8aaa8a;
+	--accent-bg: rgba(138, 170, 138, 0.15);
+	--accent-line: #8aaa8a;
+	--gold: #e8b063;
+	--gold-bg: rgba(232, 176, 99, 0.12);
+	--ok: #4ade80;
+	--warn: #fbbf24;
+	--err: #e05050;
+	--btn-pri-text: #bdd4bd;
+}
+
+[data-theme="medium"] {
+	--bg: #6a8170;
+	--bg-surf: #728a78;
+	--bg-panel: #7a9280;
+	--bg-panel-alt: #829a88;
+	--bg-hover: #829a88;
+	--border: rgba(255, 255, 255, 0.14);
+	--border-mid: rgba(255, 255, 255, 0.22);
+	--text: #f4f0e6;
+	--text-sub: #e0dccf;
+	--text-muted: #c4c0b2;
+	--accent: #2e4330;
+	--accent-bg: rgba(46, 67, 48, 0.18);
+	--accent-line: #2e4330;
+	--gold: #d49540;
+	--gold-bg: rgba(212, 149, 64, 0.18);
+	--ok: #4ade80;
+	--warn: #fbbf24;
+	--err: #e05050;
+	--btn-pri-text: #e5f0e5;
+}
+
+[data-theme="light"] {
+	--bg: #f0f2f0;
+	--bg-surf: #fff;
+	--bg-panel: #fff;
+	--bg-panel-alt: #f0f2f0;
+	--bg-hover: #f0f2f0;
+	--border: rgba(52, 71, 52, 0.1);
+	--border-mid: rgba(52, 71, 52, 0.18);
+	--text: #1a221a;
+	--text-sub: #4a5a4a;
+	--text-muted: #8a9a8a;
+	--accent: #344734;
+	--accent-bg: rgba(52, 71, 52, 0.07);
+	--accent-line: #344734;
+	--gold: #c8841a;
+	--gold-bg: rgba(200, 132, 26, 0.09);
+	--ok: #4ade80;
+	--warn: #fbbf24;
+	--err: #e05050;
+	--btn-pri-text: #e5f0e5;
+}
+
+/* ── Animations (02-UI-SPEC Motion + component contracts) ── */
+
+/* creating-dot pulse (sidebar row, 1.4s) */
+@keyframes pulse {
+	0%,
+	100% {
+		opacity: 1;
+	}
+	50% {
+		opacity: 0.35;
+	}
+}
+
+/* spinner spin (reconnecting overlay / saga, 0.8s linear) */
+@keyframes spin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+/* live block cursor blink (1.1s steps) */
+@keyframes blink {
+	50% {
+		opacity: 0;
+	}
+}
+
+/*
+ * Honor prefers-reduced-motion: still the pulse, spin, and cursor blink so
+ * motion-sensitive users get a static state (02-UI-SPEC Accessibility / Motion).
+ */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+	}
+}
