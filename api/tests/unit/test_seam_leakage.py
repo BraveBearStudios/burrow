@@ -80,39 +80,73 @@ def test_proxmox_and_aiosqlite_symbols_are_confined() -> None:
                 )
 
 
+def _non_docstring_string_literals(source: str) -> list[str]:
+    """Return the upper-cased contents of every non-docstring STRING literal.
+
+    Raw SQL only ever lives *inside* string literals (``conn.execute("SELECT
+    ...")``), so the guard must scan string contents — the previous version
+    stripped exactly the tokens it claimed to inspect and so passed vacuously.
+
+    Module/class/function docstrings are STRING tokens too, but they hold prose
+    (e.g. a method doc reading "a cheap SELECT 1 healthcheck") that must not trip
+    the guard. A docstring is the FIRST statement of a module or suite, so its
+    STRING token is immediately preceded by a statement boundary: ENCODING/NEWLINE
+    /NL (module top), INDENT (start of a class/function body), or a COMMENT on
+    that boundary. Any other STRING (preceded by ``=``, ``(``, ``,``, a NAME …)
+    is executable — that is where raw SQL would appear, so those are kept.
+    """
+    literals: list[str] = []
+    readline = io.StringIO(source).readline
+    _docstring_predecessors = {
+        tokenize.ENCODING,
+        tokenize.NEWLINE,
+        tokenize.NL,
+        tokenize.INDENT,
+        tokenize.COMMENT,
+    }
+    prev_type: int | None = None
+    for tok in tokenize.generate_tokens(readline):
+        if tok.type == tokenize.STRING:
+            is_docstring = prev_type is None or prev_type in _docstring_predecessors
+            if not is_docstring:
+                literals.append(tok.string.upper())
+        prev_type = tok.type
+    return literals
+
+
+def _has_sql_keyword(source: str) -> bool:
+    """True if any SQL keyword fragment appears in a non-docstring string literal."""
+    return any(
+        keyword in literal
+        for literal in _non_docstring_string_literals(source)
+        for keyword in _SQL_KEYWORDS
+    )
+
+
 def test_raw_sql_is_confined() -> None:
     for path in _python_sources():
         rel = path.relative_to(_API_ROOT).as_posix()
         if rel in _SQL_ALLOWED:
             continue
-        # Strip docstrings/strings so prose like "cheap SELECT 1" in a docstring
-        # does not count; only code-level string content remains as STRING tokens
-        # we deliberately exclude — so for non-allowed files we scan code tokens
-        # for SQL keyword fragments via the raw text minus comments/docstrings.
-        code_only = _strip_comments_and_strings(path.read_text(encoding="utf-8"))
-        upper = code_only.upper()
-        for keyword in _SQL_KEYWORDS:
-            if keyword in upper:
-                raise AssertionError(
-                    f"seam leak: raw SQL fragment '{keyword.strip()}' found in {rel}; "
-                    f"raw SQL is allowed only in {sorted(_SQL_ALLOWED)} + db/migrations/"
-                )
+        if _has_sql_keyword(path.read_text(encoding="utf-8")):
+            raise AssertionError(
+                f"seam leak: raw SQL fragment found in {rel}; "
+                f"raw SQL is allowed only in {sorted(_SQL_ALLOWED)} + db/migrations/"
+            )
 
 
-def _strip_comments_and_strings(source: str) -> str:
-    """Return ``source`` with COMMENT and STRING tokens removed.
+def test_sql_guard_actually_bites() -> None:
+    """Prove the guard is not vacuous: a non-owning file with SQL must be caught.
 
-    Used for the SQL scan: docstrings (STRING) and ``#`` comments (COMMENT) are
-    dropped so SQL prose in documentation cannot trip the guard; any remaining
-    SQL keyword is therefore genuinely executable code, not prose.
+    The previous guard stripped string literals before scanning, so embedding
+    ``conn.execute("SELECT * FROM workspaces")`` outside the provider passed
+    silently. This fixture asserts the corrected guard FAILS on exactly that.
     """
-    pieces: list[str] = []
-    readline = io.StringIO(source).readline
-    for tok in tokenize.generate_tokens(readline):
-        if tok.type in (tokenize.COMMENT, tokenize.STRING):
-            continue
-        pieces.append(tok.string)
-    return " ".join(pieces)
+    leaky = 'def go(conn):\n    return conn.execute("SELECT * FROM workspaces")\n'
+    assert _has_sql_keyword(leaky), "guard must detect SQL embedded in a string literal"
+
+    clean = '"""Module that merely mentions SELECT in prose."""\nx = 1\n'
+    assert not _has_sql_keyword(clean), "guard must not trip on docstring prose"
 
 
 def test_migrations_dir_is_the_schema_home() -> None:
