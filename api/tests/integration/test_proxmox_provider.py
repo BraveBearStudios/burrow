@@ -180,8 +180,43 @@ async def test_clone_raises_task_failed_on_non_ok_exitstatus() -> None:
     _register_clone_calls(
         {"status": "stopped", "exitstatus": "command failed", "upid": _CLONE_UPID}
     )
-    with pytest.raises(TaskFailedError):
+    # WR-06: the non-OK message carries the UPID AND the actual exitstatus, distinct
+    # from a timeout / still-running message.
+    with pytest.raises(TaskFailedError) as exc_info:
         await _provider().cloneCt(9000, 201, "ws-201", _NODE)
+    message = str(exc_info.value)
+    assert _CLONE_UPID in message
+    assert "command failed" in message
+    assert "exitstatus" in message
+    # It is NOT misreported as a timeout (the conflation WR-06 fixes).
+    assert "timed out" not in message
+
+
+@responses.activate
+async def test_block_timeout_message_is_distinct_from_failure() -> None:
+    """WR-06: a timeout reports 'timed out' + the UPID, not a bogus exitstatus."""
+    settings = _Settings(clone_timeout=0.0)
+    responses.add(
+        responses.POST,
+        f"{_BASE}/nodes/{_NODE}/lxc/9000/clone",
+        json={"data": _CLONE_UPID},
+        status=200,
+    )
+    responses.add(responses.PUT, f"{_BASE}/pools/burrow-workers", json={"data": None})
+    responses.add(responses.PUT, f"{_BASE}/nodes/{_NODE}/lxc/201/config", json={"data": None})
+    responses.add(
+        responses.GET,
+        f"{_BASE}/nodes/{_NODE}/tasks/{_CLONE_UPID}/status",
+        json={"data": {"status": "running", "upid": _CLONE_UPID}},
+        status=200,
+    )
+    with pytest.raises(TaskFailedError) as exc_info:
+        await ProxmoxComputeProvider(settings).cloneCt(9000, 201, "ws-201", _NODE)
+    message = str(exc_info.value)
+    assert _CLONE_UPID in message
+    assert "timed out" in message
+    # A timeout is not reported as a non-OK exitstatus.
+    assert "exitstatus" not in message
 
 
 @responses.activate

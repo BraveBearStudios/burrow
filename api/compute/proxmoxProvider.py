@@ -70,13 +70,29 @@ class ProxmoxComputeProvider(ComputeProvider):
         ``Tasks.blocking_status`` polls the node until the task leaves ``running`` or the
         timeout elapses, returning a status dict (``None`` on timeout). Runs in a worker
         thread so the synchronous poll never stalls the event loop (Pitfall 2).
+
+        WR-06: the three failure modes are reported with DISTINCT messages so an
+        operator can tell them apart in real-infra triage — a timeout, a task still
+        running / in an unknown state, and a stopped-but-non-OK exit are no longer
+        conflated. Every message carries the UPID; the non-OK message also carries
+        the actual ``exitstatus``.
         """
         status = await asyncio.to_thread(Tasks.blocking_status, self._api, upid, timeout)
+        # Mode 1 — timeout: blocking_status returned None (deadline hit while running).
         if status is None:
-            raise TaskFailedError(f"task {upid} timed out after {timeout}s")
+            raise TaskFailedError(f"task {upid} timed out after {timeout}s (still running)")
+        # Mode 2 — still running / unknown: a status dict that is present but not
+        # 'stopped' (some proxmoxer versions return the last-seen running snapshot
+        # rather than None). Distinct from a stopped-but-failed task.
+        task_state = status.get("status")
+        if task_state != "stopped":
+            raise TaskFailedError(
+                f"task {upid} did not stop (status={task_state!r}) within {timeout}s"
+            )
+        # Mode 3 — stopped but non-OK: the task finished with a failure exitstatus.
         exitstatus = status.get("exitstatus")
         if exitstatus != "OK":
-            raise TaskFailedError(f"task {upid} exited {exitstatus!r}")
+            raise TaskFailedError(f"task {upid} stopped with exitstatus={exitstatus!r}")
         return ComputeTask(upid=upid, status="ok", exitstatus=exitstatus)
 
     def _ip_for(self, vmid: int) -> str:
