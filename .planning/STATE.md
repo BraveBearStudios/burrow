@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 02-03-PLAN.md (MVP terminal vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App; render/echo/fit/reconnect/dispose proven over a mocked WebSocket; TERM-05/06/07 done, UI-01 poll foundation). Commits 35948b4, ea58fc4, fd59d68."
-last_updated: "2026-06-10T19:25:06.166Z"
+stopped_at: "Completed 02-04-PLAN.md (tiling: layoutStore — mosaic tree + persist + reconcile — and WorkspaceLayout binding react-mosaic 6.2.0 with restore-after-refresh; App swapped to the tiling grid; UI-02 + UI-05 done). Commits 56052cb, d433202."
+last_updated: "2026-06-10T19:57:16.835Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 18
-  completed_plans: 15
-  percent: 40
+  completed_plans: 16
+  percent: 89
 ---
 
 <!--
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 2 of 4 (Terminal Proxy + React UI)
-Plan: 3 of 6 complete in current phase
+Plan: 4 of 6 complete in current phase
 Status: Ready to execute
 Last activity: 2026-06-10
 
-Progress: [███░░░░░░░] 33% (Phase 2: 2/6 plans)
+Progress: [██████░░░░] 67% (Phase 2: 4/6 plans)
 
 ## Performance Metrics
 
@@ -76,6 +76,7 @@ Progress: [███░░░░░░░] 33% (Phase 2: 2/6 plans)
 | Phase 2 P01 | 14 min | 3 tasks | 8 files |
 | Phase 2 P02 | 24 min | 3 tasks | 22 files |
 | Phase 02 P03 | 16min | 3 tasks | 10 files |
+| Phase 2 P04 | 23 | 2 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -132,6 +133,8 @@ Recent decisions affecting current work:
 - [Plan 02-02]: Fonts ship CDN-free. No woff2 was vendorable at build time (no font package, none in the design bundle, no network), so per the UI-SPEC's sanctioned fallback the --font-* tokens resolve to the _ds system stacks (ui-sans-serif… / ui-monospace…) and the @font-face blocks stay commented; public/fonts/README.md is the drop-in activation contract. The CSP comment + README were reworded to not embed the literal forbidden CDN hostnames because Vite copies public/ into dist/, which would otherwise trip the binding `grep googleapis|gstatic|jsdelivr` assert (UI-SPEC criterion 6). Shipped src/dist are CDN-clean. MSW handlers mock the /api/v1 surface in the {data,meta,error} envelope, wired into tests/setup.ts (listen/reset/close, onUnhandledRequest:error). Green build/tsc/biome (15 files) + 11 vitest; reuse 185/185. App.tsx is an intentional placeholder — the real shell is Waves 2-4.
 - [Phase 02]: [Plan 02-03] The MVP terminal slice: useTerminal owns the full xterm.js + WebSocket + FitAddon + ResizeObserver lifecycle in ONE effect with ref-held resources (term/fit/socket/observer/timer) so teardown is idempotent under StrictMode double-mount (flat over 50 mount/unmount cycles, TERM-07). Jittered exponential backoff (min(30000,500*2^n)+random()*250, cap 5, reset on onopen) drives connecting->open->reconnecting->error + reconnectAttempts behind the spec reconnecting overlay; the stop-on-terminal rule does NOT retry on close 1008 or an LXC_NOT_READY frame (TERM-06). A debounced ResizeObserver fits only when visible/non-zero and sends the ttyd '1'+JSON resize frame so the TUI reflows, never stuck 80x24 (TERM-05). ttyd frames are sent as a fresh-ArrayBuffer copy to satisfy the TS6 BufferSource generic.
 - [Phase 02]: [Plan 02-03] App kept at ui/src/App.tsx (not the plan's components/App.tsx) so main.tsx's ./App import keeps resolving (Rule-3 blocking). useTerminal exposes an additive reattach() to back the overlay Reattach/Retry buttons. Terminal->list reconciliation is wired via an onTerminalEvent callback the panel hands to queryClient.invalidateQueries(['workspaces']) rather than calling useQueryClient inside useTerminal, keeping the hook provider-free and unit-testable (Pitfall 4). xterm/FitAddon/ResizeObserver are mocked in vitest (jsdom can't lay out xterm) so render/echo/fit/reconnect/dispose are CI-provable with zero real infra; the real ttyd/live-claude echo is the deferred dev-homelab smoke. UI-01 is partial (useWorkspaces poll done; sidebar rows land in 02-05).
+- [Phase ?]: [Plan 02-04]: layoutStore is the ONLY persisted client state (zustand persist, partialized to mosaicNode + activeWorkspaceId; status stays in TanStack Query, Pitfall 11). Tree mutations are pure helpers over react-mosaic getLeaves + createBalancedTreeFromLeaves (deep util import to dodge the nested react-dom). reconcile(liveIds) drops gone leaves, rebalances, retargets active id (UI-05).
+- [Phase ?]: [Plan 02-04]: react/react-dom 19.2.7 overrides collapse react-mosaic's nested react-dom@18 (else <Mosaic> crashes on ReactCurrentDispatcher); <Mosaic> 6.2.0 bundles its own DndProvider (never double-wrap); Blueprint chrome suppressed via className=burrow-mosaic. Node 25 localStorage shadow fixed by an in-memory Storage polyfill in tests/setup.ts.
 
 ### Pending Todos
 
@@ -156,7 +159,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T19:24:27.461Z
+Last session: 2026-06-10T19:56:49.916Z
 Stopped at: Completed 02-03-PLAN.md (MVP terminal vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App; render/echo/fit/reconnect/dispose proven over a mocked WebSocket; TERM-05/06/07 done, UI-01 poll foundation). Commits 35948b4, ea58fc4, fd59d68.
 Resume file: None
 Next plan: 02-03-PLAN.md — MVP vertical slice: useTerminal + TerminalPanel + useWorkspaces + one-panel App (render/echo/fit/reconnect/dispose) (TERM-05/06/07, UI-01), importing client.ts/types/ttyd.ts + the token sheet + MSW harness from 02-02. Open items (carried): UI half of UI-04 (capacity chip) lands in 02-05; A3 operator-confirm of the real git-credential-minting mechanism before Phase 3; Playwright browser binaries install in CI (02-06).
