@@ -28,7 +28,7 @@ from models.workspace import Workspace
 
 from db.provider import DbProvider
 
-_MIGRATION = Path(__file__).parent / "migrations" / "001_init.sql"
+_MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
 # Select the camelCase columns AS the snake_case model field names so an
 # aiosqlite.Row maps directly onto Workspace via populate_by_name.
@@ -63,17 +63,32 @@ class SqliteProvider(DbProvider):
 
     # ── migration ─────────────────────────────────────────────────────────
     async def migrate(self) -> None:
-        """Apply ``001_init.sql`` once (idempotent: skips if tables exist)."""
+        """Apply every ``migrations/*.sql`` in filename order, exactly once.
+
+        A ``schema_migrations`` ledger (version PRIMARY KEY) records which
+        migrations have run, so this is idempotent and re-runnable: only files
+        whose stem is absent from the ledger are applied, in sorted order. This
+        replaces the Phase-0 "skip if the workspaces table exists" check, which
+        wrongly skipped ``002`` on a DB that already had ``001`` (Pitfall 6) —
+        the partial unique index would never get created.
+        """
+        files = sorted(_MIGRATIONS_DIR.glob("*.sql"), key=lambda p: p.name)
         async with self._connect() as conn:
-            cursor = await conn.execute(
-                "SELECT name FROM sqlite_master WHERE type='table' AND name='workspaces'"
+            await conn.execute(
+                "CREATE TABLE IF NOT EXISTS schema_migrations ("
+                "version TEXT PRIMARY KEY, appliedAt TEXT NOT NULL "
+                "DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')))"
             )
-            exists = await cursor.fetchone()
+            cursor = await conn.execute("SELECT version FROM schema_migrations")
+            applied = {row[0] for row in await cursor.fetchall()}
             await cursor.close()
-            if exists is None:
-                sql = _MIGRATION.read_text(encoding="utf-8")
-                await conn.executescript(sql)
-                await conn.commit()
+            for path in files:
+                version = path.stem
+                if version in applied:
+                    continue
+                await conn.executescript(path.read_text(encoding="utf-8"))
+                await conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
+            await conn.commit()
         self._migrated = True
 
     async def _ensure_migrated(self) -> None:
