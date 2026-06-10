@@ -15,24 +15,24 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 0 of 4 (Contracts, Seams & Golden Template)
-Plan: 0 of TBD in current phase
-Status: Ready to plan
-Last activity: 2026-06-09 — Roadmap created (5 phases); Proxmox priming gap closed (added SETUP-01..05, 53/53 mapped)
+Plan: 1 of 7 complete in current phase
+Status: Executing
+Last activity: 2026-06-10 — Plan 00-01 complete: uv api/ project + envelope (PLAT-02) + CamelModel/compute DTOs (PLAT-09) + pydantic-settings config
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [█░░░░░░░░░] 14%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 0
-- Average duration: - min
-- Total execution time: 0.0 hours
+- Total plans completed: 1
+- Average duration: 12 min
+- Total execution time: 0.2 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| - | - | - | - |
+| 0 | 1 | 12 min | 12 min |
 
 **Recent Trend:**
 - Last 5 plans: -
@@ -52,6 +52,9 @@ Recent decisions affecting current work:
 - [Phase 0]: Drop ttyd `--once` (SC-8), bind ttyd to the worker LAN interface (SC-9), use `--full` clone — frozen before the template is finalized.
 - [Phase 0]: Proxmox priming is a one-time operator kit (`cc-worker-config/lxc/host-prime/` + `PRIMING.md`); least-priv `burrow@pve` role (9 privs) + privsep token scoped to pool/storage/node. See SETUP-01..05 and `research/PROXMOX-PRIMING.md`.
 - [Phase 0→1]: Boot config delivered pull-at-boot (recommended) — `pct exec`/`pct push` are not in the HTTPS API; `injectBootConfig` = DB write + worker fetch from an internal endpoint. WORK-03 reframed; mechanism locked by Phase 0 ADR.
+- [Plan 00-01]: Provider switches bind via `Field(validation_alias="BURROW_COMPUTE"/"BURROW_DB")` — a bare field would bind the lowercase env name, not the BURROW_* name (verified with `BURROW_COMPUTE=proxmox`).
+- [Plan 00-01]: Single `CamelModel` base (`alias_generator=to_camel`, `populate_by_name`, `from_attributes`) is the sole snake↔camel mechanism; serialize at the boundary with `model_dump(by_alias=True)`. No per-field hand-mapping.
+- [Plan 00-01]: Dev deps use PEP 735 `[dependency-groups]` (portable) over uv-specific `[tool.uv] dev-dependencies`.
 
 ### Pending Todos
 
@@ -76,6 +79,6 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-09
-Stopped at: Roadmap + STATE created; Proxmox priming folded into Phase 0; REQUIREMENTS.md traceability populated (53/53 mapped)
+Last session: 2026-06-10
+Stopped at: Completed 00-01-PLAN.md (backend foundation: api/ uv project, envelope PLAT-02, CamelModel + compute DTOs PLAT-09, pydantic-settings config)
 Resume file: None

@@ -54,7 +54,7 @@ Decimal phases appear between their surrounding integers in numeric order.
   5. `provision-template.sh` + `burrow-boot.sh` exist in `cc-worker-config` with a persistent ttyd (no `--once`) bound to the worker LAN interface; the template provisions Ubuntu 24.04 + Node 22 + `@anthropic-ai/claude-code` + ttyd reproducibly.
   6. A re-runnable `cc-worker-config/lxc/host-prime/` kit + `PRIMING.md` runbook prime a bare Proxmox host (least-privilege `burrow@pve` user + `BurrowProvisioner` role + privsep token scoped to the worker pool/storage/node, CT template downloaded and `pct template`-converted, control-plane box provisioned) such that the operator can reach `GET /api/v1/health` → `compute: ok` and clone the template by hand with `--full`.
 **Plans**: 7 plans
-- [ ] 00-01-PLAN.md — Backend foundation: uv project, pydantic-settings config, response envelope (PLAT-02), camelCase models + compute DTOs (PLAT-09)
+- [x] 00-01-PLAN.md — Backend foundation: uv project, pydantic-settings config, response envelope (PLAT-02), camelCase models + compute DTOs (PLAT-09)
 - [ ] 00-02-PLAN.md — Provider seams: ComputeProvider ABC + FakeComputeProvider + Proxmox skeleton (PLAT-07/08), DbProvider ABC + SqliteProvider + 001_init.sql + Postgres stub (PLAT-06)
 - [ ] 00-03-PLAN.md — App factory DI by env + test substrate (conftest, envelope/models/fake-compute/db unit tests, seam-leakage guard)
 - [ ] 00-04-PLAN.md — Static CI gates (CICD-01) + REUSE/SPDX (CICD-06) + minimal ui/ scaffold
@@ -132,7 +132,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 0. Contracts, Seams & Golden Template | 0/7 | Not started | - |
+| 0. Contracts, Seams & Golden Template | 1/7 | In progress | - |
 | 1. Control Plane API | 0/TBD | Not started | - |
 | 2. Terminal Proxy + React UI | 0/TBD | Not started | - |
 | 3. Reproducible Workers | 0/TBD | Not started | - |

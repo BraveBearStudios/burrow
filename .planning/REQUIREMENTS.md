@@ -33,14 +33,14 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 ### Platform & API (PLAT)
 
 - [ ] **PLAT-01**: All API routes are served under `/api/v1` (resolves spec §5.2 un-versioned examples)
-- [ ] **PLAT-02**: Every API response uses the standard envelope (`data`/`meta`/`error`) with `requestId` + `timestamp` in `meta`
+- [x] **PLAT-02**: Every API response uses the standard envelope (`data`/`meta`/`error`) with `requestId` + `timestamp` in `meta`
 - [ ] **PLAT-03**: `GET /api/v1/health` reports overall status plus `db` and `compute` connectivity
 - [ ] **PLAT-04**: Backend emits structured JSON logs
 - [ ] **PLAT-05**: API responses carry security headers
 - [ ] **PLAT-06**: Persistence goes through an abstract `DbProvider`; v1 ships the SQLite (`aiosqlite`) impl with no SQLite specifics leaking past the interface
 - [ ] **PLAT-07**: Compute goes through an abstract `ComputeProvider` in a first-class `api/compute/` package; v1 ships the Proxmox impl with no Proxmox specifics leaking past the interface (SC-13)
 - [ ] **PLAT-08**: A `FakeComputeProvider` lets the integration + e2e tiers run hermetically with no real Proxmox
-- [ ] **PLAT-09**: snake_case DB columns map to camelCase JSON in Pydantic models
+- [x] **PLAT-09**: snake_case DB columns map to camelCase JSON in Pydantic models
 
 ### Workspace Lifecycle (WS)
 
@@ -152,14 +152,14 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | SETUP-04 | Phase 0 | Pending |
 | SETUP-05 | Phase 0 | Pending |
 | PLAT-01 | Phase 1 | Pending |
-| PLAT-02 | Phase 0 | Pending |
+| PLAT-02 | Phase 0 | Done (00-01) |
 | PLAT-03 | Phase 1 | Pending |
 | PLAT-04 | Phase 1 | Pending |
 | PLAT-05 | Phase 1 | Pending |
 | PLAT-06 | Phase 0 | Pending |
 | PLAT-07 | Phase 0 | Pending |
 | PLAT-08 | Phase 0 | Pending |
-| PLAT-09 | Phase 0 | Pending |
+| PLAT-09 | Phase 0 | Done (00-01) |
 | WS-01 | Phase 1 | Pending |
 | WS-02 | Phase 1 | Pending |
 | WS-03 | Phase 1 | Pending |
