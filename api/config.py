@@ -79,6 +79,11 @@ class Settings(BaseSettings):
 
     # ── Database ──────────────────────────────────────────────────────────
     database_path: str = "/data/burrow.db"
+    # Per-connection SQLite busy timeout (ms): how long a writer blocked by a
+    # concurrent writer's held lock waits before failing. Required so the VMID
+    # reservation race (SC-3/SC-4) surfaces a retryable VmidTakenError rather
+    # than a raw "database is locked" OperationalError (CR-02).
+    sqlite_busy_timeout_ms: int = 5000
 
 
 settings = Settings()

@@ -10,9 +10,12 @@ integration tier's job.
 """
 
 from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
+import aiosqlite
 import pytest
 
 from compute.fakeProvider import FakeComputeProvider
@@ -104,3 +107,51 @@ async def test_create_persists_creating_row_before_clone(
     assert fetched is not None
     assert fetched.vmid == ws.vmid
     assert fetched.status == "running"
+
+
+class _LockOnceDb(SqliteProvider):
+    """SqliteProvider that injects a one-shot "database is locked" on first INSERT.
+
+    CR-02 substrate at the service tier: proves the bounded reservation-retry loop
+    recovers from a transient lock loss instead of aborting the saga. The lock is
+    injected at the connection's ``execute`` (where a real concurrent-writer lock
+    would surface) so the provider's OperationalError->VmidTakenError mapping is
+    exercised — NOT by overriding ``createWorkspace`` (which would bypass it).
+    """
+
+    def __init__(self, settings: Any) -> None:
+        super().__init__(settings)
+        self._lock_inserts_remaining = 1
+
+    @asynccontextmanager
+    async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
+        async with super()._connect() as conn:
+            original_execute = conn.execute
+
+            async def _execute(sql: str, *args: Any, **kwargs: Any) -> Any:
+                if sql.startswith("INSERT INTO workspaces") and self._lock_inserts_remaining > 0:
+                    self._lock_inserts_remaining -= 1
+                    raise aiosqlite.OperationalError("database is locked")
+                return await original_execute(sql, *args, **kwargs)
+
+            conn.execute = _execute  # type: ignore[method-assign]
+            yield conn
+
+
+async def test_create_saga_retries_through_transient_lock(
+    compute: FakeComputeProvider, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """CR-02: a one-shot lock loss is retried, and the saga still reaches running."""
+    db = _LockOnceDb(_DbSettings(database_path=str(tmp_path / "lock-saga.db")))
+    await db.migrate()
+    svc = WorkspaceService(compute=compute, db=db, settings=real_settings)
+
+    async def _instant_ttyd(self: WorkspaceService, ip: str) -> None:
+        return None
+
+    monkeypatch.setattr(WorkspaceService, "_wait_ttyd", _instant_ttyd)
+
+    ws = await svc.createWorkspace(_payload())
+    assert ws.status == "running"
+    # Exactly one workspace row exists (the first locked INSERT never committed).
+    assert len(await db.listWorkspaces()) == 1

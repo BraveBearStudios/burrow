@@ -45,21 +45,41 @@ _WORKSPACE_COLUMNS = (
 class SqliteProvider(DbProvider):
     """``aiosqlite``-backed :class:`DbProvider`."""
 
+    # Default busy timeout (ms) a blocked writer waits on a held lock before it
+    # gives up. Used when ``settings`` does not carry ``sqlite_busy_timeout_ms``
+    # (e.g. the minimal test settings stub). See ``_connect`` for the rationale.
+    _DEFAULT_BUSY_TIMEOUT_MS = 5000
+
     def __init__(self, settings: Any) -> None:
         self._database_path: str = settings.database_path
+        self._busy_timeout_ms: int = getattr(
+            settings, "sqlite_busy_timeout_ms", self._DEFAULT_BUSY_TIMEOUT_MS
+        )
         self._migrated = False
 
     # ── connection ────────────────────────────────────────────────────────
     @asynccontextmanager
     async def _connect(self) -> AsyncIterator[aiosqlite.Connection]:
-        """Yield a connection with foreign-key enforcement turned ON.
+        """Yield a connection with FK enforcement, a busy timeout, and WAL on.
 
-        SQLite enforces foreign keys only when ``PRAGMA foreign_keys = ON`` is
-        set *per connection* (it defaults OFF), so the ``events.workspaceId``
-        FK in ``001_init.sql`` is a no-op unless every connection issues it.
-        Routing all methods through this helper closes that gap once, here.
+        Three per-connection pragmas, all required for correctness because each
+        opens a fresh connection (defaults reset every time):
+
+        - ``foreign_keys = ON``: SQLite enforces FKs only when set per connection
+          (defaults OFF), so the ``events.workspaceId`` FK in ``001_init.sql`` is
+          a no-op without it.
+        - ``busy_timeout``: without it a writer blocked by another writer's held
+          lock fails *immediately* with ``OperationalError: database is locked``
+          *before* the partial-unique-index check runs — so the VMID reservation
+          race (SC-3/SC-4) surfaces a raw lock error instead of the retryable
+          ``VmidTakenError`` (CR-02). With a timeout the loser waits, then hits
+          the real uniqueness check.
+        - ``journal_mode = WAL``: lets readers run concurrently with a writer,
+          shrinking the lock-contention window the busy timeout has to absorb.
         """
         async with aiosqlite.connect(self._database_path) as conn:
+            await conn.execute(f"PRAGMA busy_timeout = {self._busy_timeout_ms}")
+            await conn.execute("PRAGMA journal_mode = WAL")
             await conn.execute("PRAGMA foreign_keys = ON")
             yield conn
 
@@ -135,6 +155,18 @@ class SqliteProvider(DbProvider):
                 # none), so that column phrase is the reliable discriminator. Any
                 # other IntegrityError (e.g. the events FK) propagates unchanged.
                 if "workspaces.vmid" in str(exc):
+                    raise VmidTakenError(str(exc)) from exc
+                raise
+            except aiosqlite.OperationalError as exc:
+                # CR-02: under genuinely concurrent create sagas the losing writer
+                # can be blocked by the winner's held write lock and, even with a
+                # busy_timeout, ultimately fail with "database is locked" BEFORE
+                # the partial-unique check evaluates. That is the same "lost the
+                # race" outcome as a uniqueness collision, so it is surfaced as the
+                # retryable VmidTakenError (the seam-safe signal the service's
+                # bounded retry loop re-scans on) rather than escaping as a raw
+                # driver error. Any other OperationalError propagates unchanged.
+                if "database is locked" in str(exc).lower():
                     raise VmidTakenError(str(exc)) from exc
                 raise
             await conn.commit()
