@@ -57,12 +57,32 @@ class ComputeProvider(ABC):
         """Return the first free VMID in ``[pool_start, pool_end]`` not in ``used``.
 
         Raises :class:`NoFreeVmidError` when the range is exhausted.
+
+        .. warning::
+           This is a *pure computation* over the ``used`` snapshot the caller
+           passes; it does NOT reserve the returned VMID. ``usedVmids()`` →
+           ``getNextVmid()`` → ``cloneCt()`` is a read-then-act sequence with no
+           reservation in between, so two concurrent create sagas can pick the
+           same free VMID. Atomic reservation is provided ONLY by the Phase-1 DB
+           insert under the partial unique index on ``workspaces.vmid``
+           (``WHERE deletedAt IS NULL``, WS-10 / SC-4). Callers MUST reserve the
+           VMID via that insert *before* ``cloneCt`` and treat a uniqueness
+           violation as "lost the race, retry" — never rely on this method for
+           race-safety on its own. (The Fake masks the race: it is
+           single-threaded and stateful, so saga tests pass while a real
+           provider would collide.)
         """
         ...
 
     @abstractmethod
     async def usedVmids(self) -> set[int]:
-        """Return the set of VMIDs the compute backend currently knows about."""
+        """Return the set of VMIDs the compute backend currently knows about.
+
+        This is a point-in-time snapshot with no lock. See
+        :meth:`getNextVmid` — the snapshot may be stale by the time a clone runs,
+        so it is an optimization input, not a reservation. The DB partial unique
+        index (WS-10) is the only authority that prevents duplicate live VMIDs.
+        """
         ...
 
     @abstractmethod
