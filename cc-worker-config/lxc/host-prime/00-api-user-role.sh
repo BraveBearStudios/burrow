@@ -171,25 +171,29 @@ fi
 #    Under privsep the token alone has ZERO rights unless the user also holds
 #    them at that path -> grant to both, every path. acl modify is idempotent.
 # ---------------------------------------------------------------------------
-for principal in "--users ${USER}" "--tokens ${USER}!${TOKEN}"; do
-  # shellcheck disable=SC2086  # intentional word-split of the principal flag.
-  pveum acl modify "$POOL"    $principal --roles BurrowProvisioner --propagate 1
-  # shellcheck disable=SC2086
-  pveum acl modify "$TMPL"    $principal --roles BurrowProvisioner
-  # shellcheck disable=SC2086
-  pveum acl modify "$STORAGE" $principal --roles BurrowProvisioner
-  # shellcheck disable=SC2086
-  pveum acl modify "$NODE"    $principal --roles BurrowProvisioner
-done
+# Grant the role to one principal (a flag + value pair) at every scoped path.
+# Passing the principal as separate positional args ("$@") sidesteps IFS
+# entirely: common.sh sets IFS=$'\n\t' (no space), so any space-based split —
+# an unquoted "$principal" OR `read -a` (which also splits on $IFS) — would hand
+# pveum "--users burrow@pve" as ONE argument and the grant would be rejected.
+grant_acls() {
+  # "$@" = the principal flag and value, e.g. (--users burrow@pve).
+  pveum acl modify "$POOL"    "$@" --roles BurrowProvisioner --propagate 1
+  pveum acl modify "$TMPL"    "$@" --roles BurrowProvisioner
+  pveum acl modify "$STORAGE" "$@" --roles BurrowProvisioner
+  pveum acl modify "$NODE"    "$@" --roles BurrowProvisioner
+}
+grant_acls --users  "${USER}"
+grant_acls --tokens "${USER}!${TOKEN}"
 log "ACLs granted to user and token at pool/template/storage/node"
 
 # Conditional: grant SDN.Use on the <bridge> ONLY if SDN permission enforcement
 # is enabled on this cluster (a plain Linux-bridge homelab usually does not need
 # it). Uncomment and scope to the vNet/bridge path if a clone returns 403 on
 # 'set network':
-#   for principal in "--users ${USER}" "--tokens ${USER}!${TOKEN}"; do
-#     pveum acl modify "/sdn/zones/<zone>/<bridge>" $principal --roles BurrowProvisioner
-#   done
+#   sdn_grant() { pveum acl modify "/sdn/zones/<zone>/<bridge>" "$@" --roles BurrowProvisioner; }
+#   sdn_grant --users  "${USER}"
+#   sdn_grant --tokens "${USER}!${TOKEN}"
 
 log "STEP 0 complete. Verify scope with:"
 log "  pvesh get /access/permissions --token \"${USER}!${TOKEN}=<secret>\""
@@ -199,12 +203,14 @@ log "  pvesh get /access/permissions --token \"${USER}!${TOKEN}=<secret>\""
 # Remove everything this script created (run as root@pam). Order matters:
 # revoke ACLs, delete the token, delete the user, delete the role, delete pool.
 #
-#   for principal in "--users ${USER}" "--tokens ${USER}!${TOKEN}"; do
-#     pveum acl modify /pool/burrow-workers $principal --roles BurrowProvisioner --delete
-#     pveum acl modify /vms/<template-vmid> $principal --roles BurrowProvisioner --delete
-#     pveum acl modify /storage/<rootfs-storage> $principal --roles BurrowProvisioner --delete
-#     pveum acl modify /nodes/<node> $principal --roles BurrowProvisioner --delete
-#   done
+#   revoke_acls() {
+#     pveum acl modify /pool/burrow-workers "$@" --roles BurrowProvisioner --delete
+#     pveum acl modify /vms/<template-vmid> "$@" --roles BurrowProvisioner --delete
+#     pveum acl modify /storage/<rootfs-storage> "$@" --roles BurrowProvisioner --delete
+#     pveum acl modify /nodes/<node> "$@" --roles BurrowProvisioner --delete
+#   }
+#   revoke_acls --users  burrow@pve
+#   revoke_acls --tokens burrow@pve!burrow
 #   pveum user token remove burrow@pve burrow
 #   pveum user delete burrow@pve
 #   pveum role delete BurrowProvisioner
