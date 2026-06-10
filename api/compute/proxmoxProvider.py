@@ -129,7 +129,7 @@ class ProxmoxComputeProvider(ComputeProvider):
         node: str,
         full: bool = True,
     ) -> ComputeTask:
-        def _do() -> str:
+        def _clone() -> str:
             upid: str = (
                 self._api.nodes(node)
                 .lxc(template_vmid)
@@ -139,19 +139,37 @@ class ProxmoxComputeProvider(ComputeProvider):
                     full=1 if full else 0,
                 )
             )
+            return upid
+
+        def _configure() -> None:
             # ADR-0003: pool-scoped token must add the new VMID to /pool/burrow-workers.
             self._api.pools(_WORKER_POOL).put(vms=str(new_vmid))
             # ADR-0004: set the static net0 IP from the VMID.
             self._api.nodes(node).lxc(new_vmid).config.put(net0=self._net0_for(new_vmid))
-            return upid
 
+        # Issue the clone POST and capture its UPID.
         try:
-            upid = await asyncio.to_thread(_do)
+            upid = await asyncio.to_thread(_clone)
         except (TaskFailedError, NoFreeVmidError, CloneError):
             raise
         except Exception as exc:  # proxmoxer ResourceException etc. — no driver type escapes
             raise CloneError(f"clone of {template_vmid}->{new_vmid} failed: {exc}") from exc
-        return await self._block(upid, timeout=self._settings.clone_timeout)
+
+        # WR-05: block on the clone UPID to completion (exitstatus == OK) BEFORE the
+        # dependent pool-add and net0 PUTs. The old order fired those mutations
+        # against a half-baked VMID while the clone was still running, so a clone
+        # that later failed left a partial CT that had already been pool-added and
+        # net0-configured — widening the orphan window compensation must clean up.
+        task = await self._block(upid, timeout=self._settings.clone_timeout)
+
+        # Clone confirmed complete: now configure the fully-cloned CT.
+        try:
+            await asyncio.to_thread(_configure)
+        except Exception as exc:  # no driver type escapes the seam
+            raise CloneError(
+                f"post-clone configuration of {new_vmid} failed: {exc}"
+            ) from exc
+        return task
 
     async def injectBootConfig(self, vmid: int, config: BootConfig) -> None:
         # Pull-at-boot (ADR-0002): the worker FETCHES its boot intent from the control

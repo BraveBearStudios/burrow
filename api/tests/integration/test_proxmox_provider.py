@@ -134,6 +134,47 @@ async def test_clone_blocks_on_upid_and_wires_pool_and_net0() -> None:
 
 
 @responses.activate
+async def test_clone_blocks_on_upid_before_pool_and_net0_puts() -> None:
+    """WR-05: the clone UPID is confirmed OK BEFORE the pool-add / net0 config PUTs.
+
+    Firing the dependent mutations against a still-cloning VMID widened the orphan
+    window; the provider must block on the clone task first, then configure the
+    fully-cloned CT. Asserted by call ORDER in responses.calls.
+    """
+    _register_clone_calls({"status": "stopped", "exitstatus": "OK", "upid": _CLONE_UPID})
+
+    await _provider().cloneCt(9000, 201, "ws-201", _NODE)
+
+    ordered = [(c.request.method, str(c.request.url)) for c in responses.calls]
+    status_get = ("GET", f"{_BASE}/nodes/{_NODE}/tasks/{_CLONE_UPID}/status")
+    pool_put = ("PUT", f"{_BASE}/pools/burrow-workers")
+    net0_put = ("PUT", f"{_BASE}/nodes/{_NODE}/lxc/201/config")
+
+    # The clone-task status GET (the block) precedes BOTH dependent config PUTs.
+    assert ordered.index(status_get) < ordered.index(pool_put)
+    assert ordered.index(status_get) < ordered.index(net0_put)
+
+
+@responses.activate
+async def test_clone_failure_skips_pool_and_net0_puts() -> None:
+    """WR-05: a clone that ends non-OK never issues the dependent config PUTs.
+
+    With the block moved ahead of the PUTs, a failed clone raises before pool-add /
+    net0 run, so no mutation is left against a CT that never finished cloning.
+    """
+    _register_clone_calls(
+        {"status": "stopped", "exitstatus": "command failed", "upid": _CLONE_UPID}
+    )
+
+    with pytest.raises(TaskFailedError):
+        await _provider().cloneCt(9000, 201, "ws-201", _NODE)
+
+    issued = [(c.request.method, str(c.request.url)) for c in responses.calls]
+    assert ("PUT", f"{_BASE}/pools/burrow-workers") not in issued
+    assert ("PUT", f"{_BASE}/nodes/{_NODE}/lxc/201/config") not in issued
+
+
+@responses.activate
 async def test_clone_raises_task_failed_on_non_ok_exitstatus() -> None:
     """A non-OK task exitstatus makes cloneCt raise TaskFailedError (SC-1)."""
     _register_clone_calls(
