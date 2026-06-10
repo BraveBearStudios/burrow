@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 00-07-PLAN.md (golden-template provisioner + SC-corrected burrow-boot.sh + systemd unit, WORK-01/WORK-04 script half)
-last_updated: "2026-06-10T03:25:00.000Z"
+stopped_at: "Completed 00-02-PLAN.md (provider seams: ComputeProvider/DbProvider ABCs + FakeComputeProvider + SqliteProvider + Proxmox/Postgres stubs, PLAT-06/07/08)"
+last_updated: "2026-06-10T05:05:49.556Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 7
-  completed_plans: 4
-  percent: 57
+  completed_plans: 5
+  percent: 71
 ---
 
 <!--
@@ -31,25 +31,25 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 0 of 4 (Contracts, Seams & Golden Template)
-Plan: 4 of 7 complete in current phase
+Plan: 5 of 7 complete in current phase
 Status: Executing
-Last activity: 2026-06-10 — Plan 00-07 complete: golden-template shell artifacts (cc-worker-config/lxc/worker-template/provision-template.sh + burrow-boot.sh, cc-worker-config/systemd/burrow-worker.service). provision-template.sh bakes Ubuntu 24.04 + Node 22 (setup_22.x) + pinned @anthropic-ai/claude-code@2.1.170 + ttyd + baked plugins and enables the boot unit; burrow-boot.sh launches a PERSISTENT (no --once, SC-8), LAN-bound (--interface 0.0.0.0, SC-9) ttyd on :7681 with a documented pull-at-boot stub keeping secrets off the worker env. WORK-01/WORK-04 script half done; real-template build/boot deferred to dev-homelab smoke. (Unit canonicalized under systemd/; 20-create-template.sh repointed.)
+Last activity: 2026-06-10 — Plan 00-02 complete: the two provider seams. api/compute/ (ComputeProvider ABC with the full Phase-1 saga method set + typed ComputeError hierarchy, deterministic in-memory FakeComputeProvider with injectable FakeFailures hooks, ProxmoxComputeProvider NotImplementedError skeleton) and api/db/ (DbProvider ABC, SqliteProvider over aiosqlite + 001_init.sql migration runner, PostgresProvider stub). Providers return Pydantic DTOs only — no proxmoxer/aiosqlite type leaks past the interface. ruff + ruff format + mypy --strict green across the 17-file api/ tree; uv lock fresh. PLAT-06/07/08 complete.
 
-Progress: [██████░░░░] 57%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 4
-- Average duration: 19 min
-- Total execution time: 1.25 hours
+- Total plans completed: 5
+- Average duration: 17 min
+- Total execution time: 1.43 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 0 | 4 | 75 min | 19 min |
+| 0 | 5 | 86 min | 17 min |
 
 **Per-plan:**
 
@@ -57,6 +57,7 @@ Progress: [██████░░░░] 57%
 |------|----------|-------|-------|
 | Phase 0 P06 | 35 min | 4 tasks | 7 files |
 | Phase 0 P07 | 20 min | 3 tasks | 4 files |
+| Phase 0 P02 | 11 min | 3 tasks | 10 files |
 
 **Recent Trend:**
 
@@ -86,6 +87,10 @@ Recent decisions affecting current work:
 - [Plan 00-06]: shellcheck unavailable on the Windows dev host -> scripts validated with bash -n (all pass); shellcheck static analysis unverified, run in CI/homelab. SPDX verified via uvx --with charset-normalizer reuse lint-file.
 - [Plan 00-07]: Golden-template shell artifacts authored from the SC-corrected RESEARCH skeletons, NOT the tech-spec §9.3 snippet (its --once and --interface lo are both SC-reversed). burrow-boot.sh ttyd is FROZEN: --port 7681 --writable --interface 0.0.0.0, NO --once (SC-8 persistent) + LAN bind (SC-9 / WORK-04). Pull-at-boot is a documented TODO(Phase 3) stub; no secret is written to /etc/burrow/worker.env (SC-4). WORK-01/WORK-04 script half done; real-template build/boot is the dev-homelab gate.
 - [Plan 00-07]: Unit-location conflict resolved — burrow-worker.service canonicalized under cc-worker-config/systemd/ (Plan 00-07, most-recent-doc-wins) rather than worker-template/ where 00-06's 20-create-template.sh expected it; 20-create-template.sh's WORKER_UNIT repointed at the systemd/ path.
+- [Plan 00-02]: ComputeProvider ABC exposes the COMPLETE Phase-1 saga method set + typed ComputeError hierarchy; the surface is frozen before the saga is written (PLAT-07, SC-13).
+- [Plan 00-02]: FakeComputeProvider is in-memory + deterministic (IP=10.99.0.<vmid%256>, no random/sleep), lifecycle-accurate, with an injectable FakeFailures(raise_on_nth_call) hook shaped for Phase-1 compensation tests (PLAT-08).
+- [Plan 00-02]: Scoped mypy override module='proxmoxer.*' ignore_missing_imports (no py.typed) keeps --strict on all first-party code; proxmoxer stays confined to proxmoxProvider.py.
+- [Plan 00-02]: SQLite columns are camelCase (tech-spec §7.1 verbatim); snake<->camel bridge lives ONLY in sqliteProvider.py. 001_init.sql omits the UNIQUE(vmid) partial index (Phase-1 002_* migration, SC-4).
 
 ### Pending Todos
 
@@ -110,7 +115,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T03:25:00.000Z
-Stopped at: Completed 00-07-PLAN.md (golden-template provisioner + SC-corrected burrow-boot.sh + systemd unit, WORK-01/WORK-04 script half)
+Last session: 2026-06-10T05:05:49.547Z
+Stopped at: Completed 00-02-PLAN.md (provider seams: ComputeProvider/DbProvider ABCs + FakeComputeProvider + SqliteProvider + Proxmox/Postgres stubs, PLAT-06/07/08)
 Resume file: None
 Next plan: 00-02 (provider seams: ComputeProvider/DbProvider ABCs + FakeComputeProvider + Sqlite/Postgres + Proxmox skeleton) — wave-1 sibling, no remaining dependency.
