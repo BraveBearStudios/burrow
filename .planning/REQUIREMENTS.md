@@ -58,8 +58,8 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 - [ ] **WS-07**: Operator can start a stopped workspace (awaits ttyd health)
 - [ ] **WS-08**: Operator can destroy a workspace (stop + destroy LXC, soft-delete the row)
 - [ ] **WS-09**: Workspace status follows the enforced state machine (creating→running|error; running→stopped|destroyed; stopped→running|destroyed)
-- [ ] **WS-10**: VMID allocation is race-safe across uvicorn workers via a DB unique reservation using a partial unique index that excludes soft-deleted rows (SC-3)
-- [ ] **WS-11**: Operator can read a workspace's event log (created/started/stopped/destroyed/terminal.connected/terminal.disconnected/boot.error)
+- [x] **WS-10**: VMID allocation is race-safe across uvicorn workers via a DB unique reservation using a partial unique index that excludes soft-deleted rows (SC-3)
+- [ ] **WS-11**: Operator can read a workspace's event log (created/started/stopped/destroyed/terminal.connected/terminal.disconnected/boot.error) — DB read path (`getEvents`) landed in 01-01; `GET .../{id}/events` endpoint in 01-04
 
 ### Terminal Proxy (TERM)
 
@@ -174,8 +174,8 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | WS-07 | Phase 1 | Pending |
 | WS-08 | Phase 1 | Pending |
 | WS-09 | Phase 1 | Pending |
-| WS-10 | Phase 1 | Pending |
-| WS-11 | Phase 1 | Pending |
+| WS-10 | Phase 1 | Done (01-01) |
+| WS-11 | Phase 1 | In progress (01-01 DB read path; endpoint 01-04) |
 | TERM-01 | Phase 2 | Pending |
 | TERM-02 | Phase 2 | Pending |
 | TERM-03 | Phase 2 | Pending |

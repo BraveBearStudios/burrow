@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 00-03-PLAN.md (app factory DI by env + Phase-0 test substrate; PLAT-02/06/07/08/09 CI-proven; Phase 0 complete 7/7)
-last_updated: "2026-06-10T06:01:47.751Z"
+stopped_at: Completed 01-01-PLAN.md (DB foundation: 002 partial-unique index + ordered migrate() ledger, VmidTakenError reservation, getEvents/getByVmid, all Phase-1 Settings keys; WS-10/WS-11 CI-proven)
+last_updated: "2026-06-10T15:19:24Z"
 last_activity: 2026-06-10
 progress:
   total_phases: 5
   completed_phases: 1
-  total_plans: 7
-  completed_plans: 7
-  percent: 20
+  total_plans: 12
+  completed_plans: 8
+  percent: 22
 ---
 
 <!--
@@ -26,35 +26,37 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 0 — Contracts, Seams & Golden Template
+**Current focus:** Phase 1 — Control Plane API
 
 ## Current Position
 
-Phase: 0 of 4 (Contracts, Seams & Golden Template)
-Plan: 7 of 7 complete in current phase
-Status: Phase 0 complete
-Last activity: 2026-06-10 — Plan 00-03 complete: FastAPI app factory + the single env-driven provider-DI seam (get_compute()/get_db() are the ONLY place concrete impls are named; BURROW_COMPUTE/BURROW_DB flip the backend with no service edit) + the hermetic Phase-0 test substrate. conftest fixtures (fake_compute, migrated tmp sqlite_db, httpx ASGITransport client) + five req-anchored unit files prove PLAT-02/06/07/08/09 green over Fake/Sqlite with zero Proxmox, and a tokenize-based seam-leakage guard (red on an injected leak, green on the tree) confines proxmoxer/aiosqlite/raw-SQL to their owning provider files. Full gate green: 28 pytest passed, ruff + ruff format + mypy --strict (26 files) + uv lock --check + reuse lint (110/110). Closes the Wave-0 VALIDATION.md test gaps; Phase 0 is now 7/7.
+Phase: 1 of 4 (Control Plane API)
+Plan: 1 of 5 complete in current phase
+Status: Executing Phase 1
+Last activity: 2026-06-10 — Plan 01-01 complete: the DB foundation for the Phase-1 saga. `002_vmid_unique.sql` adds a partial unique index on `workspaces(vmid) WHERE deletedAt IS NULL AND vmid IS NOT NULL` — the cross-process VMID reservation arbiter (SC-3/SC-4) that survives destroy-then-recreate. `migrate()` is now an ordered, idempotent `schema_migrations`-ledger runner applying every `migrations/*.sql` by stem (fixes the Phase-0 landmine where it ran only 001). `SqliteProvider.createWorkspace` maps a vmid-uniqueness IntegrityError to a typed `VmidTakenError` (the "lost the race, retry" signal the saga will catch without an aiosqlite dep); `getEvents` (WS-11, oldest-first via createdAt+rowid) and `getByVmid` (active vmid owner) added to the ABC + SqliteProvider, with the Postgres stub kept concrete. All Phase-1 `Settings` keys landed in one config edit (capacity threshold, ttyd/clone/task timeouts, net0 params, allowed_origin, git credential token, source-IP gate) with safe non-secret defaults mirrored into `.env.example`. WS-10 is CI-proven over real SQLite. Full gate green: 38 pytest passed, ruff + ruff format + mypy --strict (28 files) + uv lock --check + reuse lint (122/122).
 
-Progress: [██████████] 100% (Phase 0)
+Progress: [██░░░░░░░░] 20% (Phase 1: 1/5 plans)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 5
-- Average duration: 17 min
-- Total execution time: 1.43 hours
+- Total plans completed: 6
+- Average duration: 18 min
+- Total execution time: 1.80 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
 | 0 | 5 | 86 min | 17 min |
+| 1 | 1 | 22 min | 22 min |
 
 **Per-plan:**
 
 | Plan | Duration | Tasks | Files |
 |------|----------|-------|-------|
+| Phase 1 P01 | 22 min | 4 tasks | 8 files |
 | Phase 0 P06 | 35 min | 4 tasks | 7 files |
 | Phase 0 P07 | 20 min | 3 tasks | 4 files |
 | Phase 0 P02 | 11 min | 3 tasks | 10 files |
@@ -75,6 +77,11 @@ Progress: [██████████] 100% (Phase 0)
 Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
+- [Plan 01-01]: 002 partial unique index on `workspaces(vmid) WHERE deletedAt IS NULL AND vmid IS NOT NULL` is the cross-process VMID reservation arbiter (SC-3/SC-4); soft-deleted tombstones and NULL vmids stay out of the index so destroy-then-recreate reuses a vmid. A plain UNIQUE would break recycle.
+- [Plan 01-01]: `migrate()` is now an ordered, idempotent `schema_migrations`-ledger runner applying every `migrations/*.sql` by stem — replaces the Phase-0 "skip if workspaces table exists" check that wrongly skipped 002 on an existing DB (Pitfall 6).
+- [Plan 01-01]: `VmidTakenError` is discriminated on the SQLite `workspaces.vmid` column phrase, NOT the index name — SQLite reports the violated column for a partial-unique failure, and the 002 index is the only uniqueness on that column. Declared on the DbProvider ABC module so the service catches it without an aiosqlite dep.
+- [Plan 01-01]: `getEvents` orders by `(createdAt, rowid)` so two same-millisecond events keep insertion order (deterministic WS-11 oldest-first). `getByVmid` returns the active (non-soft-deleted) vmid owner.
+- [Plan 01-01]: All Phase-1 `Settings` keys consolidated in one config.py edit (single-owner file → no cross-plan write conflicts) with safe non-secret placeholder defaults; real LAN/secret values live only in the gitignored `.env` (T-01-22 mitigation).
 - [Roadmap]: Seams-first build — provider ABCs + FakeComputeProvider + envelope land in Phase 0 so ~80% of the backend is CI-green before any real Proxmox call.
 - [Roadmap]: Implement the Spec Corrections (SC-1..SC-13), not the spec happy-path — UPID waits, persist-before-clone, race-safe VMID reservation, partial unique index, `tty` subprotocol, persistent ttyd.
 - [Phase 0]: Drop ttyd `--once` (SC-8), bind ttyd to the worker LAN interface (SC-9), use `--full` clone — frozen before the template is finalized.
@@ -123,7 +130,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T06:00:35.338Z
-Stopped at: Completed 00-03-PLAN.md (app factory DI by env + Phase-0 test substrate; PLAT-02/06/07/08/09 CI-proven; Phase 0 complete 7/7)
+Last session: 2026-06-10T15:19:24Z
+Stopped at: Completed 01-01-PLAN.md (DB foundation: 002 partial-unique index + ordered migrate() ledger, VmidTakenError reservation, getEvents/getByVmid, all Phase-1 Settings keys; WS-10/WS-11 CI-proven)
 Resume file: None
-Next plan: Phase 1 (Control Plane API) — plan with `/gsd:plan-phase 1`. Phase 0 contracts, seams, FakeComputeProvider, envelope, app factory, static gates, golden-template + host-prime decisions are all done; the create saga + state machine + real providers build against the now-frozen seam.
+Next plan: 01-02-PLAN.md (Real ProxmoxComputeProvider — UPID-blocked clone/start/stop/destroy in asyncio.to_thread, CA-pinned TLS, net0 static IP + pool-add, node memory, responses-mock integration test). 01-03 (saga) reserves VMIDs through this index + VmidTakenError; 01-04 (routers) reads events via getEvents; 01-05 (bootconfig) looks up workspaces via getByVmid and reads git_credential_token/allowed_origin/net0 from Settings.

@@ -1,3 +1,8 @@
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
+
 # Phase 1: Control Plane API - Context
 
 **Gathered:** 2026-06-10

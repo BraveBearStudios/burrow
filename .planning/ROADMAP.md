@@ -88,7 +88,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Plans**: 5 plans
 
 Plans:
-- [ ] 01-01-PLAN.md — DB foundation: 002 partial-unique-index + ordered migrate(), VmidTakenError reservation, getEvents/getByVmid, all Phase-1 Settings keys (WS-10, WS-11)
+- [x] 01-01-PLAN.md — DB foundation: 002 partial-unique-index + ordered migrate(), VmidTakenError reservation, getEvents/getByVmid, all Phase-1 Settings keys (WS-10, WS-11)
 - [ ] 01-02-PLAN.md — Real ProxmoxComputeProvider (UPID-blocked, asyncio.to_thread, CA-pinned, net0+pool-add, node memory) + responses-mock integration test (PLAT-07, CAP-01, CICD-02/03)
 - [ ] 01-03-PLAN.md — WorkspaceService create→stop→start→destroy saga + state machine + compensation + capacity guard over the Fake (WS-01/02/03/06/07/08/09, CAP-01/04)
 - [ ] 01-04-PLAN.md — /api/v1 routers (CRUD + stop/start/destroy/events, templates, degrade-not-500 health) + JSON logging + security headers + non-* CORS + integration tier (PLAT-01/03/04/05, WS-04/05/11, CICD-02)
@@ -158,7 +158,7 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
-| 1. Control Plane API | 0/TBD | Not started | - |
+| 1. Control Plane API | 1/5 | In progress | - |
 | 2. Terminal Proxy + React UI | 0/TBD | Not started | - |
 | 3. Reproducible Workers | 0/TBD | Not started | - |
 | 4. Hardening & Release | 0/TBD | Not started | - |
