@@ -11,11 +11,13 @@ Phase 1).
 
 The envelope contract (PLAT-02) is enforced at the ASGI boundary: an exception
 handler wraps any uncaught error into the ``{data, meta, error}`` shape from
-:mod:`lib.envelope`. Success-wrapping middleware is deferred to Phase 1 with the
-routers; this phase only needs the error boundary and the factory.
+:mod:`lib.envelope`. The ``/api/v1`` routers, structured JSON logging (PLAT-04),
+security headers + non-``*`` CORS (PLAT-05), and the ``get_service`` DI seam are
+wired here in :func:`create_app`.
 """
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from compute.fakeProvider import FakeComputeProvider
@@ -25,6 +27,9 @@ from config import settings
 from db.provider import DbProvider
 from db.sqliteProvider import SqliteProvider
 from lib.envelope import respond_error
+from lib.logging import setup_logging
+from lib.middleware import SecurityHeadersMiddleware
+from services.workspaceService import WorkspaceService
 
 
 def get_compute() -> ComputeProvider:
@@ -48,6 +53,19 @@ def get_db() -> DbProvider:
     return SqliteProvider(settings)
 
 
+def get_service(
+    compute: ComputeProvider = Depends(get_compute),
+    db: DbProvider = Depends(get_db),
+) -> WorkspaceService:
+    """Compose the :class:`WorkspaceService` from the provider factories (Pattern 5).
+
+    Routers depend on this rather than on a provider impl: ``get_service`` is the
+    single DI seam that hands the orchestration core its two ABCs plus
+    ``settings``. The service never names a concrete provider (seam discipline).
+    """
+    return WorkspaceService(compute=compute, db=db, settings=settings)
+
+
 def _envelope_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Wrap any uncaught error into the standard error envelope (PLAT-02)."""
     body = respond_error(code="internal_error", message="Internal server error")
@@ -57,12 +75,28 @@ def _envelope_exception_handler(request: Request, exc: Exception) -> JSONRespons
 def create_app() -> FastAPI:
     """Build and configure the Burrow control-plane FastAPI app.
 
-    Registers the envelope error boundary. Routers (Phase 1) are added here; this
-    phase ships the factory + DI seam so the rest of the app builds against a
-    stable shape.
+    Installs structured JSON logging (PLAT-04), registers the envelope error
+    boundary (PLAT-02), and adds the security-headers + non-``*`` CORS middleware
+    (PLAT-05). Middleware add-order is inner→outer, so :class:`SecurityHeadersMiddleware`
+    is added FIRST and ``CORSMiddleware`` LAST, making CORS the outermost layer that
+    handles preflight + error responses (RESEARCH Pattern 7). CORS is restricted to
+    ``settings.allowed_origin`` (a non-``*`` LAN origin; a wildcard origin is
+    incompatible with credentials, Pitfall 12). v1 is LAN-only no-auth by design — no
+    auth is added here.
     """
+    setup_logging()
     app = FastAPI(title="Burrow Control Plane", version="0.1.0")
     app.add_exception_handler(Exception, _envelope_exception_handler)
+
+    # Inner→outer add order: SecurityHeaders first, CORS last (outermost).
+    app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[settings.allowed_origin],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
     return app
 
 
