@@ -532,23 +532,27 @@ export default defineConfig({ plugins: [react(), tailwindcss()] });
 
 **If this table is empty:** it is not — A1–A6 need confirmation (A3/A4/A1 are the load-bearing ones for the planner).
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Which token palette is binding — design prompt (forest-green/gold) or generic `_ds` (warm-neutral)?**
    - What we know: the design prompt + `burrow-ui-mockup.html` describe forest-green `#344734` + gold prestige; the `_ds/colors_and_type.css` is an unbranded warm-neutral base meant to be overridden.
    - What's unclear: which the UI-SPEC (generated after this research) locks.
    - Recommendation: treat the **design prompt + mockup as authoritative** (it explicitly says "override everything"); seed `@theme` from it. Defer the final token table to the UI-SPEC.
+   - RESOLVED: forest-green/gold per the binding 02-UI-SPEC Color Tokens (`--accent #344734`, gold prestige) — the `_ds` warm-neutral base is the override target, not the contract.
 
 2. **Boot-progress: cosmetic staged animation, or migrate create to async `202`+poll?**
    - What we know: create is synchronous today; the mockup implies streamed steps.
    - Recommendation: ship cosmetic staged animation in Phase 2 (no backend change); record the `202`+poll migration as a future option (ARCHITECTURE.md already notes it). Surface to the planner before locking UI-03.
+   - RESOLVED: cosmetic staged progress during the synchronous create POST (Plan 02-05); the async `202`+poll migration is deferred to v1.x.
 
 3. **Node capacity for the status bar (UI-04) — new endpoint or drop the "GB free" chip?**
    - What we know: `getNodeMemory` exists on the ComputeProvider but is not exposed via any `/api/v1` route; the list endpoint has no node-capacity field.
    - Recommendation: v1 status bar shows running/stopped/error counts + session uptime from the workspace list; mark the per-node "GB free" chip as needing a small read-only `GET /api/v1/nodes` (or fold into `/health`) — flag to the planner as a scope decision (could defer to Phase 4 alongside the capacity work).
+   - RESOLVED: add `GET /api/v1/nodes` (Plan 02-01) exposing `memoryUsedFraction`; the status bar shows the real used-memory fraction, not an invented "GB free" number.
 
 4. **react-mosaic 6.2.0 dnd backend wiring (`<Mosaic>` vs `<MosaicWithoutDragDropContext>` + `DndProvider`)?**
    - Recommendation: verify the 6.2.0 exports at plan time and pick one path; do not double-wrap `DndProvider` (Pitfall 6).
+   - RESOLVED: confirm the 6.2.0 `<Mosaic>` (bundled HTML5 backend) vs `<MosaicWithoutDragDropContext>` + own `DndProvider` export at implementation time (Plan 02-04 Pitfall); `react-mosaic-component` stays pinned `6.2.0` exact.
 
 ## Environment Availability
 
