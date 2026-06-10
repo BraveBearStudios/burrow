@@ -85,6 +85,6 @@ jobs:
       pull-requests: read
     steps:
       - name: Validate PR title (semantic / conventional-commit)
-        uses: amannn/action-semantic-pull-request@e32d7e603df1aa1ba07e981f2a23455dee596825 # TODO pin exact SHA
+        uses: amannn/action-semantic-pull-request@e32d7e603df1aa1ba07e981f2a23455dee596825 # v5
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
