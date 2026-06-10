@@ -5,15 +5,24 @@
 // Task 1 authors the happy-path (RED until the hook exists); Task 3 adds the
 // fit/reconnect/dispose hardening tests under this same file.
 
-import { render } from "@testing-library/react";
+import { act, render } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+	frameText,
 	installMockWebSocket,
 	lastSocket,
 	type MockWebSocket,
 } from "../../tests/helpers/mockWebSocket";
-import { lastTerminal, resetXtermMocks } from "../../tests/helpers/mockXterm";
-import { installMockResizeObserver } from "../../tests/helpers/resizeObserver";
+import {
+	lastTerminal,
+	liveTerminalCount,
+	resetXtermMocks,
+} from "../../tests/helpers/mockXterm";
+import {
+	installMockResizeObserver,
+	liveObserverCount,
+	MockResizeObserver,
+} from "../../tests/helpers/resizeObserver";
 import { useTerminal } from "./useTerminal";
 
 vi.mock("@xterm/xterm", () => import("../../tests/helpers/mockXterm"));
@@ -84,10 +93,194 @@ describe("useTerminal — happy path (TERM-05)", () => {
 			status = t.status;
 			return <div ref={t.containerRef} />;
 		}
-		const { rerender } = render(<StatusHarness />);
+		render(<StatusHarness />);
 		expect(status).toBe("connecting");
-		lastSocket().emitOpen();
-		rerender(<StatusHarness />);
+		act(() => {
+			lastSocket().emitOpen();
+		});
 		expect(status).toBe("open");
 	});
 });
+
+// A status-reading harness shared by the Task-3 hardening blocks.
+let observed: {
+	status: string;
+	reconnectAttempts: number;
+	reattach: () => void;
+};
+function ObservedHarness({ id = "w1" }: { id?: string }) {
+	const t = useTerminal(id, "running");
+	observed = {
+		status: t.status,
+		reconnectAttempts: t.reconnectAttempts,
+		reattach: t.reattach,
+	};
+	return <div ref={t.containerRef} />;
+}
+
+describe("useTerminal — fit on resize (TERM-05)", () => {
+	beforeEach(() => {
+		installMockWebSocket();
+		installMockResizeObserver();
+		resetXtermMocks();
+		// jsdom reports 0 for layout; give the panel body a visible non-zero size
+		// so the hook's "only fit when visible & non-zero" guard lets fit() run.
+		vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(800);
+		vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockReturnValue(600);
+	});
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("fits and sends a resize frame on a ResizeObserver callback (not stuck 80x24)", () => {
+		render(<ObservedHarness />);
+		const socket = lastSocket();
+		act(() => {
+			socket.emitOpen();
+		});
+		const term = lastTerminal();
+		// The mock fit() reflows off the 80x24 default.
+		expect(term.cols).not.toBe(80);
+
+		const before = socket.sent.length;
+		act(() => {
+			MockResizeObserver.instances.at(-1)?.trigger();
+		});
+		// A resize frame ('1' + JSON {columns,rows}) was sent.
+		const resizeFrames = socket.sent
+			.slice(before)
+			.map(frameText)
+			.filter((t) => t.startsWith("1") && t.includes("columns"));
+		expect(resizeFrames.length).toBeGreaterThanOrEqual(1);
+	});
+});
+
+describe("useTerminal — reconnect with jittered backoff (TERM-06)", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		installMockWebSocket();
+		installMockResizeObserver();
+		resetXtermMocks();
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
+
+	it("reconnects on an unexpected close, incrementing the attempt counter", () => {
+		render(<ObservedHarness />);
+		act(() => {
+			lastSocket().emitOpen();
+		});
+		expect(observed.status).toBe("open");
+
+		const firstSocket = lastSocket();
+		act(() => {
+			firstSocket.emitClose(1006); // abnormal drop
+		});
+		expect(observed.status).toBe("reconnecting");
+		expect(observed.reconnectAttempts).toBe(1);
+
+		// The backoff timer fires and a NEW socket is opened.
+		act(() => {
+			vi.runOnlyPendingTimers();
+		});
+		expect(lastSocket()).not.toBe(firstSocket);
+
+		// A successful reopen resets the attempt counter to 0.
+		act(() => {
+			lastSocket().emitOpen();
+		});
+		expect(observed.status).toBe("open");
+		expect(observed.reconnectAttempts).toBe(0);
+	});
+
+	it("stops retrying after 5 attempts and shows the error state", () => {
+		render(<ObservedHarness />);
+		act(() => {
+			lastSocket().emitOpen();
+		});
+		// Drop + let the timer fire, six times: attempts 1..5 then exhaustion.
+		for (let i = 0; i < 6; i += 1) {
+			act(() => {
+				lastSocket().emitClose(1006);
+			});
+			act(() => {
+				vi.runOnlyPendingTimers();
+			});
+		}
+		expect(observed.status).toBe("error");
+	});
+
+	it("does NOT retry on close code 1008 (policy violation) — error state", () => {
+		render(<ObservedHarness />);
+		act(() => {
+			lastSocket().emitOpen();
+		});
+		const sockets = MockWebSocketInstances();
+		act(() => {
+			lastSocket().emitClose(1008);
+		});
+		expect(observed.status).toBe("error");
+		act(() => {
+			vi.runOnlyPendingTimers();
+		});
+		// No new socket was constructed after the 1008 close.
+		expect(MockWebSocketInstances()).toBe(sockets);
+	});
+
+	it("goes to error (no retry) on an LXC_NOT_READY error frame", () => {
+		render(<ObservedHarness />);
+		const socket = lastSocket();
+		act(() => {
+			socket.emitOpen();
+		});
+		act(() => {
+			socket.emitMessage(
+				JSON.stringify({ type: "error", code: "LXC_NOT_READY" }),
+			);
+		});
+		expect(observed.status).toBe("error");
+	});
+});
+
+describe("useTerminal — clean dispose (TERM-07)", () => {
+	beforeEach(() => {
+		installMockWebSocket();
+		installMockResizeObserver();
+		resetXtermMocks();
+	});
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("closes the WS, disposes the terminal, and disconnects the observer on unmount", () => {
+		const { unmount } = render(<ObservedHarness />);
+		const socket = lastSocket();
+		expect(liveTerminalCount()).toBe(1);
+		expect(liveObserverCount()).toBe(1);
+
+		unmount();
+		expect(socket.closed).toBe(true);
+		expect(liveTerminalCount()).toBe(0);
+		expect(liveObserverCount()).toBe(0);
+	});
+
+	it("leaves a flat terminal/observer count over many mount/unmount cycles", () => {
+		for (let i = 0; i < 50; i += 1) {
+			const { unmount } = render(<ObservedHarness />);
+			unmount();
+		}
+		expect(liveTerminalCount()).toBe(0);
+		expect(liveObserverCount()).toBe(0);
+	});
+});
+
+/** Snapshot the MockWebSocket instances array identity for no-retry assertions. */
+function MockWebSocketInstances() {
+	return lastSocketCount();
+}
+function lastSocketCount(): number {
+	// biome-ignore lint/suspicious/noExplicitAny: read the mock's static list
+	return ((globalThis as any).WebSocket?.instances ?? []).length;
+}

@@ -5,7 +5,7 @@
 // (mount → connect → init → echo → type), RED until TerminalPanel/useTerminal
 // exist; Task 3 adds the reconnecting/error overlay assertions.
 
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	installMockWebSocket,
@@ -68,5 +68,55 @@ describe("TerminalPanel — happy path (the MVP slice)", () => {
 	it("renders the workspace name in the panel header", () => {
 		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
 		expect(screen.getByText("project-eta")).toBeInTheDocument();
+	});
+
+	it("shows the connecting overlay before the first byte", () => {
+		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		expect(screen.getByText("Connecting…")).toBeInTheDocument();
+	});
+});
+
+describe("TerminalPanel — overlays (TERM-06)", () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+		installMockWebSocket();
+		installMockResizeObserver();
+		resetXtermMocks();
+	});
+	afterEach(() => {
+		vi.useRealTimers();
+		vi.restoreAllMocks();
+	});
+
+	it("shows the reconnecting overlay with the verbatim attempt copy + Reattach", () => {
+		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		act(() => {
+			lastSocket().emitOpen();
+		});
+		act(() => {
+			lastSocket().emitClose(1006);
+		});
+		// 02-UI-SPEC copy: `reconnecting… attempt {n} / 5`
+		expect(screen.getByText("reconnecting… attempt 1 / 5")).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "Reattach" }),
+		).toBeInTheDocument();
+		// aria-live region announces the attempt counter.
+		expect(screen.getByRole("status")).toBeInTheDocument();
+	});
+
+	it("shows the error overlay (no spinner) + Retry on a 1008 close", () => {
+		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		act(() => {
+			lastSocket().emitOpen();
+		});
+		act(() => {
+			lastSocket().emitClose(1008);
+		});
+		expect(
+			screen.getByText("Session unavailable. the worker isn't ready."),
+		).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+		expect(screen.getByRole("alert")).toBeInTheDocument();
 	});
 });

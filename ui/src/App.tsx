@@ -6,10 +6,8 @@
 // sidebar / react-mosaic grid / status-bar shell lands in Waves 3-4 (02-04/05);
 // QueryClientProvider + data-theme="dark" are provided by main.tsx / index.html.
 
-import { useQuery } from "@tanstack/react-query";
-import { api } from "./api/client";
 import { TerminalPanel } from "./components/TerminalPanel";
-import type { Workspace } from "./types/workspace";
+import { useInvalidateWorkspaces, useWorkspaces } from "./hooks/useWorkspaces";
 
 const shellStyle: React.CSSProperties = {
 	display: "flex",
@@ -21,11 +19,8 @@ const shellStyle: React.CSSProperties = {
 };
 
 export function App() {
-	const { data: workspaces } = useQuery({
-		queryKey: ["workspaces"],
-		queryFn: () => api<Workspace[]>("/workspaces"),
-		refetchInterval: 3000,
-	});
+	const { data: workspaces } = useWorkspaces();
+	const invalidateWorkspaces = useInvalidateWorkspaces();
 
 	const running = workspaces?.find((w) => w.status === "running");
 
@@ -37,6 +32,7 @@ export function App() {
 					name={running.name}
 					status={running.status}
 					branch={running.projectBranch}
+					onTerminalEvent={invalidateWorkspaces}
 				/>
 			) : (
 				<div

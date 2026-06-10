@@ -21,7 +21,12 @@ export interface TerminalPanelProps {
 	onSplit?: (id: string) => void;
 	onDetach?: (id: string) => void;
 	onTerminate?: (id: string) => void;
+	/** Fired when the terminal hits a terminal state (Pitfall 4: invalidate list). */
+	onTerminalEvent?: (event: "error" | "closed") => void;
 }
+
+/** Human-readable reason for the error overlay (02-UI-SPEC Copywriting). */
+const ERROR_REASON = "the worker isn't ready";
 
 const ICON = {
 	stroke: "currentColor",
@@ -119,6 +124,46 @@ const iconButtonStyle: React.CSSProperties = {
 	cursor: "pointer",
 };
 
+const overlayBase: React.CSSProperties = {
+	position: "absolute",
+	inset: 0,
+	display: "flex",
+	flexDirection: "column",
+	alignItems: "center",
+	justifyContent: "center",
+	gap: "9px",
+	fontFamily: "var(--font-sans)",
+	fontSize: "12px",
+	color: "var(--text-sub)",
+};
+
+const overlayButton: React.CSSProperties = {
+	font: "inherit",
+	color: "var(--text)",
+	background: "var(--bg-panel-alt)",
+	border: "0.5px solid var(--border-mid)",
+	borderRadius: "var(--radius-control)",
+	padding: "5px 12px",
+	cursor: "pointer",
+};
+
+/** A 22px ring spinner; the top arc is gold (02-UI-SPEC reconnecting overlay). */
+function Spinner({ gold }: { gold?: boolean }) {
+	return (
+		<span
+			aria-hidden="true"
+			style={{
+				width: "22px",
+				height: "22px",
+				borderRadius: "var(--radius-full)",
+				border: "2px solid var(--border-mid)",
+				borderTopColor: gold ? "var(--gold)" : "var(--accent-line)",
+				animation: "spin 0.8s linear infinite",
+			}}
+		/>
+	);
+}
+
 export function TerminalPanel({
 	id,
 	name,
@@ -128,8 +173,14 @@ export function TerminalPanel({
 	onSplit,
 	onDetach,
 	onTerminate,
+	onTerminalEvent,
 }: TerminalPanelProps) {
-	const { containerRef } = useTerminal(id, status);
+	const {
+		containerRef,
+		status: termStatus,
+		reconnectAttempts,
+		reattach,
+	} = useTerminal(id, status, { onTerminalEvent });
 
 	return (
 		<section
@@ -211,22 +262,80 @@ export function TerminalPanel({
 			</header>
 
 			<div
-				ref={containerRef}
-				className="term"
-				data-testid={`term-${id}`}
 				style={{
 					position: "relative",
 					flex: 1,
 					minHeight: 0,
-					padding: "11px 13px",
-					background: "var(--bg-surf)",
-					color: "var(--text-sub)",
-					fontFamily: "var(--font-mono)",
-					fontSize: "12px",
-					lineHeight: 1.6,
-					overflowY: "auto",
 				}}
-			/>
+			>
+				<div
+					ref={containerRef}
+					className="term"
+					data-testid={`term-${id}`}
+					style={{
+						position: "absolute",
+						inset: 0,
+						padding: "11px 13px",
+						background: "var(--bg-surf)",
+						color: "var(--text-sub)",
+						fontFamily: "var(--font-mono)",
+						fontSize: "12px",
+						lineHeight: 1.6,
+						overflowY: "auto",
+					}}
+				/>
+
+				{termStatus === "connecting" ? (
+					<div
+						style={{ ...overlayBase, background: "rgba(26,28,26,.45)" }}
+						role="status"
+						aria-live="polite"
+					>
+						<Spinner />
+						<span>Connecting…</span>
+					</div>
+				) : null}
+
+				{termStatus === "reconnecting" ? (
+					<div
+						style={{ ...overlayBase, background: "rgba(26,28,26,.78)" }}
+						role="status"
+						aria-live="polite"
+					>
+						<Spinner gold />
+						<span>{`reconnecting… attempt ${reconnectAttempts} / 5`}</span>
+						<button type="button" style={overlayButton} onClick={reattach}>
+							Reattach
+						</button>
+					</div>
+				) : null}
+
+				{termStatus === "error" ? (
+					<div
+						style={{ ...overlayBase, background: "rgba(26,28,26,.78)" }}
+						role="alert"
+						aria-live="assertive"
+					>
+						<span
+							aria-hidden="true"
+							style={{
+								width: "22px",
+								height: "22px",
+								display: "grid",
+								placeItems: "center",
+								color: "var(--err)",
+								fontSize: "18px",
+							}}
+						>
+							!
+						</span>
+						<span>{`Session unavailable. ${ERROR_REASON}.`}</span>
+						<button type="button" style={overlayButton} onClick={reattach}>
+							Retry
+						</button>
+					</div>
+				) : null}
+			</div>
 		</section>
 	);
 }
