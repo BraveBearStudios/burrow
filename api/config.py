@@ -47,6 +47,36 @@ class Settings(BaseSettings):
     worker_pool_end: int = 299
     default_node: str = "pve1"
 
+    # ── Worker net0 / static-IP-from-VMID (ADR-0004) ──────────────────────
+    # Placeholders only — the real LAN topology lives in the gitignored .env.
+    # The static IP is derived from the VMID against these params; never a real LAN.
+    worker_subnet: str = "10.99.0.0/24"  # placeholder LAN subnet (CIDR)
+    worker_gateway: str = "10.99.0.1"  # placeholder LAN gateway
+    worker_bridge: str = "vmbr0"  # Proxmox bridge the net0 attaches to
+    worker_prefix: int = 24  # net0 CIDR prefix length
+
+    # ── Capacity guard (CAP-01) ───────────────────────────────────────────
+    capacity_threshold: float = 0.80  # refuse create when node RAM fraction exceeds this
+
+    # ── Saga timeouts (seconds) ───────────────────────────────────────────
+    ttyd_timeout: float = 60  # saga step 6: total ttyd-health wait
+    ttyd_interval: float = 2  # saga step 6: poll interval
+    clone_timeout: float = 300  # UPID wait for a --full clone (conservative; tune in homelab)
+    task_timeout: float = 120  # UPID wait for start/stop/destroy
+
+    # ── Security / CORS (PLAT-05) ─────────────────────────────────────────
+    # The LAN UI origin — NEVER "*" (incompatible with credentials + Pitfall 12).
+    # A clearly-marked placeholder; the real origin lives in the gitignored .env.
+    allowed_origin: str = "http://localhost:5173"  # placeholder LAN UI origin
+
+    # ── Bootconfig (WORK-03 / ADR-0002) ───────────────────────────────────
+    # Short-lived, repo-scoped git credential read from the gitignored .env.
+    # Empty placeholder default — NEVER commit a real PAT (CLAUDE.md: no secrets).
+    git_credential_token: str = ""
+    # Defense-in-depth source-IP binding for the bootconfig endpoint; default off
+    # so it does not break the no-auth LAN posture unless an operator enables it.
+    bootconfig_source_ip_check: bool = False
+
     # ── Database ──────────────────────────────────────────────────────────
     database_path: str = "/data/burrow.db"
 
