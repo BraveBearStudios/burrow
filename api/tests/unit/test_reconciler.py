@@ -31,7 +31,6 @@ import pytest
 
 from compute.fakeProvider import FakeComputeProvider, _FakeContainer
 from db.sqliteProvider import SqliteProvider
-from models.workspace import WorkspaceCreate
 from services.reconciler import Reconciler
 from services.workspaceService import WorkspaceService
 
