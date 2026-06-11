@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 03-03-PLAN.md — ADR-0009 (plugin cadence: boot-time-latest, reproducibility via manifest ref-pinning; SC-4) + CI wiring: a shellcheck step on burrow-boot.sh + provision-template.sh and an api pytest step running tests/boot + test_manifest_schema.py, both ADDED to static-gates (no new third-party action, permissions: contents: read unchanged). Commits 05ca051, f508b65. Phase 3 complete — ready for verification."
-last_updated: "2026-06-11T22:43:05.193Z"
-last_activity: 2026-06-11 -- Phase 4 planning complete
+stopped_at: "Completed 04-02-PLAN.md — atomic capacity check+reserve under one process-wide asyncio.Lock (Pitfall 5/CAP-02) + stopWorkspace(reason=) + 3 reconciler Settings keys + deterministic capacity-race test + ADR-0010. Commits 9742908, 81f94a1, a6ee94a, 15db872. Plan 04-01 (reconciler) unblocked."
+last_updated: "2026-06-11T23:10:21.724Z"
+last_activity: 2026-06-11 -- Completed 04-02-PLAN.md (capacity-lock + reconciler-readiness)
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 26
-  completed_plans: 21
-  percent: 80
+  completed_plans: 22
+  percent: 85
 ---
 
 <!--
@@ -26,22 +26,22 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 3 — Reproducible Workers
+**Current focus:** Phase 4 — Hardening & Release
 
 ## Current Position
 
-Phase: 3 (Reproducible Workers) — EXECUTING
-Plan: 3 of 3
-Status: Ready to execute
-Last activity: 2026-06-11 -- Phase 4 planning complete
+Phase: 4 (Hardening & Release) — EXECUTING
+Plan: 2 of 5 complete (next: 04-01 reconciler)
+Status: Executing Phase 4
+Last activity: 2026-06-11 -- Completed 04-02-PLAN.md (capacity-lock + reconciler-readiness)
 
-Progress: [██████████] 100% (Phase 3: 3/3 plans — ready for verification)
+Progress: [█████████░] 85% (22/26 plans; Phase 4: 1/5 plans complete)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 14
+- Total plans completed: 22
 - Average duration: 16 min
 - Total execution time: 3.50 hours
 
@@ -82,6 +82,7 @@ Progress: [██████████] 100% (Phase 3: 3/3 plans — ready fo
 | Phase 3 P01 | 22min | 3 tasks | 9 files |
 | Phase 03 P02 | 38min | 2 tasks | 9 files |
 | Phase 03 P03 | 9min | 2 tasks | 3 files |
+| Phase 04 P02 | 38min | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,8 @@ Recent decisions affecting current work:
 - [Phase 03]: [Plan 03-02]: install_claude_plugin is idempotent + scheme-aware — rm -rf the dest then git clone --depth=1 --branch <immutable-ref> → byte-identical plugin tree across two boots (SC-2, Pitfall 1); only claude-plugin types are pulled fresh, binary/npm-global are SKIPPED (baked at provision). https:// is prepended ONLY when the source lacks a :// scheme, so production github.com/<org>/<repo> resolves to HTTPS while a hermetic file:// test source passes through (same code path under test + in prod). Rule-1 fix: IFS includes \r so a CRLF jq line leaves no carriage return on the ref. enabledPlugins[<name>]=true shape is [ASSUMED] for claude-code@2.1.170 — confirm at the dev-homelab smoke.
 - [Phase 03]: [Plan 03-03]: ADR-0009 records the B4 plugin-cadence decision (SC-4) — cadence is boot-time-latest (pull cc-worker-config branch HEAD each boot, tech-spec 988); reproducibility comes from manifest ref-pinning (immutable tag/SHA per claude-plugin), NOT config-repo snapshot-at-create. Consequences: two boots of the same manifest → identical plugin tree (SC-2); a ref:"main" on a claude-plugin is intentionally non-reproducible "latest" (Pitfall 1). Revisit trigger: per-workspace pinning / snapshot-at-create, deferred until the manifest stabilizes. Mirrors ADR-0002's Nygard skeleton (Status/Context/Decision/Consequences/Revisit trigger). The Phase-3 "ADRs required within their phase" blocker is now RESOLVED.
 - [Phase 03]: [Plan 03-03]: CI now enforces the Phase-3 gates — a shellcheck step (ubuntu-latest preinstalled binary, NO new third-party action, SHA-pin convention preserved, T-03-09) lints burrow-boot.sh + provision-template.sh, and an api pytest step runs tests/boot + test_manifest_schema.py (working-directory: api) so boot-script regressions + manifest drift fail the build, not the homelab (T-03-10). Both steps ADDED to the existing static-gates job; existing gates, SHA pins, and permissions: contents: read unchanged. Verified the exact pytest command green locally (12 passed) + full api suite still green (139 passed). shellcheck remains the one locally-unverifiable item (unavailable on the Windows dev host) — first CI run is the authority. Phase 3 complete (pending verification).
+- [Phase 04]: [Plan 04-02]: Capacity-under-concurrency race (Pitfall 5 / CAP-02) closed by wrapping ONLY the step-0 capacity guard + step-1 VMID reservation in one process-wide `self._create_lock` (asyncio.Lock), released BEFORE the multi-second clone so concurrent creates still parallelize their slow saga work. The 002 VMID partial-unique INSERT is untouched (it remains the cross-process uniqueness arbiter); only the unserialized capacity READ was the gap. v1 assumes `--workers 1`; `BEGIN IMMEDIATE` is the documented `--workers >1` upgrade path (ADR-0010). Proven non-tautological: bypassing the lock makes the deterministic two-create test fail (2 successes), with it 1 success + 1 CapacityError.
+- [Phase 04]: [Plan 04-02]: `stopWorkspace` gained a keyword-only `reason` param (default None) emitting `{"reason": reason}` in the `workspace.stopped` event data when set, `{}` otherwise — so the reconciler's idle auto-stop carries `reason: idle` for the UI badge (FROZEN 3 / Open Q2). `reason` is a fixed non-secret literal; no user/topology input flows in (T-04-02B). Three reconciler cadence Settings keys added (non-secret defaults): `reconciler_period_s=60`, `creating_timeout_s=300`, `idle_window_s=1800`. ADR-0010 records the single in-process asyncio reconciler (reap + idle auto-stop, FastAPI lifespan-owned) + the capacity-lock decision in the Nygard format. Full api suite 155 passed; mypy --strict + ruff + REUSE (255/255) green.
 
 ### Pending Todos
 
@@ -176,7 +179,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-11T15:47:45.840Z
+Last session: 2026-06-11T23:09:37.842Z
 Stopped at: Completed 03-03-PLAN.md — ADR-0009 (plugin cadence: boot-time-latest, reproducibility via manifest ref-pinning; SC-4) + CI wiring: a shellcheck step on burrow-boot.sh + provision-template.sh and an api pytest step running tests/boot + test_manifest_schema.py, both ADDED to static-gates (no new third-party action, permissions: contents: read unchanged). Commits 05ca051, f508b65. Phase 3 complete — ready for verification.
 Resume file: None
 Next plan: Phase 3 is complete (all 3 plans done) — next is phase verification, then Phase 4. Carried open items (all dev-homelab-smoke, NOT CI): the first CI run confirms the new shellcheck step is clean on both scripts (the one locally-unverifiable item — shellcheck unavailable on the Windows dev host); real worker boot + template rebuild (20-create-template.sh re-run); the enabledPlugins on-disk shape for claude-code@2.1.170 [ASSUMED]; resolve_vmid hostname-suffix parse vs 30-network-notes.md/ADR-0004; x-access-token username convention + config-repo auth model (A2/A3/A5, operator-confirm).
