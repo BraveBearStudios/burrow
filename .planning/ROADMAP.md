@@ -169,7 +169,20 @@ Plans:
   4. CI builds both images (`burrow-api`, `burrow-ui`) multi-stage, digest-pinned, non-root, with HEALTHCHECKs, and the image scan fails the build on HIGH/CRITICAL findings.
   5. The release path emits an SBOM (syft), a cosign keyless signature, and SLSA build provenance, and publishes to GHCR with least-privilege per-job permissions and SHA-pinned third-party actions.
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 1** *(three independent slices — disjoint files_modified)*
+
+- [ ] 04-02-PLAN.md — Atomic capacity-check+reserve (asyncio.Lock around the create gate+reserve) + stopWorkspace(reason=) + 3 reconciler Settings keys + deterministic capacity-race test + ADR-0010 (CAP-02)
+- [ ] 04-03-PLAN.md — Activity drawer (UI-06): WorkspaceEvent type + enabled-gated useWorkspaceEvents + EVENT_BADGE map + ActivityDrawer (4 states, boot.error emphasis, a11y) + panel trigger + vitest + Playwright e2e
+- [ ] 04-04-PLAN.md — Images (CICD-04): Dockerfile.api + Dockerfile.ui (multi-stage, digest-pinned, non-root, HEALTHCHECK /api/v1/health, OCI labels) + .dockerignore + ci.yml build-scan job (no-push + Trivy two-run gate + SARIF)
+
+**Wave 2** *(blocked: 04-01 needs stopWorkspace(reason=) from 04-02; 04-05 needs the Dockerfiles from 04-04)*
+
+- [ ] 04-01-PLAN.md — Reconciler (CAP-02/03): Reconciler.reconcile_once() reaper (orphan + leaked-vmid + timed-out creating, pool-range safety bound) + idle auto-stop (reason=idle, event-log derived) + FastAPI lifespan + unit/lifespan tests + CI wiring
+- [ ] 04-05-PLAN.md — Release supply-chain (CICD-05): release.yml on v* — build+push GHCR by digest → syft SBOM (SPDX+CycloneDX) → cosign keyless → SLSA provenance, least-priv perms + SHA-pinned actions
+
 **UI hint**: yes
 **Infra note**: The reaper, auto-stop, and capacity-under-concurrency behaviors are only meaningful against real workspaces on real Proxmox — their true acceptance is the dev-homelab smoke gate (the "Looks Done But Isn't" checklist), not CI. The supply-chain gates (CICD-04/05) are fully CI-verifiable.
 
@@ -184,4 +197,4 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
 | 2. Terminal Proxy + React UI | 6/6 | Complete   | 2026-06-10 |
 | 3. Reproducible Workers | 3/3 | Complete   | 2026-06-11 |
-| 4. Hardening & Release | 0/TBD | Not started | - |
+| 4. Hardening & Release | 0/5 | Not started | - |
