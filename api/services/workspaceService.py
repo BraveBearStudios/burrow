@@ -97,6 +97,15 @@ class WorkspaceService:
         # inside the lock is the cross-process backstop (the reservation index covers
         # create-create).
         self._locks: dict[str, asyncio.Lock] = {}
+        # Process-wide create serializer: holds the step-0 capacity READ and the
+        # step-1 VMID reservation in ONE critical section so two concurrent creates
+        # cannot both pass a stale node-RAM check and overcommit a node (Pitfall 5).
+        # It is RELEASED before the multi-second clone, so concurrent creates still
+        # parallelize their slow work. The VMID partial-unique INSERT remains the
+        # cross-process race arbiter; only the capacity read was the unserialized gap.
+        # v1 assumes `--workers 1`; the cross-process `BEGIN IMMEDIATE` upgrade path
+        # is documented in ADR-0010 (deferred per RESEARCH A1 / Open Q3).
+        self._create_lock = asyncio.Lock()
 
     # ── create saga (WS-01/02/03, CAP-01/04) ──────────────────────────────
     async def createWorkspace(self, payload: WorkspaceCreate) -> Workspace:
@@ -108,12 +117,17 @@ class WorkspaceService:
         health; (7) mark ``running``. Any failure after step 1 triggers idempotent
         stop+destroy, a redacted ``boot.error`` event, and ``status=error``.
         """
-        # 0 — capacity guard (CAP-01); node is operator-selected (CAP-04).
-        if await self.compute.getNodeMemory(payload.node) > self.settings.capacity_threshold:
-            raise CapacityError(payload.node)
-
-        # 1 — reserve VMID via the DB partial-unique INSERT (the race arbiter).
-        ws = await self._reserve_vmid_and_row(payload)
+        # 0+1 — capacity guard + VMID reservation, SERIALIZED under one lock so two
+        # concurrent creates cannot both pass a stale capacity read and overcommit
+        # the node (Pitfall 5). The lock spans ONLY check+reserve; it is released
+        # before the multi-second clone below so concurrent creates parallelize the
+        # slow saga steps (FROZEN guardrail 6).
+        async with self._create_lock:
+            # 0 — capacity guard (CAP-01); node is operator-selected (CAP-04).
+            if await self.compute.getNodeMemory(payload.node) > self.settings.capacity_threshold:
+                raise CapacityError(payload.node)
+            # 1 — reserve VMID via the DB partial-unique INSERT (the race arbiter).
+            ws = await self._reserve_vmid_and_row(payload)
         vmid = ws.vmid
         assert vmid is not None  # reservation always assigns a vmid
 
@@ -216,11 +230,17 @@ class WorkspaceService:
             pass  # best-effort: destroy of a missing CT is a no-op
 
     # ── stop / start / destroy (WS-06/07/08/09) ───────────────────────────
-    async def stopWorkspace(self, workspace_id: str) -> Workspace:
+    async def stopWorkspace(self, workspace_id: str, *, reason: str | None = None) -> Workspace:
         """Stop a running workspace; state preserved (WS-06).
 
         Guarded by ``assert_transition(running, stop)``; the provider blocks on the
         UPID. Sets ``stoppedAt`` and logs ``workspace.stopped``.
+
+        ``reason`` is keyword-only and defaults to ``None`` so operator-initiated
+        stops carry no reason (event data ``{}``). The reconciler's idle auto-stop
+        passes ``reason="idle"`` so ``reason: idle`` lands in the event ``data`` for
+        the UI badge to key on (FROZEN guardrail 3 / Open Q2). It is a fixed,
+        non-secret literal — no user or topology input flows into it (T-04-02B).
         """
         async with self._lock_for(workspace_id):
             ws = await self._get_or_raise(workspace_id)
@@ -230,7 +250,8 @@ class WorkspaceService:
             updated = await self.db.updateWorkspace(
                 ws.id, {"status": "stopped", "stopped_at": self._now()}
             )
-            await self.db.logEvent(ws.id, "workspace.stopped", {})
+            data = {"reason": reason} if reason is not None else {}
+            await self.db.logEvent(ws.id, "workspace.stopped", data)
             return updated
 
     async def startWorkspace(self, workspace_id: str) -> Workspace:

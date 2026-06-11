@@ -64,6 +64,13 @@ class Settings(BaseSettings):
     clone_timeout: float = 300  # UPID wait for a --full clone (conservative; tune in homelab)
     task_timeout: float = 120  # UPID wait for start/stop/destroy
 
+    # ── Reconciler (reaper + idle auto-stop, CAP-02/03) ───────────────────
+    # Non-secret cadence knobs for the in-process periodic reconciler (ADR-0010).
+    # Defaults sit inside the CONTEXT ranges; tune per deployment.
+    reconciler_period_s: float = 60  # how often the reconcile loop runs one pass
+    creating_timeout_s: float = 300  # a `creating` row older than this is reaped to `error`
+    idle_window_s: float = 1800  # auto-stop a running workspace idle longer than this (~30 min)
+
     # ── Security / CORS (PLAT-05) ─────────────────────────────────────────
     # The LAN UI origin — NEVER "*" (incompatible with credentials + Pitfall 12).
     # A clearly-marked placeholder; the real origin lives in the gitignored .env.

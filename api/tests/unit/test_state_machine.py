@@ -137,9 +137,7 @@ async def test_operator_stop_carries_no_reason(
     assert stopped[0].data == {}
 
 
-async def test_idle_stop_carries_reason_idle(
-    service: WorkspaceService, db: SqliteProvider
-) -> None:
+async def test_idle_stop_carries_reason_idle(service: WorkspaceService, db: SqliteProvider) -> None:
     """An auto-stop threads ``reason: idle`` into the event data for the UI badge (FROZEN 3)."""
     ws = await _running_workspace(service)
     await service.stopWorkspace(ws.id, reason="idle")
