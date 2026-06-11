@@ -46,6 +46,14 @@ jobs:
         run: uv run ruff check .
         working-directory: api
 
+      # Boot-harness + manifest-drift tiers (CICD-02/03): a regression in
+      # burrow-boot.sh or a manifest schema drift fails the build here, not on
+      # the dev-homelab smoke. Hermetic — no real Proxmox (fake control plane +
+      # file:// bare repos + stub ttyd on PATH).
+      - name: api · pytest (boot + manifest tiers)
+        run: uv run pytest tests/boot tests/integration/test_manifest_schema.py -q
+        working-directory: api
+
       - name: api · ruff format --check
         run: uv run ruff format --check .
         working-directory: api
@@ -70,6 +78,13 @@ jobs:
       - name: ui · biome ci
         run: npx biome ci .
         working-directory: ui
+
+      # ── Boot-script lint (shellcheck) ──────────────────────────────────
+      # shellcheck ships preinstalled on ubuntu-latest, so no third-party
+      # action is needed (the repo's SHA-pin convention is preserved). It runs
+      # here because it was unavailable on the Windows dev host (Plan 00-06).
+      - name: shellcheck · worker boot scripts
+        run: shellcheck cc-worker-config/lxc/worker-template/burrow-boot.sh cc-worker-config/lxc/worker-template/provision-template.sh
 
       # ── Repo-wide SPDX gate (CICD-06) ──────────────────────────────────
       - name: spdx · reuse lint
