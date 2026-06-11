@@ -228,14 +228,23 @@ process_manifest() {
   ' "$manifest" >/dev/null || { log "manifest failed structural validation"; return 1; }
 
   # Iterate only claude-plugin entries; binary/npm-global are baked (skip).
+  # Capture the jq output into a variable FIRST (not a `< <(...)` process
+  # substitution): with process substitution the jq exit status is not part of
+  # any pipeline, so `set -o pipefail`/`set -e` cannot see a mid-stream jq
+  # failure and the loop would silently see EOF and install a partial set. The
+  # command substitution below makes the jq failure visible to `set -e`, so a
+  # broken extraction aborts the boot fail-closed.
+  local rows
+  rows="$(jq -r '.plugins | to_entries[]
+                 | select(.value.type == "claude-plugin")
+                 | [.key, .value.source, .value.ref] | @tsv' "$manifest")"
+
   # IFS includes \r so a CRLF-terminated jq line (e.g. jq on a non-Unix host, or a
   # CRLF-saved manifest) does not leave a trailing carriage return on the last field.
   while IFS=$'\t\r' read -r name source ref; do
     [[ -n "$name" ]] || continue
     install_claude_plugin "$name" "$source" "$ref"
-  done < <(jq -r '.plugins | to_entries[]
-                  | select(.value.type == "claude-plugin")
-                  | [.key, .value.source, .value.ref] | @tsv' "$manifest")
+  done <<<"$rows"
 }
 
 # --- Live pull-at-boot --------------------------------------------------------

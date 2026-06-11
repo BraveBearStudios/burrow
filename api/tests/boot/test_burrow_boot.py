@@ -443,3 +443,27 @@ def test_boot_path_clones_set_git_terminal_prompt() -> None:
         )
 
 
+def test_manifest_iteration_jq_failure_aborts_boot(
+    boot_script: Path,
+    manifest_config_repo: Callable[..., ManifestConfigRepo],
+    stub_ttyd_path: Path,
+    tmp_path: Path,
+) -> None:
+    """WR-04: the install loop reads a captured var, so the happy path still installs cleanly.
+
+    The structural fix (capture the jq tsv into a var instead of ``< <(...)``) must not
+    regress the happy path: a valid manifest still installs its claude-plugin and reaches
+    ttyd. The pipefail-visibility property is covered structurally; this guards the loop's
+    behavior end-to-end so the refactor is proven non-breaking.
+    """
+    repo = manifest_config_repo(include_binary=True)
+    with serve_bootconfig(repo) as cp:
+        proc, home, _etc = _run_boot(
+            boot_script, control_plane=cp.url, tmp_path=tmp_path, stub_bin=stub_ttyd_path
+        )
+    assert proc.returncode == 0, f"boot failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+    for name in repo.claude_plugin_names:
+        assert (home / ".claude" / "plugins" / name / "plugin.json").is_file(), (
+            f"claude-plugin {name!r} not installed via the captured-var iteration loop"
+        )
+    assert (home / "ttyd-argv.txt").exists(), "ttyd not reached on the happy path after WR-04"
