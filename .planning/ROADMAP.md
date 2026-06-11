@@ -36,7 +36,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 0: Contracts, Seams & Golden Template** - Pydantic models, provider ABCs, FakeComputeProvider, envelope, app factory, static CI gates, the Proxmox host-prime kit + runbook, and the golden-template + boot-script decisions (completed 2026-06-10)
 - [x] **Phase 1: Control Plane API** - The create saga, state machine, real SQLite + Proxmox providers, `/api/v1` envelope, `/health`, structured logs, security headers, test pyramid (all 5 plans complete; ready for phase verification)
 - [x] **Phase 2: Terminal Proxy + React UI** - ttyd-subprotocol WS bridge, xterm.js, react-mosaic tiling, reconnect overlay, sidebar, new-workspace modal, status bar, restore-after-refresh (completed 2026-06-10)
-- [ ] **Phase 3: Reproducible Workers** - Manifest-driven plugin/CLAUDE.md pull, hardened `burrow-boot.sh`, secret-safe boot config injection
+- [x] **Phase 3: Reproducible Workers** - Manifest-driven plugin/CLAUDE.md pull, hardened `burrow-boot.sh`, secret-safe boot config injection (completed 2026-06-11)
 - [ ] **Phase 4: Hardening & Release** - Orphan reaper, auto-stop idle, capacity tuning, event-log drawer, and the supply-chain release path (scan/SBOM/sign/provenance/GHCR)
 
 ## Phase Details
@@ -150,7 +150,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 03-02-PLAN.md — Manifest slice: manifest.json + JSON-Schema + fail-closed jq gate + idempotent claude-plugin install + CI drift test (WORK-05)
-- [ ] 03-03-PLAN.md — ADR-0009 (cadence: boot-time-latest) + CI wiring (shellcheck + boot/manifest pytest tiers)
+- [x] 03-03-PLAN.md — ADR-0009 (cadence: boot-time-latest) + CI wiring (shellcheck + boot/manifest pytest tiers)
 
 **Infra note**: True acceptance — a real worker booting and pulling its config — requires a real Proxmox node + the golden template, validated in the dev homelab smoke gate; CI can only lint/unit-test the boot script and manifest schema. Needs an ADR for the B4 cadence decision.
 
@@ -183,5 +183,5 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
 | 2. Terminal Proxy + React UI | 6/6 | Complete   | 2026-06-10 |
-| 3. Reproducible Workers | 2/3 | In Progress|  |
+| 3. Reproducible Workers | 3/3 | Complete   | 2026-06-11 |
 | 4. Hardening & Release | 0/TBD | Not started | - |

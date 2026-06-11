@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: "Completed 03-02-PLAN.md — the manifest slice: versioned manifest.json + shared manifest.schema.json (single source of truth) + fail-closed process_manifest jq gate + idempotent install_claude_plugin (pinned-ref clone, byte-identical across boots) + CI drift gate + 3 boot-harness tests. Commits 01521b6, 974d837, db744ce, 2a0d71f. WORK-05 done; WORK-02 fully delivered."
-last_updated: "2026-06-11T15:33:10.176Z"
+status: verifying
+stopped_at: "Completed 03-03-PLAN.md — ADR-0009 (plugin cadence: boot-time-latest, reproducibility via manifest ref-pinning; SC-4) + CI wiring: a shellcheck step on burrow-boot.sh + provision-template.sh and an api pytest step running tests/boot + test_manifest_schema.py, both ADDED to static-gates (no new third-party action, permissions: contents: read unchanged). Commits 05ca051, f508b65. Phase 3 complete — ready for verification."
+last_updated: "2026-06-11T15:47:45.856Z"
 last_activity: 2026-06-11
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 21
-  completed_plans: 20
-  percent: 95
+  completed_plans: 21
+  percent: 80
 ---
 
 <!--
@@ -32,18 +32,18 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 Phase: 3 (Reproducible Workers) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-11
 
-Progress: [███████▁▁▁] 67% (Phase 3: 2/3 plans)
+Progress: [██████████] 100% (Phase 3: 3/3 plans — ready for verification)
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 13
+- Total plans completed: 14
 - Average duration: 16 min
-- Total execution time: 3.35 hours
+- Total execution time: 3.50 hours
 
 **By Phase:**
 
@@ -81,6 +81,7 @@ Progress: [███████▁▁▁] 67% (Phase 3: 2/3 plans)
 | Phase 2 P06 | 35min | 2 tasks | 13 files |
 | Phase 3 P01 | 22min | 3 tasks | 9 files |
 | Phase 03 P02 | 38min | 2 tasks | 9 files |
+| Phase 03 P03 | 9min | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -149,6 +150,8 @@ Recent decisions affecting current work:
 - [Phase 02]: [Plan 02-06]: The phase e2e gate. The full Playwright journey (create → terminal echoes → split/tile → detach→reconnect → terminate) RAN GREEN locally (21.7s) over BURROW_COMPUTE=fake + a STANDALONE protocol-accurate stub ttyd (api/tests/e2e/stub_ttyd_server.py) — the SAME tty handler the Plan-01 pytest fixture uses, factored into one shared module so a .encode()/subprotocol regression fails BOTH tiers (T-02-07). The stub also answers the create saga's HTTP health GET (websockets process_request → 200) so the synchronous create resolves. A BURROW_E2E_TTYD_HOST override (operator env, NEVER client input — SSRF posture unchanged) retargets the bridge dial + the saga health poll at the single local stub instead of the unroutable 10.99.0.x Fake worker IP. The UI-05 restore-after-refresh integration test (vitest+MSW) proves reconcile (gone leaf dropped) + live reconnect (running panel re-mounts, fresh WS) + NO scrollback (Pitfall 7). DEVIATION (Rule 2): the terminate confirm gate (Destroy {name}? …) + non-destructive detach (useTerminal.detach closes the live socket → reconnect overlay, session survives) were unwired before this plan despite being must_haves truths — added + unit-covered (UI-SPEC criterion 12). Harness: playwright.config.ts webServer (stub+uvicorn-on-fake+vite preview) / BURROW_E2E_USE_COMPOSE toggle + docker-compose.e2e.yml + nginx.e2e.conf (Docker not on this host → compose validated by YAML parse, first CI run confirms boot). Gate: 81 vitest + 127 pytest + tsc + biome + ruff + mypy --strict all green. Real ttyd handshake + live claude TUI stays the deferred dev-homelab smoke.
 - [Phase 03]: [Plan 03-02]: manifest.schema.json is THE single source of truth — the boot-time jq gate in burrow-boot.sh enforces the IDENTICAL required-keys + type enum IN(claude-plugin,binary,npm-global) as the schema, so a CI-green manifest and a boot-passing manifest are the same set (CI and boot never diverge, the locked fail-closed decision). An unknown/unsupported type or missing key → non-zero → ERR trap → boot fails (never skip-and-continue).
 - [Phase 03]: [Plan 03-02]: install_claude_plugin is idempotent + scheme-aware — rm -rf the dest then git clone --depth=1 --branch <immutable-ref> → byte-identical plugin tree across two boots (SC-2, Pitfall 1); only claude-plugin types are pulled fresh, binary/npm-global are SKIPPED (baked at provision). https:// is prepended ONLY when the source lacks a :// scheme, so production github.com/<org>/<repo> resolves to HTTPS while a hermetic file:// test source passes through (same code path under test + in prod). Rule-1 fix: IFS includes \r so a CRLF jq line leaves no carriage return on the ref. enabledPlugins[<name>]=true shape is [ASSUMED] for claude-code@2.1.170 — confirm at the dev-homelab smoke.
+- [Phase 03]: [Plan 03-03]: ADR-0009 records the B4 plugin-cadence decision (SC-4) — cadence is boot-time-latest (pull cc-worker-config branch HEAD each boot, tech-spec 988); reproducibility comes from manifest ref-pinning (immutable tag/SHA per claude-plugin), NOT config-repo snapshot-at-create. Consequences: two boots of the same manifest → identical plugin tree (SC-2); a ref:"main" on a claude-plugin is intentionally non-reproducible "latest" (Pitfall 1). Revisit trigger: per-workspace pinning / snapshot-at-create, deferred until the manifest stabilizes. Mirrors ADR-0002's Nygard skeleton (Status/Context/Decision/Consequences/Revisit trigger). The Phase-3 "ADRs required within their phase" blocker is now RESOLVED.
+- [Phase 03]: [Plan 03-03]: CI now enforces the Phase-3 gates — a shellcheck step (ubuntu-latest preinstalled binary, NO new third-party action, SHA-pin convention preserved, T-03-09) lints burrow-boot.sh + provision-template.sh, and an api pytest step runs tests/boot + test_manifest_schema.py (working-directory: api) so boot-script regressions + manifest drift fail the build, not the homelab (T-03-10). Both steps ADDED to the existing static-gates job; existing gates, SHA pins, and permissions: contents: read unchanged. Verified the exact pytest command green locally (12 passed) + full api suite still green (139 passed). shellcheck remains the one locally-unverifiable item (unavailable on the Windows dev host) — first CI run is the authority. Phase 3 complete (pending verification).
 
 ### Pending Todos
 
@@ -160,7 +163,7 @@ None yet.
 
 [Issues that affect future work]
 
-- ADRs required before/within their phase: **Phase 0 — RESOLVED (Plan 00-05):** SC-8 (`--once`) → ADR-0006, SC-9 (ttyd binding) → ADR-0007, clone-mode `--full` → ADR-0005, boot-config injection (pull-at-boot) → ADR-0002, Proxmox ACL scoping (`/pool` vs `/vms`) → ADR-0003, static-IP-from-VMID → ADR-0004, sqlite-first → ADR-0001, stack-version bumps (Vite 8, TS 6, Biome 2, Vitest 4, @xterm 6, mypy 2, react-mosaic 6.2.0, Tailwind v4) → ADR-0008. **Still pending: Phase 3** — B4 plugin cadence (boot-time-latest vs snapshot-at-create).
+- ADRs required before/within their phase: **Phase 0 — RESOLVED (Plan 00-05):** SC-8 (`--once`) → ADR-0006, SC-9 (ttyd binding) → ADR-0007, clone-mode `--full` → ADR-0005, boot-config injection (pull-at-boot) → ADR-0002, Proxmox ACL scoping (`/pool` vs `/vms`) → ADR-0003, static-IP-from-VMID → ADR-0004, sqlite-first → ADR-0001, stack-version bumps (Vite 8, TS 6, Biome 2, Vitest 4, @xterm 6, mypy 2, react-mosaic 6.2.0, Tailwind v4) → ADR-0008. **Phase 3 — RESOLVED (Plan 03-03):** B4 plugin cadence (boot-time-latest vs snapshot-at-create) → ADR-0009. All phase ADRs authored.
 - Real-infra-only validation: Phase 0 template, Phase 1 real-clone create, Phase 3 worker boot cannot be CI-verified — dev-homelab smoke gate is the acceptance authority (the "Looks Done But Isn't" checklist).
 
 ## Deferred Items
@@ -173,7 +176,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-11T15:30:45.406Z
-Stopped at: Completed 03-02-PLAN.md — the manifest slice: versioned manifest.json + shared manifest.schema.json (single source of truth) + fail-closed process_manifest jq gate + idempotent install_claude_plugin (pinned-ref clone, byte-identical across boots) + CI drift gate + 3 boot-harness tests. Commits 01521b6, 974d837, db744ce, 2a0d71f. WORK-05 done; WORK-02 fully delivered.
+Last session: 2026-06-11T15:47:45.840Z
+Stopped at: Completed 03-03-PLAN.md — ADR-0009 (plugin cadence: boot-time-latest, reproducibility via manifest ref-pinning; SC-4) + CI wiring: a shellcheck step on burrow-boot.sh + provision-template.sh and an api pytest step running tests/boot + test_manifest_schema.py, both ADDED to static-gates (no new third-party action, permissions: contents: read unchanged). Commits 05ca051, f508b65. Phase 3 complete — ready for verification.
 Resume file: None
-Next plan: 03-02-PLAN.md — the manifest slice (manifest.json + JSON-Schema + fail-closed jq gate + idempotent claude-plugin install + CI drift test, WORK-05) on top of the now-live fetch/clone path. Carried open items: A2/A3 operator-confirm of the real git-credential-minting mechanism + the x-access-token username convention (askpass Username branch may change); the resolve_vmid hostname-suffix parse [ASSUMED] vs 30-network-notes.md/ADR-0004; config-repo auth model (A5, assumed reachable); shellcheck CI-wiring + ADR-0009 land in Plan 03-03; real worker boot + template rebuild = deferred dev-homelab smoke (CI cannot prove).
+Next plan: Phase 3 is complete (all 3 plans done) — next is phase verification, then Phase 4. Carried open items (all dev-homelab-smoke, NOT CI): the first CI run confirms the new shellcheck step is clean on both scripts (the one locally-unverifiable item — shellcheck unavailable on the Windows dev host); real worker boot + template rebuild (20-create-template.sh re-run); the enabledPlugins on-disk shape for claude-code@2.1.170 [ASSUMED]; resolve_vmid hostname-suffix parse vs 30-network-notes.md/ADR-0004; x-access-token username convention + config-repo auth model (A2/A3/A5, operator-confirm).

@@ -83,7 +83,7 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 ### Workers & Config Pipeline (WORK)
 
 - [ ] **WORK-01**: A golden template LXC spec provisions all worker software reproducibly (Ubuntu 24.04, Node 22, `@anthropic-ai/claude-code`, ttyd, configured plugins)
-- [ ] **WORK-02**: Each worker boots via `burrow-boot.sh`: pulls CLAUDE.md + plugin manifest from `cc-worker-config`, clones the project repo, launches ttyd shelling into Claude Code
+- [x] **WORK-02**: Each worker boots via `burrow-boot.sh`: pulls CLAUDE.md + plugin manifest from `cc-worker-config`, clones the project repo, launches ttyd shelling into Claude Code
 - [x] **WORK-03**: Boot config (config/project repo + branch) reaches the worker via a non-cloud-init, non-`pct`-over-API mechanism — **pull-at-boot recommended**: `injectBootConfig` persists intent to the DB and the worker fetches its non-secret config + a short-lived git credential from an internal control-plane endpoint at boot, since `pct exec`/`pct push` are node-CLI-only and absent from the HTTPS API (SC-4); final mechanism locked by an ADR in Phase 0. **Endpoint contract done (Plan 01-05):** `GET /api/v1/internal/bootconfig/{vmid}` serves the non-secret payload + a short-lived repo-scoped credential via a pluggable `mint_repo_credential` seam, with a vmid-in-pool gate, enumeration-resistant 404, source-IP defense-in-depth, and no credential in logs/events. The live `burrow-boot.sh` consumer pull-step is **Phase 3**.
 - [ ] **WORK-04**: ttyd is reachable by the control-plane proxy over the worker's network address (not `lo`-only), resolving the spec §9.3↔§6.4 contradiction (SC-7)
 - [x] **WORK-05**: The worker plugin set is defined by a versioned manifest; `claude-plugin` types are pulled fresh at boot, `binary`/`npm-global` types are baked into the template
@@ -190,7 +190,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | UI-05 | Phase 2 | Complete |
 | UI-06 | Phase 4 | Pending |
 | WORK-01 | Phase 0 | Pending |
-| WORK-02 | Phase 3 | Fetch/clone/ttyd half done (Plan 03-01): live burrow-boot.sh resolves its VMID, bounded-retries the frozen bootconfig endpoint, clones config + project via a leak-proof in-memory GIT_ASKPASS subshell, copies CLAUDE.md, and execs the frozen ttyd — CI-proven by the hermetic api/tests/boot harness incl. the SC-3 no-leak test. The "pulls plugin manifest" clause completes with Plan 03-02. |
+| WORK-02 | Phase 3 | Complete. Plan 03-01: live burrow-boot.sh resolves its VMID, bounded-retries the frozen bootconfig endpoint, clones config + project via a leak-proof in-memory GIT_ASKPASS subshell, copies CLAUDE.md, and execs the frozen ttyd. Plan 03-02: the plugin-manifest clause — process_manifest fail-closed jq gate + idempotent install_claude_plugin (claude-plugin pulled fresh). Plan 03-03 CI-enforces the gate (shellcheck on burrow-boot.sh + the boot/manifest pytest tiers). CI-proven by the hermetic api/tests/boot harness incl. the SC-3 no-leak test; real worker boot is the dev-homelab smoke. |
 | WORK-03 | Phase 1 | Endpoint contract done (Plan 01-05): bootconfig endpoint + pluggable credential seam + no-cred-in-logs gate, all CI-proven. Live `burrow-boot.sh` consumer pull-step deferred to Phase 3. |
 | WORK-04 | Phase 0 | Pending (ADR-0007 records the ttyd LAN-bind decision; impl/validation half lands with burrow-boot.sh in 00-07 + dev-homelab smoke) |
 | WORK-05 | Phase 3 | Complete |
