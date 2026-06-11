@@ -1,0 +1,65 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Build-context exclusions (ci-cd-and-testing.md §2.2): keep the Docker build
+# context minimal AND secret-free. T-04-04A mitigation — .git history, every .env
+# variant, tests, and local runtime state must never enter an image layer.
+
+# ── VCS / CI metadata ─────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+.github
+.planning
+
+# ── Secrets / local config (NEVER into a layer) ───────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Tests + test artifacts ────────────────────────────────────────────
+**/tests
+**/test-results
+**/playwright-report
+**/blob-report
+**/.playwright
+
+# ── Python local state ────────────────────────────────────────────────
+**/__pycache__
+**/*.py[cod]
+**/.venv
+**/venv
+**/.mypy_cache
+**/.ruff_cache
+**/.pytest_cache
+**/*.egg-info
+
+# ── Node / frontend local state ───────────────────────────────────────
+**/node_modules
+**/dist
+**/.vite
+**/*.local
+
+# ── Databases / runtime state ─────────────────────────────────────────
+*.db
+*.sqlite
+*.sqlite3
+**/*.db
+/data
+
+# ── Design handoff bundle + docs not needed in an image ───────────────
+design
+docs
+
+# ── Editor / OS cruft ─────────────────────────────────────────────────
+.DS_Store
+.idea
+.vscode
+*.swp
+
+# ── Existing Dockerfiles / compose (not part of the app image content) ─
+Dockerfile.*
+.dockerignore
+docker-compose*.yml
