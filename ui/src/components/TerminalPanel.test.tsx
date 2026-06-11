@@ -5,7 +5,15 @@
 // (mount → connect → init → echo → type), RED until TerminalPanel/useTerminal
 // exist; Task 3 adds the reconnecting/error overlay assertions.
 
-import { act, fireEvent, render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import {
+	act,
+	fireEvent,
+	type RenderResult,
+	render,
+	screen,
+} from "@testing-library/react";
+import type { ReactElement } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	installMockWebSocket,
@@ -19,6 +27,17 @@ import { TerminalPanel } from "./TerminalPanel";
 vi.mock("@xterm/xterm", () => import("../../tests/helpers/mockXterm"));
 vi.mock("@xterm/addon-fit", () => import("../../tests/helpers/mockXterm"));
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
+
+// The panel renders the (closed) ActivityDrawer, whose useWorkspaceEvents hook
+// needs a QueryClient in context even when the poll is disabled. Wrap every render.
+function renderPanel(ui: ReactElement): RenderResult {
+	const client = new QueryClient({
+		defaultOptions: { queries: { retry: false } },
+	});
+	return render(
+		<QueryClientProvider client={client}>{ui}</QueryClientProvider>,
+	);
+}
 
 describe("TerminalPanel — happy path (the MVP slice)", () => {
 	let WS: typeof MockWebSocket;
@@ -34,7 +53,7 @@ describe("TerminalPanel — happy path (the MVP slice)", () => {
 	});
 
 	it("mounting opens a WS to the workspace terminal and sends init on open", () => {
-		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		renderPanel(<TerminalPanel id="w1" name="project-eta" status="running" />);
 		const socket = lastSocket();
 		expect(socket.url).toContain("/ws/workspaces/w1/terminal");
 		expect(WS.instances).toHaveLength(1);
@@ -47,7 +66,7 @@ describe("TerminalPanel — happy path (the MVP slice)", () => {
 	});
 
 	it("writes OUTPUT ('0'+\"hi\") through to the terminal (echo visible)", () => {
-		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		renderPanel(<TerminalPanel id="w1" name="project-eta" status="running" />);
 		const socket = lastSocket();
 		socket.emitOpen();
 		socket.emitOutput("hi");
@@ -55,7 +74,7 @@ describe("TerminalPanel — happy path (the MVP slice)", () => {
 	});
 
 	it("sends an inputFrame when the terminal emits typed data", () => {
-		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		renderPanel(<TerminalPanel id="w1" name="project-eta" status="running" />);
 		const socket = lastSocket();
 		socket.emitOpen();
 		lastTerminal().emitData("x");
@@ -66,12 +85,12 @@ describe("TerminalPanel — happy path (the MVP slice)", () => {
 	});
 
 	it("renders the workspace name in the panel header", () => {
-		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		renderPanel(<TerminalPanel id="w1" name="project-eta" status="running" />);
 		expect(screen.getByText("project-eta")).toBeInTheDocument();
 	});
 
 	it("shows the connecting overlay before the first byte", () => {
-		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		renderPanel(<TerminalPanel id="w1" name="project-eta" status="running" />);
 		expect(screen.getByText("Connecting…")).toBeInTheDocument();
 	});
 });
@@ -89,7 +108,7 @@ describe("TerminalPanel — overlays (TERM-06)", () => {
 	});
 
 	it("shows the reconnecting overlay with the verbatim attempt copy + Reattach", () => {
-		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		renderPanel(<TerminalPanel id="w1" name="project-eta" status="running" />);
 		act(() => {
 			lastSocket().emitOpen();
 		});
@@ -106,7 +125,7 @@ describe("TerminalPanel — overlays (TERM-06)", () => {
 	});
 
 	it("shows the error overlay (no spinner) + Retry on a 1008 close", () => {
-		render(<TerminalPanel id="w1" name="project-eta" status="running" />);
+		renderPanel(<TerminalPanel id="w1" name="project-eta" status="running" />);
 		act(() => {
 			lastSocket().emitOpen();
 		});
@@ -133,7 +152,7 @@ describe("TerminalPanel — terminate confirm + detach (UI-SPEC criterion 12)", 
 
 	it("terminate (×) asks the confirm copy and does NOT terminate until Destroy", () => {
 		const onTerminate = vi.fn();
-		render(
+		renderPanel(
 			<TerminalPanel
 				id="w1"
 				name="project-eta"
@@ -165,7 +184,7 @@ describe("TerminalPanel — terminate confirm + detach (UI-SPEC criterion 12)", 
 	it("detach (plug) closes the live socket non-destructively → reconnecting overlay", () => {
 		const onDetach = vi.fn();
 		const onTerminate = vi.fn();
-		render(
+		renderPanel(
 			<TerminalPanel
 				id="w1"
 				name="project-eta"

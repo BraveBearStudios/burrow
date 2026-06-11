@@ -12,6 +12,7 @@
 import { useState } from "react";
 import { useTerminal } from "../hooks/useTerminal";
 import type { WorkspaceStatus } from "../types/workspace";
+import { ActivityDrawer } from "./ActivityDrawer";
 
 export interface TerminalPanelProps {
 	id: string;
@@ -106,6 +107,21 @@ function CloseIcon() {
 	);
 }
 
+/** Activity-log glyph (a pulse/list line) — opens the per-workspace event drawer. */
+function ActivityIcon() {
+	return (
+		<svg
+			width="15"
+			height="15"
+			viewBox="0 0 24 24"
+			aria-hidden="true"
+			{...ICON}
+		>
+			<path d="M3 12h4l2 6 4-14 2 8h6" />
+		</svg>
+	);
+}
+
 const headerStyle: React.CSSProperties = {
 	display: "flex",
 	alignItems: "center",
@@ -192,6 +208,12 @@ export function TerminalPanel({
 	// the × opens a confirm overlay (dimming the panel) and only `Destroy` removes it.
 	const [isConfirmingTerminate, setConfirmingTerminate] = useState(false);
 
+	// The activity drawer's ephemeral target (UI-06): a single non-persisted id,
+	// exactly one drawer open at a time. Null = closed (no poll, no render).
+	const [activeEventsWorkspaceId, setActiveEventsWorkspaceId] = useState<
+		string | null
+	>(null);
+
 	return (
 		<section
 			style={{
@@ -247,6 +269,14 @@ export function TerminalPanel({
 					</span>
 				) : null}
 				<span style={{ flex: 1 }} />
+				<button
+					type="button"
+					aria-label="Activity log"
+					style={iconButtonStyle}
+					onClick={() => setActiveEventsWorkspaceId(id)}
+				>
+					<ActivityIcon />
+				</button>
 				<button
 					type="button"
 					aria-label="Split"
@@ -389,6 +419,13 @@ export function TerminalPanel({
 					</div>
 				) : null}
 			</div>
+
+			{/* Per-workspace activity drawer (UI-06); closed when the id is null. */}
+			<ActivityDrawer
+				workspaceId={activeEventsWorkspaceId}
+				workspaceName={name}
+				onClose={() => setActiveEventsWorkspaceId(null)}
+			/>
 		</section>
 	);
 }
