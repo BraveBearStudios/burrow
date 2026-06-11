@@ -27,11 +27,14 @@ log() { echo "[provision-template] $*"; }
 
 CLAUDE_CODE_VERSION="2.1.170"
 
-# --- Base OS + build toolchain + ttyd ----------------------------------------
-log "apt update/upgrade + base packages (git curl build-essential ttyd)"
+# --- Base OS + build toolchain + ttyd + jq -----------------------------------
+# jq is the live burrow-boot.sh's JSON dependency (it parses the camelCase
+# bootconfig envelope and, from Plan 02, iterates the plugin manifest). It is
+# baked here so the boot script's runtime dependency exists in the golden image.
+log "apt update/upgrade + base packages (git curl build-essential ttyd jq)"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update && apt-get upgrade -y
-apt-get install -y git curl build-essential ttyd
+apt-get install -y git curl build-essential ttyd jq
 
 # --- Node 22 (NodeSource setup_22.x) + pinned Claude Code ---------------------
 # The `curl | bash` runs inside the worker (not CI); it is the operator's
