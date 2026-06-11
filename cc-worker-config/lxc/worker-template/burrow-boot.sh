@@ -266,6 +266,22 @@ PROJECT_BRANCH="$(jq -r '.projectBranch' <<<"$BOOTCONFIG")"
 GIT_CRED="$(jq -r '.gitCredential' <<<"$BOOTCONFIG")"
 unset BOOTCONFIG
 
+# Validate every required bootconfig field BEFORE any git/cp runs. jq -r emits the
+# literal string "null" for an absent/null field, so a missing projectRepo would
+# otherwise be handed to `git clone null ...` (which ERR-traps confusingly) or be
+# treated as a real repo by the START_DIR guard below. Treat "null"/empty as a
+# hard "missing field" failure so a malformed envelope fails closed with a clear
+# message. GIT_CRED is intentionally NOT named in the log line (never echo a token
+# or its absence pattern beyond the var name). (WR-05)
+for _field in CONFIG_REPO CONFIG_BRANCH PROJECT_REPO PROJECT_BRANCH GIT_CRED; do
+  _val="${!_field}"
+  if [[ -z "$_val" || "$_val" == "null" ]]; then
+    log "bootconfig missing required field: ${_field}"
+    exit 1
+  fi
+done
+unset _field _val
+
 # Config repo: master CLAUDE.md + the plugin manifest (manifest processing lands
 # in Plan 02). Assume cc-worker-config is operator-reachable (A5/Open-Q-1); if it
 # needs separate auth that is an operator-contract question, not a code change here.

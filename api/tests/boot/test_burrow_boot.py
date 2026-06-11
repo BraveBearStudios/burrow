@@ -35,6 +35,7 @@ from tests.boot.conftest import (
     ManifestConfigRepo,
     make_boot_env,
     serve_bootconfig,
+    serve_custom_bootconfig,
 )
 
 
@@ -441,6 +442,44 @@ def test_boot_path_clones_set_git_terminal_prompt() -> None:
         assert "GIT_TERMINAL_PROMPT=0" in line, (
             f"git clone on the boot path lacks GIT_TERMINAL_PROMPT=0 (WR-03): {line!r}"
         )
+
+
+@pytest.mark.parametrize("missing_field", ["projectRepo", "configRepo", "projectBranch"])
+def test_null_bootconfig_field_fails_closed_before_clone(
+    boot_script: Path,
+    bare_repos: dict[str, str],
+    stub_ttyd_path: Path,
+    tmp_path: Path,
+    missing_field: str,
+) -> None:
+    """WR-05: a null/missing required bootconfig field fails the boot before any git/cp.
+
+    jq -r emits the literal string ``"null"`` for an absent/null field; the boot must
+    treat that as a missing field and exit non-zero with a clear message BEFORE handing
+    ``null`` to ``git clone`` (which would ERR-trap confusingly) — and never reach ttyd.
+    """
+    payload: dict[str, object] = {
+        "configRepo": bare_repos["config_repo"],
+        "configBranch": bare_repos["config_branch"],
+        "projectRepo": bare_repos["project_repo"],
+        "projectBranch": bare_repos["project_branch"],
+        "gitCredential": SENTINEL_CREDENTIAL,
+        missing_field: None,  # explicit JSON null → jq -r yields the literal "null"
+    }
+    with serve_custom_bootconfig(payload) as cp_url:
+        proc, home, _etc = _run_boot(
+            boot_script, control_plane=cp_url, tmp_path=tmp_path, stub_bin=stub_ttyd_path
+        )
+    assert proc.returncode != 0, (
+        f"a null {missing_field} must fail the boot non-zero before any clone (WR-05)\n{proc.stderr}"
+    )
+    output = proc.stdout + proc.stderr
+    assert "missing required field" in output, (
+        f"expected a clear missing-field message, got:\n{output}"
+    )
+    # The fail-closed check runs BEFORE the config clone, so nothing was cloned.
+    assert not (home / "project").exists(), "project cloned despite a null bootconfig field"
+    assert not (home / "ttyd-argv.txt").exists(), "ttyd reached despite a null bootconfig field"
 
 
 def test_manifest_iteration_jq_failure_aborts_boot(

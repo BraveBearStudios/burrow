@@ -32,7 +32,7 @@ import os
 import shutil
 import subprocess
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -77,8 +77,14 @@ class FakeControlPlane:
         self.git_credential = git_credential
 
 
-def _make_handler(payload: dict[str, str] | None) -> type[BaseHTTPRequestHandler]:
-    """Build a request handler: ``payload is None`` → always 503 (the down variant)."""
+def _make_handler(payload: Mapping[str, object] | None) -> type[BaseHTTPRequestHandler]:
+    """Build a request handler: ``payload is None`` → always 503 (the down variant).
+
+    Values may be ``str`` or ``None`` (the WR-05 malformed-envelope tests inject a JSON
+    ``null`` field), so the payload is a ``Mapping[str, object]`` (covariant in the value
+    type, so the ``dict[str, str]`` callers and the WR-05 ``dict[str, object]`` caller
+    both satisfy it).
+    """
 
     class _Handler(BaseHTTPRequestHandler):
         def do_GET(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
@@ -323,6 +329,27 @@ def serve_bootconfig(repo: ManifestConfigRepo) -> Iterator[FakeControlPlane]:
             project_branch=repo.project_branch,
             git_credential=_SENTINEL_CREDENTIAL,
         )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@contextmanager
+def serve_custom_bootconfig(payload: dict[str, object]) -> Iterator[str]:
+    """Serve an ARBITRARY bootconfig ``.data`` payload on loopback; yield the base URL.
+
+    Unlike ``serve_bootconfig`` (which always emits a well-formed envelope), this lets a
+    test inject a malformed envelope — a ``null`` or omitted ``projectRepo`` /
+    ``configRepo`` / branch / ``gitCredential`` — to prove the boot validates required
+    fields BEFORE any ``git``/``cp`` runs and fails closed on a ``null`` field (WR-05).
+    """
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(payload))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = str(server.server_address[0]), int(server.server_address[1])
+    try:
+        yield f"http://{host}:{port}"
     finally:
         server.shutdown()
         server.server_close()
