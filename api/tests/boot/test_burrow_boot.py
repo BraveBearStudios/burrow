@@ -24,6 +24,7 @@ Real worker boot stays the dev-homelab smoke (human-verify), NOT a CI command.
 from __future__ import annotations
 
 import subprocess
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -31,7 +32,9 @@ import pytest
 from tests.boot.conftest import (
     SENTINEL_CREDENTIAL,
     FakeControlPlane,
+    ManifestConfigRepo,
     make_boot_env,
+    serve_bootconfig,
 )
 
 
@@ -156,3 +159,98 @@ def test_no_set_x_on_boot_path(boot_script: Path, flag: str) -> None:
         line for line in boot_script.read_text().splitlines() if not line.lstrip().startswith("#")
     )
     assert flag not in code, "no `set -x` on the boot path (Pitfall 6 — would echo secrets)"
+
+
+# --- Plan 02: manifest processing (process_manifest + install_claude_plugin) --
+
+
+def _plugins_dir(home: Path) -> Path:
+    """``~/.claude/plugins`` under the temp HOME."""
+    return home / ".claude" / "plugins"
+
+
+def test_only_claude_plugins_installed(
+    boot_script: Path,
+    manifest_config_repo: Callable[..., ManifestConfigRepo],
+    stub_ttyd_path: Path,
+    tmp_path: Path,
+) -> None:
+    """A claude-plugin + a binary entry → only the claude-plugin is cloned; binary is skipped."""
+    repo = manifest_config_repo(include_binary=True)
+    with serve_bootconfig(repo) as cp:
+        proc, home, _etc = _run_boot(
+            boot_script, control_plane=cp.url, tmp_path=tmp_path, stub_bin=stub_ttyd_path
+        )
+    assert proc.returncode == 0, f"boot failed:\nSTDOUT:\n{proc.stdout}\nSTDERR:\n{proc.stderr}"
+
+    plugins = _plugins_dir(home)
+    for name in repo.claude_plugin_names:
+        assert (plugins / name / "plugin.json").is_file(), (
+            f"claude-plugin {name!r} not cloned into ~/.claude/plugins/{name}"
+        )
+    for name in repo.skipped_names:
+        assert not (plugins / name).exists(), (
+            f"non-claude-plugin {name!r} must be SKIPPED at boot (baked at provision time)"
+        )
+
+    # The plugin was enabled in the user settings (enabledPlugins write).
+    settings = home / ".claude" / "settings.json"
+    assert settings.is_file(), "settings.json not written by install_claude_plugin"
+
+
+def test_two_boots_identical_plugin_tree(
+    boot_script: Path,
+    manifest_config_repo: Callable[..., ManifestConfigRepo],
+    stub_ttyd_path: Path,
+    tmp_path: Path,
+) -> None:
+    """Two boots over the same manifest produce a byte-identical plugin tree (SC-2)."""
+    repo = manifest_config_repo(include_binary=True)
+
+    def _digest(plugins: Path) -> list[tuple[str, str]]:
+        import hashlib
+
+        out: list[tuple[str, str]] = []
+        for path in sorted(plugins.rglob("*")):
+            if path.is_file() and ".git" not in path.parts:
+                rel = path.relative_to(plugins).as_posix()
+                out.append((rel, hashlib.sha256(path.read_bytes()).hexdigest()))
+        return out
+
+    boot1 = tmp_path / "boot1"
+    boot1.mkdir()
+    boot2 = tmp_path / "boot2"
+    boot2.mkdir()
+    with serve_bootconfig(repo) as cp:
+        proc1, home1, _e1 = _run_boot(
+            boot_script, control_plane=cp.url, tmp_path=boot1, stub_bin=stub_ttyd_path
+        )
+        proc2, home2, _e2 = _run_boot(
+            boot_script, control_plane=cp.url, tmp_path=boot2, stub_bin=stub_ttyd_path
+        )
+    assert proc1.returncode == 0, f"boot1 failed:\n{proc1.stdout}\n{proc1.stderr}"
+    assert proc2.returncode == 0, f"boot2 failed:\n{proc2.stdout}\n{proc2.stderr}"
+
+    tree1 = _digest(_plugins_dir(home1))
+    tree2 = _digest(_plugins_dir(home2))
+    assert tree1, "no plugin files were installed — nothing to compare"
+    assert tree1 == tree2, "two boots of the same manifest produced different plugin trees (SC-2)"
+
+
+def test_bad_manifest_fails_boot(
+    boot_script: Path,
+    manifest_config_repo: Callable[..., ManifestConfigRepo],
+    stub_ttyd_path: Path,
+    tmp_path: Path,
+) -> None:
+    """An unknown plugin ``type`` → the boot-time jq gate fails the boot non-zero (fail-closed)."""
+    repo = manifest_config_repo(include_binary=True, bad_type=True)
+    with serve_bootconfig(repo) as cp:
+        proc, _home, _etc = _run_boot(
+            boot_script, control_plane=cp.url, tmp_path=tmp_path, stub_bin=stub_ttyd_path
+        )
+    assert proc.returncode != 0, (
+        "an unknown plugin type must FAIL the boot non-zero (fail-closed jq gate, ERR trap)"
+    )
+    # ttyd must never be reached on the fail-closed path.
+    assert not (tmp_path / "home" / "ttyd-argv.txt").exists(), "ttyd reached despite a bad manifest"
