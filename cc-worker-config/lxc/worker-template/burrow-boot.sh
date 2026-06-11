@@ -123,6 +123,74 @@ ASK
   )
 }
 
+# --- claude-plugin install: pinned clone + settings enable (RESEARCH Pattern 4)
+# install_claude_plugin <name> <source> <ref>
+# Idempotent by construction: rm -rf the dest then `git clone --depth=1 --branch
+# <ref>` of the IMMUTABLE ref, so two boots of the same manifest produce a
+# byte-identical plugin tree (SC-2, Pitfall 1). `source` may already carry a
+# scheme (e.g. a file:// hermetic test remote); a bare host/path gets https://
+# (the production github.com/<org>/<repo> form). The plugin is then enabled in
+# the user settings.
+#
+# [ASSUMED] (A1 / Open-Q-2): the enabledPlugins[<name>]=true shape in
+# ~/.claude/settings.json is the directory-install enablement key for
+# claude-code@2.1.170 — CONFIRM at the dev-homelab smoke (`claude plugin list` /
+# `--debug`). The master CLAUDE.md copy is independent and works regardless.
+install_claude_plugin() {
+  local name="$1" source="$2" ref="$3"
+  local dest="${WORKER_HOME}/.claude/plugins/${name}"
+  local url="$source"
+  [[ "$source" == *://* ]] || url="https://${source}"
+
+  log "installing claude-plugin '${name}' @ ${ref} (pinned, idempotent)"
+  rm -rf "$dest"
+  mkdir -p "${WORKER_HOME}/.claude/plugins"
+  git clone --depth=1 --branch "$ref" "$url" "$dest"
+
+  # Enable in the user settings.json (create {} if absent). enabledPlugins is
+  # keyed by plugin name; see the [ASSUMED] note above.
+  local settings="${WORKER_HOME}/.claude/settings.json"
+  [[ -f "$settings" ]] || echo '{}' >"$settings"
+  local tmp; tmp="$(mktemp)"
+  jq --arg n "$name" '.enabledPlugins[$n] = true' "$settings" >"$tmp" && mv "$tmp" "$settings"
+}
+
+# --- Manifest processing: fail-closed jq gate + claude-plugin-only install ----
+# process_manifest <manifest.json>
+# A structural jq gate that MUST enforce the SAME required-keys + type enum as
+# cc-worker-config/plugins/manifest.schema.json (the single source of truth) so
+# CI and boot never diverge: every entry needs string source/ref/type and
+# type ∈ {claude-plugin,binary,npm-global}. An unknown/unsupported type or a
+# missing key fails the gate → `return 1` → the ERR trap fires → non-zero boot
+# (fail-closed, the locked decision — never skip-and-continue).
+#
+# Only `type=="claude-plugin"` entries are pulled fresh at boot; `binary` and
+# `npm-global` are baked into the golden template at provision time and SKIPPED.
+process_manifest() {
+  local manifest="$1"
+  if [[ ! -f "$manifest" ]]; then
+    log "manifest not found at ${manifest} — failing boot"
+    return 1
+  fi
+  jq -e '
+    .plugins
+    | to_entries
+    | all(.value | (.type | type == "string") and (.source | type == "string")
+                   and (.ref | type == "string")
+                   and (.type | IN("claude-plugin", "binary", "npm-global")))
+  ' "$manifest" >/dev/null || { log "manifest failed structural validation"; return 1; }
+
+  # Iterate only claude-plugin entries; binary/npm-global are baked (skip).
+  # IFS includes \r so a CRLF-terminated jq line (e.g. jq on a non-Unix host, or a
+  # CRLF-saved manifest) does not leave a trailing carriage return on the last field.
+  while IFS=$'\t\r' read -r name source ref; do
+    [[ -n "$name" ]] || continue
+    install_claude_plugin "$name" "$source" "$ref"
+  done < <(jq -r '.plugins | to_entries[]
+                  | select(.value.type == "claude-plugin")
+                  | [.key, .value.source, .value.ref] | @tsv' "$manifest")
+}
+
 # --- Live pull-at-boot --------------------------------------------------------
 # CONTROL_PLANE is now REQUIRED (the Phase-0 warn-and-skip is gone): the live
 # fetch depends on it, so a missing value must fail the boot rather than launch
@@ -150,6 +218,13 @@ rm -rf /tmp/cc-worker-config
 clone_with_token "$GIT_CRED" "$CONFIG_REPO" /tmp/cc-worker-config \
   --depth=1 --branch "$CONFIG_BRANCH"
 cp /tmp/cc-worker-config/claude/CLAUDE.md "${WORKER_HOME}/CLAUDE.md"
+
+# Process the versioned plugin manifest from the just-cloned config repo BEFORE
+# the project clone. The fail-closed jq gate rejects an unknown type / malformed
+# manifest (non-zero → ERR trap); only claude-plugin types are pulled fresh
+# (binary/npm-global are baked at provision time).
+log "processing plugin manifest"
+process_manifest /tmp/cc-worker-config/plugins/manifest.json
 
 log "cloning project repo (branch ${PROJECT_BRANCH})"
 rm -rf "$PROJECT_DIR"

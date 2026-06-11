@@ -99,7 +99,9 @@ def _make_handler(payload: dict[str, str] | None) -> type[BaseHTTPRequestHandler
     return _Handler
 
 
-def _seed_bare_repo(repos_root: Path, name: str, files: dict[str, str], tag: str | None = None) -> str:
+def _seed_bare_repo(
+    repos_root: Path, name: str, files: dict[str, str], tag: str | None = None
+) -> str:
     """git init a work tree, commit ``files`` on ``main`` (+ optional ``tag``), bare-clone it.
 
     Returns the bare repo's ``file://`` URL so the boot script can clone it hermetically.
@@ -142,15 +144,43 @@ def bare_repos(tmp_path: Path) -> dict[str, str]:
     """Create file:// bare config + project repos; return their URLs + branch + tag.
 
     The config repo carries ``claude/CLAUDE.md`` (the boot script copies it to
-    ``~/CLAUDE.md``); the project repo carries a ``README.md``. Both are committed on
-    ``main`` and the config repo is tagged ``v1.0.0`` so ref-pinning is exercisable.
+    ``~/CLAUDE.md``) and a ``plugins/manifest.json`` (the boot's ``process_manifest``
+    requires one — a missing manifest fails the boot fail-closed). The manifest pins a
+    single ``claude-plugin`` to a real seeded ``file://`` source repo so the happy path
+    installs cleanly. The project repo carries a ``README.md``. All committed on ``main``;
+    the config + plugin repos are tagged ``v1.0.0`` so ref-pinning is exercisable.
     """
     repos_root = tmp_path / "repos"
     repos_root.mkdir()
+    plugin_url = _seed_bare_repo(
+        repos_root,
+        "plugin-example-claude-plugin",
+        {"plugin.json": '{"name": "example-claude-plugin"}\n'},
+        tag="v1.0.0",
+    )
+    manifest = (
+        json.dumps(
+            {
+                "schemaVersion": "1.0.0",
+                "plugins": {
+                    "example-claude-plugin": {
+                        "source": plugin_url,
+                        "ref": "v1.0.0",
+                        "type": "claude-plugin",
+                    }
+                },
+            },
+            indent=2,
+        )
+        + "\n"
+    )
     config_url = _seed_bare_repo(
         repos_root,
         "cc-worker-config",
-        {"claude/CLAUDE.md": "# Worker CLAUDE.md (seeded)\n"},
+        {
+            "claude/CLAUDE.md": "# Worker CLAUDE.md (seeded)\n",
+            "plugins/manifest.json": manifest,
+        },
         tag="v1.0.0",
     )
     project_url = _seed_bare_repo(repos_root, "project", {"README.md": "# Project (seeded)\n"})
