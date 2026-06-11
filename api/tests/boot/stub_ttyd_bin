@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# stub_ttyd_bin — a fake `ttyd` on PATH for the hermetic boot harness.
+#
+# burrow-boot.sh ends with `exec ttyd ... bash -lc "..."`. In CI there is no real
+# terminal, so the harness prepends a temp dir holding this script (named `ttyd`)
+# to PATH. It records the full argv it was invoked with to the file named in
+# STUB_TTYD_ARGV_FILE, then exits 0 — letting the boot complete so the test can
+# assert the FROZEN ttyd contract (--interface 0.0.0.0 present, --once absent)
+# without launching a real terminal. Mirrors the "fake binary records argv, exits 0"
+# precedent of tests/e2e/stub_ttyd_server.py.
+set -euo pipefail
+
+if [[ -n "${STUB_TTYD_ARGV_FILE:-}" ]]; then
+  printf '%s\n' "$@" >"${STUB_TTYD_ARGV_FILE}"
+fi
+exit 0

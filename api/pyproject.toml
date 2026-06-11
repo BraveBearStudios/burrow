@@ -33,6 +33,11 @@ dev = [
     "responses==0.26.1",
     # respx mocks the httpx ttyd-health leg used by the Plan-04 saga integration tests.
     "respx==0.23.1",
+    # jsonschema is the canonical reference validator (python-jsonschema/jsonschema,
+    # years old, very high downloads). Phase-3 dev/CI dep for the plugin-manifest
+    # schema gate; gated by the normal lockfile-freshness CI step (not a human-verify
+    # checkpoint — it is a well-known package, not an [ASSUMED] one).
+    "jsonschema==4.26.0",
 ]
 
 [tool.ruff]

@@ -1,0 +1,247 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+"""Boot-harness fixtures: loopback fake control plane + bare-repo factory + stub ttyd.
+
+These reuse the loopback-fake idiom of ``tests/integration/conftest.py`` (bind on
+``127.0.0.1:0``, yield a handle, tear down automatically) but for a SUBPROCESS
+substrate rather than an in-process ASGI app:
+
+- ``fake_control_plane`` — a stdlib ``http.server`` on an ephemeral loopback port
+  serving the FROZEN ``{data, meta, error}`` envelope (Shared Pattern D) at
+  ``/api/v1/internal/bootconfig/<vmid>`` with ``gitCredential`` set to the
+  module-level ``_SENTINEL_CREDENTIAL``. A ``down`` variant (every request 503s)
+  drives the retry-then-fail test.
+- ``bare_repos`` — a ``git init --bare`` factory seeding a config repo
+  (``claude/CLAUDE.md`` + a tag for ref-pinning) and a project repo, exposed as
+  ``file://`` paths so the boot script's clones are real-but-hermetic.
+- ``stub_ttyd_path`` — a temp dir holding the committed ``stub_ttyd_bin`` as an
+  executable named ``ttyd``, to prepend to the subprocess ``PATH`` so the boot
+  completes without a real terminal (records the frozen argv instead).
+"""
+
+from __future__ import annotations
+
+import json
+import shutil
+import subprocess
+import threading
+from collections.abc import Callable, Iterator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+
+import pytest
+
+# A high-entropy value that cannot occur incidentally; if it shows up in any
+# captured boot output or in worker.env, the credential leaked (T-03-01..03,
+# block_on=high). Mirrors tests/integration/test_bootconfig.py.
+_SENTINEL_CREDENTIAL = "SENTINEL-bootcred-9f2c4e7a1b6d8054-DO-NOT-LOG"
+
+# Repo root from api/tests/boot/conftest.py → parents[3].
+_ROOT = Path(__file__).resolve().parents[3]
+_BOOT_SCRIPT = _ROOT / "cc-worker-config" / "lxc" / "worker-template" / "burrow-boot.sh"
+_STUB_TTYD_BIN = Path(__file__).resolve().parent / "stub_ttyd_bin"
+
+
+class FakeControlPlane:
+    """A live loopback fake bootconfig endpoint plus the values the test asserts on.
+
+    ``url`` is the ``http://127.0.0.1:<port>`` base the boot script's ``CONTROL_PLANE``
+    points at. ``config_repo`` / ``project_repo`` are the ``file://`` bare-repo paths
+    the served envelope advertises. ``git_credential`` is the sentinel the no-leak
+    test hunts for.
+    """
+
+    def __init__(
+        self,
+        *,
+        url: str,
+        config_repo: str,
+        config_branch: str,
+        project_repo: str,
+        project_branch: str,
+        git_credential: str,
+    ) -> None:
+        self.url = url
+        self.config_repo = config_repo
+        self.config_branch = config_branch
+        self.project_repo = project_repo
+        self.project_branch = project_branch
+        self.git_credential = git_credential
+
+
+def _make_handler(payload: dict[str, str] | None) -> type[BaseHTTPRequestHandler]:
+    """Build a request handler: ``payload is None`` → always 503 (the down variant)."""
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:  # noqa: N802 (BaseHTTPRequestHandler API)
+            if payload is None or "/api/v1/internal/bootconfig/" not in self.path:
+                self.send_response(503)
+                self.end_headers()
+                return
+            body = json.dumps({"data": payload, "meta": {}, "error": None}).encode()
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args: object) -> None:  # silence the stderr access log
+            return
+
+    return _Handler
+
+
+@pytest.fixture
+def bare_repos(tmp_path: Path) -> dict[str, str]:
+    """Create file:// bare config + project repos; return their URLs + branch + tag.
+
+    The config repo carries ``claude/CLAUDE.md`` (the boot script copies it to
+    ``~/CLAUDE.md``); the project repo carries a ``README.md``. Both are committed on
+    ``main`` and the config repo is tagged ``v1.0.0`` so ref-pinning is exercisable.
+    """
+    repos_root = tmp_path / "repos"
+    repos_root.mkdir()
+
+    def _seed_repo(name: str, files: dict[str, str], tag: str | None = None) -> str:
+        work = repos_root / f"{name}-work"
+        work.mkdir()
+        for rel, content in files.items():
+            target = work / rel
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(content)
+        env = {
+            "GIT_AUTHOR_NAME": "Burrow Test",
+            "GIT_AUTHOR_EMAIL": "test@example.invalid",
+            "GIT_COMMITTER_NAME": "Burrow Test",
+            "GIT_COMMITTER_EMAIL": "test@example.invalid",
+        }
+        run = lambda *args: subprocess.run(  # noqa: E731
+            ["git", *args], cwd=work, check=True, capture_output=True, text=True, env={**env}
+        )
+        run("init", "-q", "-b", "main")
+        run("add", "-A")
+        run("commit", "-q", "-m", "seed")
+        if tag is not None:
+            run("tag", tag)
+        bare = repos_root / f"{name}.git"
+        subprocess.run(
+            ["git", "clone", "-q", "--bare", str(work), str(bare)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return bare.as_uri()  # file:// URL
+
+    config_url = _seed_repo(
+        "cc-worker-config",
+        {"claude/CLAUDE.md": "# Worker CLAUDE.md (seeded)\n"},
+        tag="v1.0.0",
+    )
+    project_url = _seed_repo("project", {"README.md": "# Project (seeded)\n"})
+    return {
+        "config_repo": config_url,
+        "config_branch": "main",
+        "project_repo": project_url,
+        "project_branch": "main",
+    }
+
+
+@pytest.fixture
+def fake_control_plane(bare_repos: dict[str, str]) -> Iterator[FakeControlPlane]:
+    """Serve the FROZEN bootconfig envelope on a loopback ephemeral port (the UP variant)."""
+    payload = {
+        "configRepo": bare_repos["config_repo"],
+        "configBranch": bare_repos["config_branch"],
+        "projectRepo": bare_repos["project_repo"],
+        "projectBranch": bare_repos["project_branch"],
+        "gitCredential": _SENTINEL_CREDENTIAL,
+    }
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(payload))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address[:2]
+    try:
+        yield FakeControlPlane(
+            url=f"http://{host}:{port}",
+            config_repo=bare_repos["config_repo"],
+            config_branch=bare_repos["config_branch"],
+            project_repo=bare_repos["project_repo"],
+            project_branch=bare_repos["project_branch"],
+            git_credential=_SENTINEL_CREDENTIAL,
+        )
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.fixture
+def down_control_plane() -> Iterator[str]:
+    """A loopback server that 503s every request — drives the retry-then-fail test."""
+    server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(None))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    host, port = server.server_address[:2]
+    try:
+        yield f"http://{host}:{port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.fixture
+def stub_ttyd_path(tmp_path: Path) -> Path:
+    """Copy the committed stub ttyd into a temp dir as an executable named ``ttyd``.
+
+    Returned dir is meant to be prepended to the subprocess ``PATH`` so the boot
+    script's final ``exec ttyd ...`` resolves to the stub (records argv, exits 0).
+    """
+    bindir = tmp_path / "stub-bin"
+    bindir.mkdir()
+    dest = bindir / "ttyd"
+    shutil.copyfile(_STUB_TTYD_BIN, dest)
+    dest.chmod(0o755)
+    return bindir
+
+
+@pytest.fixture
+def boot_script() -> Path:
+    """Absolute path to the burrow-boot.sh under test."""
+    return _BOOT_SCRIPT
+
+
+# Re-export the seam helpers the test module reaches for.
+SENTINEL_CREDENTIAL = _SENTINEL_CREDENTIAL
+
+
+def make_boot_env(
+    *,
+    control_plane: str,
+    home: Path,
+    etc_burrow: Path,
+    stub_bin: Path,
+    vmid_hostname: str = "burrow-w-241",
+) -> dict[str, str]:
+    """Build the hermetic subprocess env for a boot run (see test module for use)."""
+    import os
+
+    return {
+        "PATH": f"{stub_bin}{os.pathsep}{os.environ.get('PATH', '')}",
+        "HOME": str(home),
+        "CONTROL_PLANE": control_plane,
+        "BURROW_ETC": str(etc_burrow),
+        "BURROW_HOSTNAME": vmid_hostname,
+        "STUB_TTYD_ARGV_FILE": str(home / "ttyd-argv.txt"),
+        # Keep git hermetic and non-interactive regardless of the host's config.
+        "GIT_TERMINAL_PROMPT": "0",
+        "GIT_CONFIG_NOSYSTEM": "1",
+        "GIT_CONFIG_GLOBAL": str(home / ".gitconfig-absent"),
+    }
+
+
+__all__ = [
+    "FakeControlPlane",
+    "SENTINEL_CREDENTIAL",
+    "make_boot_env",
+]
