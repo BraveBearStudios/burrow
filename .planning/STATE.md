@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 04-02-PLAN.md — atomic capacity check+reserve under one process-wide asyncio.Lock (Pitfall 5/CAP-02) + stopWorkspace(reason=) + 3 reconciler Settings keys + deterministic capacity-race test + ADR-0010. Commits 9742908, 81f94a1, a6ee94a, 15db872. Plan 04-01 (reconciler) unblocked."
-last_updated: "2026-06-11T23:10:21.724Z"
-last_activity: 2026-06-11 -- Completed 04-02-PLAN.md (capacity-lock + reconciler-readiness)
+stopped_at: "Completed 04-03-PLAN.md — Activity drawer (UI-06): WorkspaceEvent type + enabled-gated useWorkspaceEvents poll + EVENT_BADGE/badgeFor map + ActivityDrawer (4 states, boot.error emphasis, dialog/Esc/focus-trap/focus-return a11y) + the TerminalPanel Activity-log trigger + an 11-test vitest suite + a green Playwright drawer e2e over the Fake + stub ttyd. Commits 1326546, 97a82b6, cacc99c. Zero new runtime dependency; tsc + biome(47) + 92 vitest + build all green."
+last_updated: "2026-06-11T23:30:55.567Z"
+last_activity: 2026-06-11
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 26
-  completed_plans: 22
-  percent: 85
+  completed_plans: 23
+  percent: 88
 ---
 
 <!--
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 4 (Hardening & Release) — EXECUTING
-Plan: 2 of 5 complete (next: 04-01 reconciler)
-Status: Executing Phase 4
-Last activity: 2026-06-11 -- Completed 04-02-PLAN.md (capacity-lock + reconciler-readiness)
+Plan: 04-03 complete (next: 04-04 images, or 04-01 reconciler)
+Status: Ready to execute
+Last activity: 2026-06-11 -- Completed 04-03-PLAN.md (activity drawer UI-06)
 
-Progress: [█████████░] 85% (22/26 plans; Phase 4: 1/5 plans complete)
+Progress: [█████████░] 88% (23/26 plans; Phase 4: 2/5 plans complete)
 
 ## Performance Metrics
 
@@ -83,6 +83,7 @@ Progress: [█████████░] 85% (22/26 plans; Phase 4: 1/5 plans 
 | Phase 03 P02 | 38min | 2 tasks | 9 files |
 | Phase 03 P03 | 9min | 2 tasks | 3 files |
 | Phase 04 P02 | 38min | 3 tasks | 5 files |
+| Phase 04 P03 | 12 | 3 tasks | 8 files |
 
 ## Accumulated Context
 
@@ -155,6 +156,7 @@ Recent decisions affecting current work:
 - [Phase 03]: [Plan 03-03]: CI now enforces the Phase-3 gates — a shellcheck step (ubuntu-latest preinstalled binary, NO new third-party action, SHA-pin convention preserved, T-03-09) lints burrow-boot.sh + provision-template.sh, and an api pytest step runs tests/boot + test_manifest_schema.py (working-directory: api) so boot-script regressions + manifest drift fail the build, not the homelab (T-03-10). Both steps ADDED to the existing static-gates job; existing gates, SHA pins, and permissions: contents: read unchanged. Verified the exact pytest command green locally (12 passed) + full api suite still green (139 passed). shellcheck remains the one locally-unverifiable item (unavailable on the Windows dev host) — first CI run is the authority. Phase 3 complete (pending verification).
 - [Phase 04]: [Plan 04-02]: Capacity-under-concurrency race (Pitfall 5 / CAP-02) closed by wrapping ONLY the step-0 capacity guard + step-1 VMID reservation in one process-wide `self._create_lock` (asyncio.Lock), released BEFORE the multi-second clone so concurrent creates still parallelize their slow saga work. The 002 VMID partial-unique INSERT is untouched (it remains the cross-process uniqueness arbiter); only the unserialized capacity READ was the gap. v1 assumes `--workers 1`; `BEGIN IMMEDIATE` is the documented `--workers >1` upgrade path (ADR-0010). Proven non-tautological: bypassing the lock makes the deterministic two-create test fail (2 successes), with it 1 success + 1 CapacityError.
 - [Phase 04]: [Plan 04-02]: `stopWorkspace` gained a keyword-only `reason` param (default None) emitting `{"reason": reason}` in the `workspace.stopped` event data when set, `{}` otherwise — so the reconciler's idle auto-stop carries `reason: idle` for the UI badge (FROZEN 3 / Open Q2). `reason` is a fixed non-secret literal; no user/topology input flows in (T-04-02B). Three reconciler cadence Settings keys added (non-secret defaults): `reconciler_period_s=60`, `creating_timeout_s=300`, `idle_window_s=1800`. ADR-0010 records the single in-process asyncio reconciler (reap + idle auto-stop, FastAPI lifespan-owned) + the capacity-lock decision in the Nygard format. Full api suite 155 passed; mypy --strict + ruff + REUSE (255/255) green.
+- [Phase ?]: [Phase 04]: [Plan 04-03]: Activity drawer (UI-06) hand-built on the Phase-2 tokens — NO new runtime dependency (FROZEN guardrail 7). useWorkspaceEvents is an enabled-gated TanStack poll (refetchInterval gated on enabled && !!id) so it runs ONLY while the drawer is open (criterion 5). EVENT_BADGE is a flat tokens-only literal map of the VERIFIED namespaced backend strings (mirrors status.ts); all non-static logic lives in badgeFor() — reaper.* prefix to --warn 'Reaper · {suffix}', workspace.stopped data.reason==='idle' to 'Auto-stopped (idle)' --warn, unknown to the raw type string in mono --text-sub (forward-compatible, criterion 3). The drawer reverses the oldest-first feed client-side (newest-first, criterion 2), renders the already-_safe()-redacted data verbatim and issues ONLY the same-origin events poll — no second/un-redact request (T-04-03A/B). boot.error gets the row emphasis (2px --err left bar + tint + reason in red mono, criterion 4); no other row does. a11y: role=dialog, focus trap, Esc, and focus-RETURN-to-trigger via the open-effect cleanup. The panel trigger sets a single ephemeral activeEventsWorkspaceId (one drawer at a time, not persisted). Deviation (Rule 3): TerminalPanel.test.tsx renders wrapped in QueryClientProvider since the panel now mounts the closed drawer whose useQuery needs context even when disabled. Gate: 92 vitest + tsc + biome(47) + build + Playwright drawer e2e all green over the Fake + stub ttyd; zero hex, zero gold.
 
 ### Pending Todos
 
@@ -179,7 +181,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-11T23:09:37.842Z
+Last session: 2026-06-11T23:29:34.612Z
 Stopped at: Completed 03-03-PLAN.md — ADR-0009 (plugin cadence: boot-time-latest, reproducibility via manifest ref-pinning; SC-4) + CI wiring: a shellcheck step on burrow-boot.sh + provision-template.sh and an api pytest step running tests/boot + test_manifest_schema.py, both ADDED to static-gates (no new third-party action, permissions: contents: read unchanged). Commits 05ca051, f508b65. Phase 3 complete — ready for verification.
 Resume file: None
 Next plan: Phase 3 is complete (all 3 plans done) — next is phase verification, then Phase 4. Carried open items (all dev-homelab-smoke, NOT CI): the first CI run confirms the new shellcheck step is clean on both scripts (the one locally-unverifiable item — shellcheck unavailable on the Windows dev host); real worker boot + template rebuild (20-create-template.sh re-run); the enabledPlugins on-disk shape for claude-code@2.1.170 [ASSUMED]; resolve_vmid hostname-suffix parse vs 30-network-notes.md/ADR-0004; x-access-token username convention + config-repo auth model (A2/A3/A5, operator-confirm).

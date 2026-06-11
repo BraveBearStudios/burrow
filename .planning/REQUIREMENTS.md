@@ -78,7 +78,7 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 - [x] **UI-03**: A New Workspace modal collects name/repo/branch/node and shows live boot-progress states
 - [x] **UI-04**: A status bar shows running/stopped counts, session uptime, and node capacity
 - [x] **UI-05**: After a browser refresh, the UI reconnects the terminal of a still-running workspace (live session; prior scrollback is not restored in v1)
-- [ ] **UI-06**: A per-workspace activity drawer surfaces the event log
+- [x] **UI-06**: A per-workspace activity drawer surfaces the event log
 
 ### Workers & Config Pipeline (WORK)
 
@@ -188,7 +188,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | UI-03 | Phase 2 | Complete |
 | UI-04 | Phase 2 | Complete |
 | UI-05 | Phase 2 | Complete |
-| UI-06 | Phase 4 | Pending |
+| UI-06 | Phase 4 | Complete |
 | WORK-01 | Phase 0 | Pending |
 | WORK-02 | Phase 3 | Complete. Plan 03-01: live burrow-boot.sh resolves its VMID, bounded-retries the frozen bootconfig endpoint, clones config + project via a leak-proof in-memory GIT_ASKPASS subshell, copies CLAUDE.md, and execs the frozen ttyd. Plan 03-02: the plugin-manifest clause — process_manifest fail-closed jq gate + idempotent install_claude_plugin (claude-plugin pulled fresh). Plan 03-03 CI-enforces the gate (shellcheck on burrow-boot.sh + the boot/manifest pytest tiers). CI-proven by the hermetic api/tests/boot harness incl. the SC-3 no-leak test; real worker boot is the dev-homelab smoke. |
 | WORK-03 | Phase 1 | Endpoint contract done (Plan 01-05): bootconfig endpoint + pluggable credential seam + no-cred-in-logs gate, all CI-proven. Live `burrow-boot.sh` consumer pull-step deferred to Phase 3. |
