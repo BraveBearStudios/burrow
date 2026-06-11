@@ -124,6 +124,31 @@ async def test_stop_running_to_stopped(service: WorkspaceService, db: SqliteProv
     assert any(e.type == "workspace.stopped" for e in events)
 
 
+async def test_operator_stop_carries_no_reason(
+    service: WorkspaceService, db: SqliteProvider
+) -> None:
+    """An operator-initiated stop emits ``workspace.stopped`` with empty data (Open Q2)."""
+    ws = await _running_workspace(service)
+    await service.stopWorkspace(ws.id)
+    events = await db.getEvents(ws.id)
+    stopped = [e for e in events if e.type == "workspace.stopped"]
+    assert stopped, "expected a workspace.stopped event"
+    # No reason key when the operator stops (the UI badge falls back to "Stopped").
+    assert stopped[0].data == {}
+
+
+async def test_idle_stop_carries_reason_idle(
+    service: WorkspaceService, db: SqliteProvider
+) -> None:
+    """An auto-stop threads ``reason: idle`` into the event data for the UI badge (FROZEN 3)."""
+    ws = await _running_workspace(service)
+    await service.stopWorkspace(ws.id, reason="idle")
+    events = await db.getEvents(ws.id)
+    stopped = [e for e in events if e.type == "workspace.stopped"]
+    assert stopped, "expected a workspace.stopped event"
+    assert stopped[0].data == {"reason": "idle"}
+
+
 async def test_start_stopped_to_running(service: WorkspaceService, db: SqliteProvider) -> None:
     ws = await _running_workspace(service)
     await service.stopWorkspace(ws.id)
