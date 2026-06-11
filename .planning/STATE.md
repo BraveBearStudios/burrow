@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 04-03-PLAN.md — Activity drawer (UI-06): WorkspaceEvent type + enabled-gated useWorkspaceEvents poll + EVENT_BADGE/badgeFor map + ActivityDrawer (4 states, boot.error emphasis, dialog/Esc/focus-trap/focus-return a11y) + the TerminalPanel Activity-log trigger + an 11-test vitest suite + a green Playwright drawer e2e over the Fake + stub ttyd. Commits 1326546, 97a82b6, cacc99c. Zero new runtime dependency; tsc + biome(47) + 92 vitest + build all green."
-last_updated: "2026-06-11T23:30:55.567Z"
+stopped_at: "Completed 04-04-PLAN.md — Dockerfiles + CI build-scan gate (CICD-04): Dockerfile.api (python:3.12-slim build->runtime, both live-digest-pinned, uv sync --frozen, non-root UID 10001 COPY --chown, urllib HEALTHCHECK on the verified /api/v1/health, six OCI labels) + Dockerfile.ui (node:22 build -> nginx:1.27-alpine runtime digest-pinned, npm ci, unprivileged nginx :8080 with pid/temp under /tmp, wget HEALTHCHECK on /) + secret-free .dockerignore + a ci.yml build-scan job (needs static-gates, contents:read+security-events:write, two-image matrix, push:false+load:true, Trivy two-run gate fail-on-HIGH/CRITICAL + if:always SARIF upload). All bases + uv image + four actions SHA/digest-pinned (NO placeholders). Commits 1bcd3bd, 3f1aa7c, 4a0f617. uv lock --check + reuse(266) + tsc + 155 pytest all green."
+last_updated: "2026-06-11T23:46:00.000Z"
 last_activity: 2026-06-11
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 26
-  completed_plans: 23
-  percent: 88
+  completed_plans: 24
+  percent: 92
 ---
 
 <!--
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 4 (Hardening & Release) — EXECUTING
-Plan: 04-03 complete (next: 04-04 images, or 04-01 reconciler)
+Plan: 04-04 complete (next: 04-01 reconciler, or 04-05 release.yml)
 Status: Ready to execute
-Last activity: 2026-06-11 -- Completed 04-03-PLAN.md (activity drawer UI-06)
+Last activity: 2026-06-11 -- Completed 04-04-PLAN.md (Dockerfiles + CI build-scan gate CICD-04)
 
-Progress: [█████████░] 88% (23/26 plans; Phase 4: 2/5 plans complete)
+Progress: [█████████░] 92% (24/26 plans; Phase 4: 3/5 plans complete)
 
 ## Performance Metrics
 
@@ -84,6 +84,7 @@ Progress: [█████████░] 88% (23/26 plans; Phase 4: 2/5 plans 
 | Phase 03 P03 | 9min | 2 tasks | 3 files |
 | Phase 04 P02 | 38min | 3 tasks | 5 files |
 | Phase 04 P03 | 12 | 3 tasks | 8 files |
+| Phase 04 P04 | 41min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -156,6 +157,7 @@ Recent decisions affecting current work:
 - [Phase 03]: [Plan 03-03]: CI now enforces the Phase-3 gates — a shellcheck step (ubuntu-latest preinstalled binary, NO new third-party action, SHA-pin convention preserved, T-03-09) lints burrow-boot.sh + provision-template.sh, and an api pytest step runs tests/boot + test_manifest_schema.py (working-directory: api) so boot-script regressions + manifest drift fail the build, not the homelab (T-03-10). Both steps ADDED to the existing static-gates job; existing gates, SHA pins, and permissions: contents: read unchanged. Verified the exact pytest command green locally (12 passed) + full api suite still green (139 passed). shellcheck remains the one locally-unverifiable item (unavailable on the Windows dev host) — first CI run is the authority. Phase 3 complete (pending verification).
 - [Phase 04]: [Plan 04-02]: Capacity-under-concurrency race (Pitfall 5 / CAP-02) closed by wrapping ONLY the step-0 capacity guard + step-1 VMID reservation in one process-wide `self._create_lock` (asyncio.Lock), released BEFORE the multi-second clone so concurrent creates still parallelize their slow saga work. The 002 VMID partial-unique INSERT is untouched (it remains the cross-process uniqueness arbiter); only the unserialized capacity READ was the gap. v1 assumes `--workers 1`; `BEGIN IMMEDIATE` is the documented `--workers >1` upgrade path (ADR-0010). Proven non-tautological: bypassing the lock makes the deterministic two-create test fail (2 successes), with it 1 success + 1 CapacityError.
 - [Phase 04]: [Plan 04-02]: `stopWorkspace` gained a keyword-only `reason` param (default None) emitting `{"reason": reason}` in the `workspace.stopped` event data when set, `{}` otherwise — so the reconciler's idle auto-stop carries `reason: idle` for the UI badge (FROZEN 3 / Open Q2). `reason` is a fixed non-secret literal; no user/topology input flows in (T-04-02B). Three reconciler cadence Settings keys added (non-secret defaults): `reconciler_period_s=60`, `creating_timeout_s=300`, `idle_window_s=1800`. ADR-0010 records the single in-process asyncio reconciler (reap + idle auto-stop, FastAPI lifespan-owned) + the capacity-lock decision in the Nygard format. Full api suite 155 passed; mypy --strict + ruff + REUSE (255/255) green.
+- [Phase 04]: [Plan 04-04]: Dockerfiles + CI build-scan gate (CICD-04). Both images are multi-stage with bases pinned to LIVE multi-arch index digests (python:3.12-slim a39549e…, node:22 2d178f2…, nginx:1.27-alpine 65645c7…) + the uv build image (ghcr.io/astral-sh/uv f6e3549…) and all four new actions pinned to commit SHAs — NO PIN_AT_* placeholders remain (Docker/crane/skopeo absent on the Windows host, but registry+GHCR HTTP API via the certifi CA bundle resolved every digest; the first attempt's CERTIFICATE_VERIFY_FAILED was a stale default trust store, NOT a bypass). api HEALTHCHECK probes the VERIFIED /api/v1/health (router prefix /api/v1 + /health, NOT the /health the §2.2 snippet shows) via in-image Python urllib (no curl in slim); ui runs UNPRIVILEGED nginx on :8080 (a non-root process can't bind :80) with pid + all temp paths relocated under /tmp + the SPA root chown'd to nginx, wget HEALTHCHECK on /. Both carry the six OCI labels (source=github.com/BraveBearStudios/burrow for AGPL §13; dynamic revision/created/version are ARG-backed for the CI metadata action). .dockerignore excludes .git/.env*/tests/local state (T-04-04A). The ci.yml build-scan job (needs:[static-gates], contents:read+security-events:write) builds a two-image matrix with push:false+load:true (never publish on PR — ci-cd §2.4 / Pitfall 12) then runs Trivy TWICE: a gate run (table, severity HIGH,CRITICAL, exit-code 1) that fails the build + an if:always() SARIF run uploaded to code scanning (one run can't do both — trivy-action#309). Deviation (Rule 1): the OCI image.source label was corrected from a wrong brave-bear-studios slug to the real BraveBearStudios/burrow (commit 3f1aa7c). Existing static-gates/pr-title jobs + default permissions untouched. Gate: uv lock --check + reuse(266/266) + tsc --noEmit + 155 pytest all green; Docker build is CI-only (the build-scan job's true acceptance is the first CI run, per the repo pattern). actionlint unavailable on this host → YAML validated via python yaml.safe_load.
 - [Phase ?]: [Phase 04]: [Plan 04-03]: Activity drawer (UI-06) hand-built on the Phase-2 tokens — NO new runtime dependency (FROZEN guardrail 7). useWorkspaceEvents is an enabled-gated TanStack poll (refetchInterval gated on enabled && !!id) so it runs ONLY while the drawer is open (criterion 5). EVENT_BADGE is a flat tokens-only literal map of the VERIFIED namespaced backend strings (mirrors status.ts); all non-static logic lives in badgeFor() — reaper.* prefix to --warn 'Reaper · {suffix}', workspace.stopped data.reason==='idle' to 'Auto-stopped (idle)' --warn, unknown to the raw type string in mono --text-sub (forward-compatible, criterion 3). The drawer reverses the oldest-first feed client-side (newest-first, criterion 2), renders the already-_safe()-redacted data verbatim and issues ONLY the same-origin events poll — no second/un-redact request (T-04-03A/B). boot.error gets the row emphasis (2px --err left bar + tint + reason in red mono, criterion 4); no other row does. a11y: role=dialog, focus trap, Esc, and focus-RETURN-to-trigger via the open-effect cleanup. The panel trigger sets a single ephemeral activeEventsWorkspaceId (one drawer at a time, not persisted). Deviation (Rule 3): TerminalPanel.test.tsx renders wrapped in QueryClientProvider since the panel now mounts the closed drawer whose useQuery needs context even when disabled. Gate: 92 vitest + tsc + biome(47) + build + Playwright drawer e2e all green over the Fake + stub ttyd; zero hex, zero gold.
 
 ### Pending Todos
@@ -181,7 +183,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-11T23:29:34.612Z
-Stopped at: Completed 03-03-PLAN.md — ADR-0009 (plugin cadence: boot-time-latest, reproducibility via manifest ref-pinning; SC-4) + CI wiring: a shellcheck step on burrow-boot.sh + provision-template.sh and an api pytest step running tests/boot + test_manifest_schema.py, both ADDED to static-gates (no new third-party action, permissions: contents: read unchanged). Commits 05ca051, f508b65. Phase 3 complete — ready for verification.
+Last session: 2026-06-11T23:46:00.000Z
+Stopped at: Completed 04-04-PLAN.md — Dockerfile.api + Dockerfile.ui (multi-stage, live-digest-pinned bases, non-root, HEALTHCHECK on the verified /api/v1/health [api] and / [ui], six OCI labels) + secret-free .dockerignore + a ci.yml build-scan job (two-image matrix, push:false, Trivy two-run gate fail-on-HIGH/CRITICAL + if:always SARIF upload, all actions SHA-pinned). Commits 1bcd3bd, 3f1aa7c, 4a0f617. uv lock --check + reuse(266) + tsc + 155 pytest all green.
 Resume file: None
-Next plan: Phase 3 is complete (all 3 plans done) — next is phase verification, then Phase 4. Carried open items (all dev-homelab-smoke, NOT CI): the first CI run confirms the new shellcheck step is clean on both scripts (the one locally-unverifiable item — shellcheck unavailable on the Windows dev host); real worker boot + template rebuild (20-create-template.sh re-run); the enabledPlugins on-disk shape for claude-code@2.1.170 [ASSUMED]; resolve_vmid hostname-suffix parse vs 30-network-notes.md/ADR-0004; x-access-token username convention + config-repo auth model (A2/A3/A5, operator-confirm).
+Next plan: Phase 4 has 3/5 plans done (04-02 capacity-race, 04-03 drawer, 04-04 images+scan). Remaining: 04-01 (reconciler: reaper + idle auto-stop) and 04-05 (release.yml: SBOM → cosign keyless → SLSA provenance → GHCR publish, CICD-05). Carried open item for 04-04 (CI-only, NOT dev-homelab): the first CI run is the build-scan job's true acceptance — both images must build under Buildx and the Trivy gate must execute (Docker is unavailable on the Windows dev host per the repo pattern). No PIN_AT_* placeholders to resolve before merge; operators may optionally re-pin to a newer base digest at release time.

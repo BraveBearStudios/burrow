@@ -100,7 +100,7 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 - [x] **CICD-01**: CI static gates run ruff + biome (lint/format), mypy (strict) + `tsc --noEmit`, SPDX header check, Conventional Commit validation, and lockfile freshness
 - [x] **CICD-02**: CI runs the test pyramid — unit → integration (real SQLite, mocked Proxmox, protocol-accurate stub ttyd) → e2e (FakeComputeProvider + Playwright) → container smoke
 - [x] **CICD-03**: Every bug fix lands a failing-first regression test in the appropriate tier
-- [ ] **CICD-04**: CI builds both images (`burrow-api`, `burrow-ui`) multi-stage, digest-pinned, non-root, with HEALTHCHECKs; image scan fails on HIGH/CRITICAL
+- [x] **CICD-04**: CI builds both images (`burrow-api`, `burrow-ui`) multi-stage, digest-pinned, non-root, with HEALTHCHECKs; image scan fails on HIGH/CRITICAL
 - [ ] **CICD-05**: The release path emits an SBOM (syft), a cosign keyless signature, and SLSA build provenance, and publishes to GHCR
 - [x] **CICD-06**: Every source file carries the SPDX two-line header
 
@@ -201,7 +201,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | CICD-01 | Phase 0 | Complete |
 | CICD-02 | Phase 1 | Complete |
 | CICD-03 | Phase 1 | Complete |
-| CICD-04 | Phase 4 | Pending |
+| CICD-04 | Phase 4 | Complete |
 | CICD-05 | Phase 4 | Pending |
 | CICD-06 | Phase 0 | Complete |
 

@@ -176,7 +176,7 @@ Plans:
 
 - [x] 04-02-PLAN.md — Atomic capacity-check+reserve (asyncio.Lock around the create gate+reserve) + stopWorkspace(reason=) + 3 reconciler Settings keys + deterministic capacity-race test + ADR-0010 (CAP-02)
 - [x] 04-03-PLAN.md — Activity drawer (UI-06): WorkspaceEvent type + enabled-gated useWorkspaceEvents + EVENT_BADGE map + ActivityDrawer (4 states, boot.error emphasis, a11y) + panel trigger + vitest + Playwright e2e
-- [ ] 04-04-PLAN.md — Images (CICD-04): Dockerfile.api + Dockerfile.ui (multi-stage, digest-pinned, non-root, HEALTHCHECK /api/v1/health, OCI labels) + .dockerignore + ci.yml build-scan job (no-push + Trivy two-run gate + SARIF)
+- [x] 04-04-PLAN.md — Images (CICD-04): Dockerfile.api + Dockerfile.ui (multi-stage, digest-pinned, non-root, HEALTHCHECK /api/v1/health, OCI labels) + .dockerignore + ci.yml build-scan job (no-push + Trivy two-run gate + SARIF)
 
 **Wave 2** *(blocked: 04-01 needs stopWorkspace(reason=) from 04-02; 04-05 needs the Dockerfiles from 04-04)*
 
@@ -197,4 +197,4 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
 | 2. Terminal Proxy + React UI | 6/6 | Complete   | 2026-06-10 |
 | 3. Reproducible Workers | 3/3 | Complete   | 2026-06-11 |
-| 4. Hardening & Release | 2/5 | In Progress|  |
+| 4. Hardening & Release | 3/5 | In Progress|  |
