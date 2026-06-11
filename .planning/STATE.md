@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 03-01-PLAN.md — the live pull-at-boot spine. burrow-boot.sh now resolves its VMID, bounded-retries the frozen bootconfig endpoint, clones config + project via a leak-proof in-memory GIT_ASKPASS subshell, copies CLAUDE.md, and execs the FROZEN ttyd; proven by a hermetic api/tests/boot harness (fake CP + file:// bare repos + stub ttyd) incl. the SC-3 no-leak test. jq baked into the template; jsonschema dev dep added. Commits 5c325c5, b70f63b, d2d30df.
-last_updated: "2026-06-11T14:38:25.000Z"
-last_activity: 2026-06-11 -- Completed 03-01-PLAN.md
+stopped_at: "Completed 03-02-PLAN.md — the manifest slice: versioned manifest.json + shared manifest.schema.json (single source of truth) + fail-closed process_manifest jq gate + idempotent install_claude_plugin (pinned-ref clone, byte-identical across boots) + CI drift gate + 3 boot-harness tests. Commits 01521b6, 974d837, db744ce, 2a0d71f. WORK-05 done; WORK-02 fully delivered."
+last_updated: "2026-06-11T15:33:10.176Z"
+last_activity: 2026-06-11
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 21
-  completed_plans: 19
-  percent: 63
+  completed_plans: 20
+  percent: 95
 ---
 
 <!--
@@ -31,11 +31,11 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 ## Current Position
 
 Phase: 3 (Reproducible Workers) — EXECUTING
-Plan: 2 of 3
-Status: Executing Phase 3
-Last activity: 2026-06-11 -- Completed 03-01-PLAN.md
+Plan: 3 of 3
+Status: Ready to execute
+Last activity: 2026-06-11
 
-Progress: [███▁▁▁▁▁▁▁] 33% (Phase 3: 1/3 plans)
+Progress: [███████▁▁▁] 67% (Phase 3: 2/3 plans)
 
 ## Performance Metrics
 
@@ -80,6 +80,7 @@ Progress: [███▁▁▁▁▁▁▁] 33% (Phase 3: 1/3 plans)
 | Phase 2 P05 | 51min | 3 tasks | 12 files |
 | Phase 2 P06 | 35min | 2 tasks | 13 files |
 | Phase 3 P01 | 22min | 3 tasks | 9 files |
+| Phase 03 P02 | 38min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -146,6 +147,8 @@ Recent decisions affecting current work:
 - [Plan 03-01]: jq baked into provision-template.sh apt-install (the live script's JSON dep); python3-jsonschema intentionally NOT baked (boot-time gate is the Plan-02 jq enum/required-keys check). jsonschema==4.26.0 added as a dev/CI dep + uv.lock refreshed (lockfile-freshness gate). shellcheck unavailable on this Windows host (CI-wired by Plan 03-03); both scripts pass bash -n.
 - [Plan 03-01]: THIN-slice scope honoured — fetch + clone + frozen ttyd + credential hygiene only. Manifest processing (process_manifest jq gate + install_claude_plugin), manifest.json/schema, the CI drift test, and ADR-0009 are Plans 03-02/03-03 per the PLAN objective (most-recent-doc-wins over the broader RESEARCH/PATTERNS scope). WORK-02's fetch/clone/ttyd half done; its plugin-manifest clause completes with Plan 03-02.
 - [Phase 02]: [Plan 02-06]: The phase e2e gate. The full Playwright journey (create → terminal echoes → split/tile → detach→reconnect → terminate) RAN GREEN locally (21.7s) over BURROW_COMPUTE=fake + a STANDALONE protocol-accurate stub ttyd (api/tests/e2e/stub_ttyd_server.py) — the SAME tty handler the Plan-01 pytest fixture uses, factored into one shared module so a .encode()/subprotocol regression fails BOTH tiers (T-02-07). The stub also answers the create saga's HTTP health GET (websockets process_request → 200) so the synchronous create resolves. A BURROW_E2E_TTYD_HOST override (operator env, NEVER client input — SSRF posture unchanged) retargets the bridge dial + the saga health poll at the single local stub instead of the unroutable 10.99.0.x Fake worker IP. The UI-05 restore-after-refresh integration test (vitest+MSW) proves reconcile (gone leaf dropped) + live reconnect (running panel re-mounts, fresh WS) + NO scrollback (Pitfall 7). DEVIATION (Rule 2): the terminate confirm gate (Destroy {name}? …) + non-destructive detach (useTerminal.detach closes the live socket → reconnect overlay, session survives) were unwired before this plan despite being must_haves truths — added + unit-covered (UI-SPEC criterion 12). Harness: playwright.config.ts webServer (stub+uvicorn-on-fake+vite preview) / BURROW_E2E_USE_COMPOSE toggle + docker-compose.e2e.yml + nginx.e2e.conf (Docker not on this host → compose validated by YAML parse, first CI run confirms boot). Gate: 81 vitest + 127 pytest + tsc + biome + ruff + mypy --strict all green. Real ttyd handshake + live claude TUI stays the deferred dev-homelab smoke.
+- [Phase 03]: [Plan 03-02]: manifest.schema.json is THE single source of truth — the boot-time jq gate in burrow-boot.sh enforces the IDENTICAL required-keys + type enum IN(claude-plugin,binary,npm-global) as the schema, so a CI-green manifest and a boot-passing manifest are the same set (CI and boot never diverge, the locked fail-closed decision). An unknown/unsupported type or missing key → non-zero → ERR trap → boot fails (never skip-and-continue).
+- [Phase 03]: [Plan 03-02]: install_claude_plugin is idempotent + scheme-aware — rm -rf the dest then git clone --depth=1 --branch <immutable-ref> → byte-identical plugin tree across two boots (SC-2, Pitfall 1); only claude-plugin types are pulled fresh, binary/npm-global are SKIPPED (baked at provision). https:// is prepended ONLY when the source lacks a :// scheme, so production github.com/<org>/<repo> resolves to HTTPS while a hermetic file:// test source passes through (same code path under test + in prod). Rule-1 fix: IFS includes \r so a CRLF jq line leaves no carriage return on the ref. enabledPlugins[<name>]=true shape is [ASSUMED] for claude-code@2.1.170 — confirm at the dev-homelab smoke.
 
 ### Pending Todos
 
@@ -170,7 +173,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-11T14:38:25.000Z
-Stopped at: Completed 03-01-PLAN.md — the live pull-at-boot spine + hermetic boot harness. burrow-boot.sh fetch + GIT_ASKPASS leak-proof clone + frozen ttyd; api/tests/boot green (happy path + retry-then-fail + no-leak + frozen-ttyd); jq baked; jsonschema dev dep. Commits 5c325c5, b70f63b, d2d30df. Phase 3 is 1/3 plans.
+Last session: 2026-06-11T15:30:45.406Z
+Stopped at: Completed 03-02-PLAN.md — the manifest slice: versioned manifest.json + shared manifest.schema.json (single source of truth) + fail-closed process_manifest jq gate + idempotent install_claude_plugin (pinned-ref clone, byte-identical across boots) + CI drift gate + 3 boot-harness tests. Commits 01521b6, 974d837, db744ce, 2a0d71f. WORK-05 done; WORK-02 fully delivered.
 Resume file: None
 Next plan: 03-02-PLAN.md — the manifest slice (manifest.json + JSON-Schema + fail-closed jq gate + idempotent claude-plugin install + CI drift test, WORK-05) on top of the now-live fetch/clone path. Carried open items: A2/A3 operator-confirm of the real git-credential-minting mechanism + the x-access-token username convention (askpass Username branch may change); the resolve_vmid hostname-suffix parse [ASSUMED] vs 30-network-notes.md/ADR-0004; config-repo auth model (A5, assumed reachable); shellcheck CI-wiring + ADR-0009 land in Plan 03-03; real worker boot + template rebuild = deferred dev-homelab smoke (CI cannot prove).
