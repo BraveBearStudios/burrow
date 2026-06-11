@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Burrow worker plugin manifest",
+  "type": "object",
+  "required": ["schemaVersion", "plugins"],
+  "properties": {
+    "schemaVersion": { "type": "string" },
+    "plugins": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["source", "ref", "type"],
+        "properties": {
+          "source": { "type": "string", "minLength": 1 },
+          "ref": { "type": "string", "minLength": 1 },
+          "type": { "enum": ["claude-plugin", "binary", "npm-global"] },
+          "description": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
