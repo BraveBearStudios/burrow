@@ -169,7 +169,13 @@ install_claude_plugin() {
   log "installing claude-plugin '${name}' @ ${ref} (pinned, idempotent)"
   rm -rf "$dest"
   mkdir -p "${WORKER_HOME}/.claude/plugins"
-  git clone --depth=1 --branch "$ref" "$url" "$dest"
+  # Same hardening as clone_with_token: GIT_TERMINAL_PROMPT=0 → a private repo /
+  # transient 401 fails FAST instead of hanging on a (nonexistent) TTY under
+  # systemd, and credential.helper= (empty) disables any inherited store. This
+  # makes the plugin clone fail-fast independent of the ambient environment
+  # rather than relying on the test harness exporting GIT_TERMINAL_PROMPT.
+  GIT_TERMINAL_PROMPT=0 git -c credential.helper= \
+    clone --depth=1 --branch "$ref" "$url" "$dest"
 
   # Enable in the user settings.json (create {} if absent). enabledPlugins is
   # keyed by plugin name; see the [ASSUMED] note above.

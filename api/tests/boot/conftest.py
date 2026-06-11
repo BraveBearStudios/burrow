@@ -405,20 +405,29 @@ def make_boot_env(
     etc_burrow: Path,
     stub_bin: Path,
     vmid_hostname: str = "burrow-w-241",
+    set_git_terminal_prompt: bool = True,
 ) -> dict[str, str]:
-    """Build the hermetic subprocess env for a boot run (see test module for use)."""
-    return {
+    """Build the hermetic subprocess env for a boot run (see test module for use).
+
+    ``set_git_terminal_prompt`` (default True) exports ``GIT_TERMINAL_PROMPT=0`` to keep
+    git non-interactive. Pass ``False`` to model the REAL production environment — under
+    systemd the variable is unset — so a test can prove the boot script itself wires the
+    fail-fast guard on every clone rather than relying on the harness (WR-03).
+    """
+    env = {
         "PATH": f"{stub_bin}{os.pathsep}{os.environ.get('PATH', '')}",
         "HOME": str(home),
         "CONTROL_PLANE": control_plane,
         "BURROW_ETC": str(etc_burrow),
         "BURROW_HOSTNAME": vmid_hostname,
         "STUB_TTYD_ARGV_FILE": str(home / "ttyd-argv.txt"),
-        # Keep git hermetic and non-interactive regardless of the host's config.
-        "GIT_TERMINAL_PROMPT": "0",
+        # Keep git hermetic regardless of the host's config.
         "GIT_CONFIG_NOSYSTEM": "1",
         "GIT_CONFIG_GLOBAL": str(home / ".gitconfig-absent"),
     }
+    if set_git_terminal_prompt:
+        env["GIT_TERMINAL_PROMPT"] = "0"
+    return env
 
 
 __all__ = [
@@ -427,4 +436,5 @@ __all__ = [
     "SENTINEL_CREDENTIAL",
     "make_boot_env",
     "serve_bootconfig",
+    "serve_custom_bootconfig",
 ]

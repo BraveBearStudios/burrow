@@ -45,8 +45,13 @@ def _run_boot(
     tmp_path: Path,
     stub_bin: Path,
     timeout: float = 60.0,
+    set_git_terminal_prompt: bool = True,
 ) -> tuple[subprocess.CompletedProcess[str], Path, Path]:
-    """Run burrow-boot.sh under a temp HOME + temp /etc/burrow; return proc + the paths."""
+    """Run burrow-boot.sh under a temp HOME + temp /etc/burrow; return proc + the paths.
+
+    ``set_git_terminal_prompt`` (default True) keeps git non-interactive via the harness;
+    pass ``False`` to model the unset-under-systemd production env (WR-03).
+    """
     home = tmp_path / "home"
     home.mkdir()
     etc_burrow = tmp_path / "etc-burrow"
@@ -55,7 +60,11 @@ def _run_boot(
     # the no-leak test can assert the credential never lands in it.
     (etc_burrow / "worker.env").write_text(f"CONTROL_PLANE={control_plane}\n")
     env = make_boot_env(
-        control_plane=control_plane, home=home, etc_burrow=etc_burrow, stub_bin=stub_bin
+        control_plane=control_plane,
+        home=home,
+        etc_burrow=etc_burrow,
+        stub_bin=stub_bin,
+        set_git_terminal_prompt=set_git_terminal_prompt,
     )
     proc = subprocess.run(
         ["bash", str(boot_script)],
@@ -372,5 +381,65 @@ def test_manifest_gate_at_schema_parity_fails_closed(
     assert not (tmp_path / "home" / "ttyd-argv.txt").exists(), (
         f"ttyd reached despite an invalid manifest ({why})"
     )
+
+
+def test_plugin_clone_fails_fast_without_harness_git_terminal_prompt(
+    boot_script: Path,
+    manifest_config_repo: Callable[..., ManifestConfigRepo],
+    stub_ttyd_path: Path,
+    tmp_path: Path,
+) -> None:
+    """WR-03: a claude-plugin pointing at a nonexistent repo fails FAST with no harness var.
+
+    Run the boot with ``GIT_TERMINAL_PROMPT`` UNSET (the real systemd env) and a
+    claude-plugin whose source does not exist. Because the script now sets
+    ``GIT_TERMINAL_PROMPT=0`` on the plugin clone itself, git fails fast (no TTY hang)
+    independent of the ambient environment. The generous timeout would trip on a hang.
+    """
+    bad_manifest: dict[str, object] = {
+        "schemaVersion": "1.0.0",
+        "plugins": {
+            "ghost": {
+                "source": "file:///nonexistent/burrow-ghost-plugin.git",
+                "ref": "v1.0.0",
+                "type": "claude-plugin",
+            }
+        },
+    }
+    repo = manifest_config_repo(raw_manifest=bad_manifest)
+    with serve_bootconfig(repo) as cp:
+        proc, _home, _etc = _run_boot(
+            boot_script,
+            control_plane=cp.url,
+            tmp_path=tmp_path,
+            stub_bin=stub_ttyd_path,
+            timeout=30.0,  # a credential-prompt hang would blow past this
+            set_git_terminal_prompt=False,
+        )
+    assert proc.returncode != 0, (
+        "a missing plugin repo must fail the boot fast (the script's own "
+        "GIT_TERMINAL_PROMPT=0, not the harness), not hang"
+    )
+    assert not (tmp_path / "home" / "ttyd-argv.txt").exists(), "ttyd reached despite a failed clone"
+
+
+def test_boot_path_clones_set_git_terminal_prompt() -> None:
+    """WR-03: every git clone on the boot path is guarded with GIT_TERMINAL_PROMPT=0.
+
+    A static guard so a future edit that adds an unguarded ``git clone`` is caught: each
+    non-comment ``git clone`` line (or its wrapper) must carry the fail-fast guard.
+    """
+    from tests.boot.conftest import _BOOT_SCRIPT
+
+    lines = [
+        line
+        for line in _BOOT_SCRIPT.read_text().splitlines()
+        if "git" in line and "clone" in line and not line.lstrip().startswith("#")
+    ]
+    assert lines, "expected at least one git clone on the boot path"
+    for line in lines:
+        assert "GIT_TERMINAL_PROMPT=0" in line, (
+            f"git clone on the boot path lacks GIT_TERMINAL_PROMPT=0 (WR-03): {line!r}"
+        )
 
 
