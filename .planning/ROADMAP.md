@@ -145,7 +145,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Live pull-at-boot spine: burrow-boot.sh fetch + GIT_ASKPASS leak-proof clone + frozen ttyd + hermetic boot harness + jq bake (WORK-02)
+- [x] 03-01-PLAN.md — Live pull-at-boot spine: burrow-boot.sh fetch + GIT_ASKPASS leak-proof clone + frozen ttyd + hermetic boot harness + jq bake (WORK-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -183,5 +183,5 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
 | 2. Terminal Proxy + React UI | 6/6 | Complete   | 2026-06-10 |
-| 3. Reproducible Workers | 0/3 | Not started | - |
+| 3. Reproducible Workers | 1/3 | In Progress|  |
 | 4. Hardening & Release | 0/TBD | Not started | - |

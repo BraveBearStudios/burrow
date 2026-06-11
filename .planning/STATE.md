@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: Completed 02-06-PLAN.md — the phase e2e gate. Full Playwright journey (create → echo → split/tile → detach→reconnect → terminate) RAN GREEN over Fake + a standalone protocol-accurate stub ttyd; UI-05 restore-after-refresh integration test green; terminate confirm + non-destructive detach wired (Rule 2). Commits f714da1, 8fbd527. Phase 2 (Terminal Proxy + React UI) is now complete (6/6 plans).
-last_updated: "2026-06-11T14:11:45.846Z"
-last_activity: 2026-06-11 -- Phase 3 planning complete
+stopped_at: Completed 03-01-PLAN.md — the live pull-at-boot spine. burrow-boot.sh now resolves its VMID, bounded-retries the frozen bootconfig endpoint, clones config + project via a leak-proof in-memory GIT_ASKPASS subshell, copies CLAUDE.md, and execs the FROZEN ttyd; proven by a hermetic api/tests/boot harness (fake CP + file:// bare repos + stub ttyd) incl. the SC-3 no-leak test. jq baked into the template; jsonschema dev dep added. Commits 5c325c5, b70f63b, d2d30df.
+last_updated: "2026-06-11T14:38:25.000Z"
+last_activity: 2026-06-11 -- Completed 03-01-PLAN.md
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 21
-  completed_plans: 18
-  percent: 60
+  completed_plans: 19
+  percent: 63
 ---
 
 <!--
@@ -26,16 +26,16 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-09)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 2 — Terminal Proxy + React UI
+**Current focus:** Phase 3 — Reproducible Workers
 
 ## Current Position
 
-Phase: 2 of 4 (Terminal Proxy + React UI)
-Plan: 6 of 6 complete in current phase
-Status: Ready to execute
-Last activity: 2026-06-11 -- Phase 3 planning complete
+Phase: 3 (Reproducible Workers) — EXECUTING
+Plan: 2 of 3
+Status: Executing Phase 3
+Last activity: 2026-06-11 -- Completed 03-01-PLAN.md
 
-Progress: [██████████] 100% (Phase 2: 6/6 plans)
+Progress: [███▁▁▁▁▁▁▁] 33% (Phase 3: 1/3 plans)
 
 ## Performance Metrics
 
@@ -79,6 +79,7 @@ Progress: [██████████] 100% (Phase 2: 6/6 plans)
 | Phase 2 P04 | 23 | 2 tasks | 11 files |
 | Phase 2 P05 | 51min | 3 tasks | 12 files |
 | Phase 2 P06 | 35min | 2 tasks | 13 files |
+| Phase 3 P01 | 22min | 3 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -138,6 +139,12 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 02-04]: layoutStore is the ONLY persisted client state (zustand persist, partialized to mosaicNode + activeWorkspaceId; status stays in TanStack Query, Pitfall 11). Tree mutations are pure helpers over react-mosaic getLeaves + createBalancedTreeFromLeaves (deep util import to dodge the nested react-dom). reconcile(liveIds) drops gone leaves, rebalances, retargets active id (UI-05).
 - [Phase ?]: [Plan 02-04]: react/react-dom 19.2.7 overrides collapse react-mosaic's nested react-dom@18 (else <Mosaic> crashes on ReactCurrentDispatcher); <Mosaic> 6.2.0 bundles its own DndProvider (never double-wrap); Blueprint chrome suppressed via className=burrow-mosaic. Node 25 localStorage shadow fixed by an in-memory Storage polyfill in tests/setup.ts.
 - [Phase ?]: [Plan 02-05]: WorkspaceList sidebar + Navbar capacity chips + NewWorkspaceModal + StatusBar + useNodes + the assembled four-theme App shell complete the operator surface (UI-01/03/04). Status discipline is single-sourced in lib/status.ts; four themes in lib/themes.ts (swatch hex is theme-identity DATA, components stay hex-free). Node capacity is the REAL memoryUsedFraction % (no fabricated GB). Boot-progress is COSMETIC over the SYNCHRONOUS create (A3/Pitfall 5) with single-shot submit+mounted guards; async-202+poll deferred. App kept at ui/src/App.tsx (Rule 3). Tests assert real layoutStore state for leak-proof isolation. Gate: 77 vitest + tsc + biome(39) + build + REUSE 212/212 + no CDN/hex.
+- [Plan 03-01]: burrow-boot.sh live pull-at-boot spine — resolve_vmid (hostname suffix, [ASSUMED] per ADR-0004) → fetch_bootconfig (bounded ~5x retry + capped backoff, jq -e .data, echoes .data on stdout) → clone_with_token (in-memory GIT_ASKPASS subshell, x-access-token username, GIT_TERMINAL_PROMPT=0, git -c credential.helper= empty, helper rm'd after) → cp CLAUDE.md → FROZEN ttyd exec verbatim. CONTROL_PLANE is now REQUIRED (:? guard replaces the Phase-0 warn-and-skip). The short-lived credential NEVER enters a clone URL, /etc/burrow/worker.env, or any log line; unset after the clones (SC-3, T-03-01..04). err_trap mirrors host-prime/lib/common.sh + redacts $BASH_COMMAND (backstop; real guarantee is structural). NO set -x. api/routers/internal.py + the bootconfig contract untouched (frozen).
+- [Plan 03-01]: Rule-1 fix — log() now writes to STDERR (was stdout). fetch_bootconfig returns the .data JSON via command substitution; a stdout log() would contaminate the captured JSON and swallow the retry lines (the retry test saw 0 attempts). Matches host-prime/lib/common.sh.
+- [Plan 03-01]: BURROW_HOSTNAME + BURROW_ETC are test/override seams (operator/CI config, never client input) defaulting to the real hostname -s / /etc/burrow, so the hermetic harness drives resolve_vmid + asserts on a temp worker.env without changing production behaviour.
+- [Plan 03-01]: Hermetic boot harness (api/tests/boot/) is the worker-side analogue of test_bootconfig.py — a stdlib http.server fake control plane (UP + 503-down variants serving the frozen camelCase {data,meta,error} envelope), a git --bare file:// bare-repo factory (config repo w/ claude/CLAUDE.md + a v1.0.0 tag, project repo), and a stub ttyd on PATH (records argv, exits 0). 5 tests: happy path, retry-then-fail (~5 bounded attempts, non-zero, no hang), scrub-proof no-leak (_SENTINEL_CREDENTIAL + project URL absent from output + worker.env), frozen-ttyd-line (--once absent, --interface 0.0.0.0 present), no-set-x. Real Proxmox boot stays the dev-homelab smoke, NOT CI.
+- [Plan 03-01]: jq baked into provision-template.sh apt-install (the live script's JSON dep); python3-jsonschema intentionally NOT baked (boot-time gate is the Plan-02 jq enum/required-keys check). jsonschema==4.26.0 added as a dev/CI dep + uv.lock refreshed (lockfile-freshness gate). shellcheck unavailable on this Windows host (CI-wired by Plan 03-03); both scripts pass bash -n.
+- [Plan 03-01]: THIN-slice scope honoured — fetch + clone + frozen ttyd + credential hygiene only. Manifest processing (process_manifest jq gate + install_claude_plugin), manifest.json/schema, the CI drift test, and ADR-0009 are Plans 03-02/03-03 per the PLAN objective (most-recent-doc-wins over the broader RESEARCH/PATTERNS scope). WORK-02's fetch/clone/ttyd half done; its plugin-manifest clause completes with Plan 03-02.
 - [Phase 02]: [Plan 02-06]: The phase e2e gate. The full Playwright journey (create → terminal echoes → split/tile → detach→reconnect → terminate) RAN GREEN locally (21.7s) over BURROW_COMPUTE=fake + a STANDALONE protocol-accurate stub ttyd (api/tests/e2e/stub_ttyd_server.py) — the SAME tty handler the Plan-01 pytest fixture uses, factored into one shared module so a .encode()/subprotocol regression fails BOTH tiers (T-02-07). The stub also answers the create saga's HTTP health GET (websockets process_request → 200) so the synchronous create resolves. A BURROW_E2E_TTYD_HOST override (operator env, NEVER client input — SSRF posture unchanged) retargets the bridge dial + the saga health poll at the single local stub instead of the unroutable 10.99.0.x Fake worker IP. The UI-05 restore-after-refresh integration test (vitest+MSW) proves reconcile (gone leaf dropped) + live reconnect (running panel re-mounts, fresh WS) + NO scrollback (Pitfall 7). DEVIATION (Rule 2): the terminate confirm gate (Destroy {name}? …) + non-destructive detach (useTerminal.detach closes the live socket → reconnect overlay, session survives) were unwired before this plan despite being must_haves truths — added + unit-covered (UI-SPEC criterion 12). Harness: playwright.config.ts webServer (stub+uvicorn-on-fake+vite preview) / BURROW_E2E_USE_COMPOSE toggle + docker-compose.e2e.yml + nginx.e2e.conf (Docker not on this host → compose validated by YAML parse, first CI run confirms boot). Gate: 81 vitest + 127 pytest + tsc + biome + ruff + mypy --strict all green. Real ttyd handshake + live claude TUI stays the deferred dev-homelab smoke.
 
 ### Pending Todos
@@ -163,7 +170,7 @@ Items acknowledged and carried forward from previous milestone close:
 
 ## Session Continuity
 
-Last session: 2026-06-10T22:37:03.780Z
-Stopped at: Completed 02-06-PLAN.md — the phase e2e gate. Full Playwright journey (create → echo → split/tile → detach→reconnect → terminate) RAN GREEN over Fake + a standalone protocol-accurate stub ttyd; UI-05 restore-after-refresh integration test green; terminate confirm + non-destructive detach wired (Rule 2). Commits f714da1, 8fbd527. Phase 2 (Terminal Proxy + React UI) is now complete (6/6 plans).
+Last session: 2026-06-11T14:38:25.000Z
+Stopped at: Completed 03-01-PLAN.md — the live pull-at-boot spine + hermetic boot harness. burrow-boot.sh fetch + GIT_ASKPASS leak-proof clone + frozen ttyd; api/tests/boot green (happy path + retry-then-fail + no-leak + frozen-ttyd); jq baked; jsonschema dev dep. Commits 5c325c5, b70f63b, d2d30df. Phase 3 is 1/3 plans.
 Resume file: None
-Next plan: Phase 2 is complete — run /gsd:verify-work on Phase 2, then plan Phase 3. Carried open items: real ttyd `tty` handshake + live claude TUI = deferred dev-homelab smoke (human_needed); `docker compose -f docker-compose.e2e.yml config` not validated here (no Docker on this host) — first CI run confirms the compose stack boots; A3 operator-confirm of the real git-credential-minting mechanism before Phase 3; B4 plugin-cadence ADR before/within Phase 3.
+Next plan: 03-02-PLAN.md — the manifest slice (manifest.json + JSON-Schema + fail-closed jq gate + idempotent claude-plugin install + CI drift test, WORK-05) on top of the now-live fetch/clone path. Carried open items: A2/A3 operator-confirm of the real git-credential-minting mechanism + the x-access-token username convention (askpass Username branch may change); the resolve_vmid hostname-suffix parse [ASSUMED] vs 30-network-notes.md/ADR-0004; config-repo auth model (A5, assumed reachable); shellcheck CI-wiring + ADR-0009 land in Plan 03-03; real worker boot + template rebuild = deferred dev-homelab smoke (CI cannot prove).

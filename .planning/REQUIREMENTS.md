@@ -190,7 +190,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | UI-05 | Phase 2 | Complete |
 | UI-06 | Phase 4 | Pending |
 | WORK-01 | Phase 0 | Pending |
-| WORK-02 | Phase 3 | Pending |
+| WORK-02 | Phase 3 | Fetch/clone/ttyd half done (Plan 03-01): live burrow-boot.sh resolves its VMID, bounded-retries the frozen bootconfig endpoint, clones config + project via a leak-proof in-memory GIT_ASKPASS subshell, copies CLAUDE.md, and execs the frozen ttyd — CI-proven by the hermetic api/tests/boot harness incl. the SC-3 no-leak test. The "pulls plugin manifest" clause completes with Plan 03-02. |
 | WORK-03 | Phase 1 | Endpoint contract done (Plan 01-05): bootconfig endpoint + pluggable credential seam + no-cred-in-logs gate, all CI-proven. Live `burrow-boot.sh` consumer pull-step deferred to Phase 3. |
 | WORK-04 | Phase 0 | Pending (ADR-0007 records the ttyd LAN-bind decision; impl/validation half lands with burrow-boot.sh in 00-07 + dev-homelab smoke) |
 | WORK-05 | Phase 3 | Pending |
