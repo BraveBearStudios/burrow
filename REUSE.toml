@@ -24,6 +24,8 @@ path = [
   "ui/package.json",
   "ui/tsconfig.json",
   "ui/biome.json",
+  "cc-worker-config/plugins/manifest.json",
+  "cc-worker-config/plugins/manifest.schema.json",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Brave Bear Studios"
