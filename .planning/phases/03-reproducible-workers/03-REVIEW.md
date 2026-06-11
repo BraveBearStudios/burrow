@@ -1,3 +1,7 @@
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 ---
 phase: 03-reproducible-workers
 reviewed: 2026-06-11T00:00:00Z
