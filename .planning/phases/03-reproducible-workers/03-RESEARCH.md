@@ -603,9 +603,13 @@ def test_unknown_type_is_rejected() -> None:
 | A4 | `jq` is sufficient for the boot-time structural gate (vs a full `jsonschema` validator on the worker) | Manifest patterns | If a richer constraint is needed (e.g. ref-immutability), the jq gate must grow or be replaced by the baked Python validator. Low risk — the jq gate covers required-keys + enum. |
 | A5 | The CONFIG repo (`cc-worker-config`) is reachable by the worker with the same credential as the project repo (or is public) | Boot flow | If `cc-worker-config` needs a *separate* credential, the endpoint contract (which mints one credential for `project_repo`) would need extension — but the contract is **frozen**. Likely `cc-worker-config` is operator-owned and reachable (public or same-org token). **Confirm the config-repo auth model.** |
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Config-repo credential vs project-repo credential.**
+> All three are operator/dev-homelab-dependent facts; each has an adopted recommendation the
+> plans implement, and each real-infra confirmation is routed to the dev-homelab smoke gate
+> (the documented CI boundary), not CI.
+
+1. **RESOLVED (assume config-repo reachable): Config-repo credential vs project-repo credential.**
    - What we know: `/internal/bootconfig` mints one credential scoped to `ws.project_repo`. The
      config repo (`cc-worker-config`) is fetched too.
    - What's unclear: whether the config repo is public/operator-reachable without a credential, or
@@ -614,7 +618,7 @@ def test_unknown_type_is_rejected() -> None:
      that is a **contract question for the operator**, not a code change in this phase (the endpoint
      is frozen) — flag in discuss/plan, default to "config repo reachable."
 
-2. **Exact `enabledPlugins` schema for `claude-code@2.1.170`.**
+2. **RESOLVED (clone+enable, confirm at smoke): Exact `enabledPlugins` schema for `claude-code@2.1.170`.**
    - What we know: the plugins-reference documents `enabledPlugins` + `~/.claude/plugins/` + the
      `claude plugin install/enable` CLI.
    - What's unclear: the precise on-disk shape a *directory* install (not a marketplace install)
@@ -623,7 +627,7 @@ def test_unknown_type_is_rejected() -> None:
      dev-homelab smoke with `claude --debug` and `claude plugin list`. The master CLAUDE.md path is
      independent and must work regardless.
 
-3. **Test harness: `bats-core` vs Python `subprocess`.**
+3. **RESOLVED (Python subprocess harness in pytest): Test harness: `bats-core` vs Python `subprocess`.**
    - What we know: both satisfy the locked decision; the repo's CI already runs `pytest`.
    - What's unclear: whether to add a second CI tool.
    - Recommendation: Default to a **Python `subprocess` harness in `pytest`** (zero new CI tooling,

@@ -1,8 +1,8 @@
 ---
 phase: 3
 slug: reproducible-workers
-status: draft
-nyquist_compliant: false
+status: approved
+nyquist_compliant: true
 wave_0_complete: false
 created: 2026-06-11
 ---
@@ -46,7 +46,13 @@ smoke gate, NOT CI.
 
 | Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
 |---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| TBD | — | — | WORK-02 / WORK-05 | T-03-* | no token in worker.env; no cred/URL in logs | unit/integration | `cd api && uv run pytest -q` | ❌ W0 | ⬜ pending |
+| 3-01-01 | 03-01 | 1 | WORK-02 | — | hermetic boot harness scaffold (fake CP + file:// repos + stub ttyd) | unit | `cd api && uv run pytest tests/boot/test_burrow_boot.py::test_fetch_then_clone_happy_path -x` | ❌ W0 | ⬜ pending |
+| 3-01-02 | 03-01 | 1 | WORK-02 | T-03-01 | no token in worker.env; no cred/URL in any logged line; bounded retry then fail; frozen ttyd tail | unit | `cd api && uv run pytest tests/boot -x` | ❌ W0 | ⬜ pending |
+| 3-01-03 | 03-01 | 1 | WORK-02 | — | jq + build tools baked into golden template | static | `grep -c 'apt-get install -y git curl build-essential ttyd jq' cc-worker-config/lxc/worker-template/provision-template.sh` | ✅ | ⬜ pending |
+| 3-02-01 | 03-02 | 2 | WORK-05 | T-03-02 | manifest JSON-Schema fail-closed; unknown type rejected | unit | `cd api && uv run pytest tests/integration/test_manifest_schema.py -x` | ❌ W0 | ⬜ pending |
+| 3-02-02 | 03-02 | 2 | WORK-05 | — | two boots → byte-identical plugin tree; only claude-plugin pulled (binary/npm-global baked) | unit | `cd api && uv run pytest tests/boot/test_burrow_boot.py -k "manifest or plugin or two_boots" -x` | ❌ W0 | ⬜ pending |
+| 3-03-01 | 03-03 | 2 | WORK-02, WORK-05 | — | ADR-0009 records boot-time-latest cadence | static | `test -f docs/adr/ADR-0009-plugin-cadence-boot-time-latest.md && grep -c "boot-time-latest" docs/adr/ADR-0009-plugin-cadence-boot-time-latest.md` | ✅ | ⬜ pending |
+| 3-03-02 | 03-03 | 2 | WORK-02, WORK-05 | — | CI runs shellcheck + the boot pytest tier | static | `grep -c "shellcheck" .github/workflows/ci.yml && grep -c "uv run pytest tests/boot" .github/workflows/ci.yml` | ✅ | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
@@ -78,6 +84,6 @@ smoke gate, NOT CI.
 - [ ] Wave 0 covers all MISSING references
 - [ ] No watch-mode flags
 - [ ] Feedback latency < 30s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** approved 2026-06-11

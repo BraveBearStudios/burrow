@@ -140,7 +140,18 @@ Plans:
   3. Git credentials used for the clone are short-lived/scoped and scrubbed after use — no token remains in `/etc/burrow/worker.env` post-boot, and no repo URL or credential appears in event-log `data` or structured logs.
   4. The plugin-cadence decision (boot-time-latest vs snapshot-at-create) is resolved and recorded, so reproducibility semantics are explicit.
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Live pull-at-boot spine: burrow-boot.sh fetch + GIT_ASKPASS leak-proof clone + frozen ttyd + hermetic boot harness + jq bake (WORK-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — Manifest slice: manifest.json + JSON-Schema + fail-closed jq gate + idempotent claude-plugin install + CI drift test (WORK-05)
+- [ ] 03-03-PLAN.md — ADR-0009 (cadence: boot-time-latest) + CI wiring (shellcheck + boot/manifest pytest tiers)
+
 **Infra note**: True acceptance — a real worker booting and pulling its config — requires a real Proxmox node + the golden template, validated in the dev homelab smoke gate; CI can only lint/unit-test the boot script and manifest schema. Needs an ADR for the B4 cadence decision.
 
 ### Phase 4: Hardening & Release
@@ -172,5 +183,5 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | 0. Contracts, Seams & Golden Template | 7/7 | Complete   | 2026-06-10 |
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
 | 2. Terminal Proxy + React UI | 6/6 | Complete   | 2026-06-10 |
-| 3. Reproducible Workers | 0/TBD | Not started | - |
+| 3. Reproducible Workers | 0/3 | Not started | - |
 | 4. Hardening & Release | 0/TBD | Not started | - |

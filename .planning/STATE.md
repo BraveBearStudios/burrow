@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: executing
-stopped_at: "Completed 02-06-PLAN.md — phase e2e gate: full Playwright journey (create → echo → split/tile → detach→reconnect → terminate) RAN GREEN over Fake + standalone stub ttyd; UI-05 restore integration test green; terminate confirm + detach wired. Phase 2 complete (6/6). Commits f714da1, 8fbd527."
-last_updated: "2026-06-10T22:37:03.788Z"
-last_activity: 2026-06-10
+stopped_at: Completed 02-06-PLAN.md — the phase e2e gate. Full Playwright journey (create → echo → split/tile → detach→reconnect → terminate) RAN GREEN over Fake + a standalone protocol-accurate stub ttyd; UI-05 restore-after-refresh integration test green; terminate confirm + non-destructive detach wired (Rule 2). Commits f714da1, 8fbd527. Phase 2 (Terminal Proxy + React UI) is now complete (6/6 plans).
+last_updated: "2026-06-11T14:11:45.846Z"
+last_activity: 2026-06-11 -- Phase 3 planning complete
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 18
+  total_plans: 21
   completed_plans: 18
   percent: 60
 ---
@@ -32,8 +32,8 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 Phase: 2 of 4 (Terminal Proxy + React UI)
 Plan: 6 of 6 complete in current phase
-Status: Phase 2 complete — ready to verify, then plan Phase 3
-Last activity: 2026-06-10
+Status: Ready to execute
+Last activity: 2026-06-11 -- Phase 3 planning complete
 
 Progress: [██████████] 100% (Phase 2: 6/6 plans)
 
