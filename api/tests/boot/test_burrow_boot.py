@@ -254,3 +254,60 @@ def test_bad_manifest_fails_boot(
     )
     # ttyd must never be reached on the fail-closed path.
     assert not (tmp_path / "home" / "ttyd-argv.txt").exists(), "ttyd reached despite a bad manifest"
+
+
+# --- Code-review fixes (Phase 3 REVIEW.md WR-01..05) --------------------------
+
+
+def _redact(boot_script: Path, text: str, git_cred: str | None) -> str:
+    """Call the boot script's own ``redact_secrets`` helper on ``text`` (WR-01 backstop)."""
+    setcred = f"GIT_CRED={git_cred!r}\n" if git_cred is not None else ""
+    script = (
+        f"{setcred}"
+        f"eval \"$(sed -n '/^redact_secrets() {{/,/^}}/p' '{boot_script}')\"\n"
+        f"redact_secrets {text!r}\n"
+    )
+    return subprocess.run(
+        ["bash", "-c", script], capture_output=True, text=True, timeout=30, check=True
+    ).stdout
+
+
+def test_err_trap_redacts_real_token_shapes(boot_script: Path) -> None:
+    """WR-01: the redaction backstop covers the live cred + x-access-token/ghs_/github_pat_.
+
+    The legacy ``ghp_*`` glob matched NONE of the credential shapes this design mints
+    (x-access-token / ghs_ / github_pat_) and was over-greedy (``*`` swallowed the rest of
+    the line). The replacement must redact each shape — including the live ``$GIT_CRED``
+    value exactly — and preserve trailing text.
+    """
+    sentinel = "SENTINEL-bootcred-9f2c4e7a1b6d8054-DO-NOT-LOG"
+    bad = (
+        "clone x-access-token:ghs_AbC123DEF456 mid "
+        f"{sentinel} end github_pat_11ABCDE_xyz999 TAILKEEP"
+    )
+    out = _redact(boot_script, bad, git_cred=sentinel)
+    assert sentinel not in out, f"live credential not redacted: {out!r}"
+    assert "ghs_AbC123DEF456" not in out, f"ghs_ token not redacted: {out!r}"
+    assert "github_pat_11ABCDE_xyz999" not in out, f"github_pat_ token not redacted: {out!r}"
+    assert "[redacted]" in out, f"expected a [redacted] marker: {out!r}"
+    # The over-greedy ghp_* glob would have eaten everything after the first token; the
+    # bounded patterns must preserve trailing text.
+    assert "TAILKEEP" in out, f"redaction swallowed trailing text (over-greedy): {out!r}"
+
+
+def test_redaction_backstop_works_without_live_cred(boot_script: Path) -> None:
+    """WR-01: even with $GIT_CRED unset, the format-aware layer still redacts token shapes.
+
+    Models a future refactor that puts a token on a command line BEFORE $GIT_CRED is set —
+    the format-aware net must still catch the legacy/ghs_/github_pat_ shapes.
+    """
+    out = _redact(
+        boot_script,
+        "url https://x-access-token:ghs_ZZZ999@h/r and ghp_classic123 KEEPTAIL",
+        git_cred=None,
+    )
+    assert "ghs_ZZZ999" not in out, f"ghs_ not redacted without live cred: {out!r}"
+    assert "ghp_classic123" not in out, f"ghp_ not redacted without live cred: {out!r}"
+    assert "KEEPTAIL" in out, f"redaction swallowed trailing text: {out!r}"
+
+

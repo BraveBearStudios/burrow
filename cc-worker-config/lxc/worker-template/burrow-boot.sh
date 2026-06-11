@@ -38,10 +38,34 @@ log() { echo "[burrow-boot] $*" >&2; }
 # ERR trap (mirror host-prime/lib/common.sh) + secret redaction backstop. The
 # token can never appear in $BASH_COMMAND in the first place (it lives only in a
 # subshell-local env var), so this scrub is defense-in-depth (RESEARCH Pattern 3).
+#
+# redact_secrets <text> — strip credential-shaped substrings, format-aware + exact.
+# Pure (no globals beyond GIT_CRED), so it is unit-testable in isolation. Layer 1
+# redacts the LIVE credential value exactly when $GIT_CRED is in scope (format-
+# agnostic, the real backstop). Layer 2 is a format-aware net for the credential
+# shapes this design mints (x-access-token / ghs_ / github_pat_) plus the legacy
+# gh*_ prefixes, in case a future refactor puts a token on a command line before
+# $GIT_CRED is set. Each Layer-2 pattern is BOUNDED to the token's own characters
+# (extglob `+(...)`) so it stops at a token boundary rather than swallowing the rest
+# of the line — the over-greedy `ghp_*` glob bug this replaces.
+redact_secrets() {
+  local cmd="$1"
+  shopt -s extglob
+  if [[ -n "${GIT_CRED:-}" ]]; then
+    cmd="${cmd//${GIT_CRED}/[redacted]}"
+  fi
+  cmd="${cmd//github_pat_+([A-Za-z0-9_])/[redacted]}"
+  cmd="${cmd//ghs_+([A-Za-z0-9])/[redacted]}"
+  cmd="${cmd//gho_+([A-Za-z0-9])/[redacted]}"
+  cmd="${cmd//ghp_+([A-Za-z0-9])/[redacted]}"
+  cmd="${cmd//x-access-token:+([^[:space:]])/x-access-token:[redacted]}"
+  printf '%s' "$cmd"
+}
+
 # shellcheck disable=SC2154  # BASH_COMMAND/LINENO are bash built-ins.
 err_trap() {
   local exit_code=$?
-  local cmd="${BASH_COMMAND//ghp_*/[redacted]}"
+  local cmd; cmd="$(redact_secrets "${BASH_COMMAND}")"
   printf '[burrow-boot] ERROR (exit %d) at %s:%d: %s\n' \
     "$exit_code" "${BASH_SOURCE[0]:-?}" "${BASH_LINENO[0]:-0}" "$cmd" >&2
   exit "$exit_code"
