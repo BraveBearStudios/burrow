@@ -225,6 +225,11 @@ def manifest_config_repo(tmp_path: Path) -> Callable[..., ManifestConfigRepo]:
       - ``include_binary`` (default True): add a ``binary`` entry that must be SKIPPED.
       - ``bad_type`` (default False): give the binary-slot entry an UNKNOWN ``type`` so
         the boot-time jq gate fails the boot fail-closed (the locked decision).
+      - ``raw_manifest`` (default None): when set, write this EXACT manifest object as
+        ``plugins/manifest.json`` instead of the generated one. Lets a test seed a
+        schema-parity-violating manifest verbatim (a stray key, an empty ``ref``, a
+        missing ``schemaVersion``) so the boot-time jq gate's parity with
+        ``manifest.schema.json`` is exercised end-to-end (WR-02).
 
     Always seeds ONE ``claude-plugin`` source repo (its own ``file://`` bare repo tagged
     ``v1.0.0``) so ``install_claude_plugin`` does a real, pinned, hermetic clone.
@@ -233,7 +238,12 @@ def manifest_config_repo(tmp_path: Path) -> Callable[..., ManifestConfigRepo]:
     repos_root.mkdir(exist_ok=True)
     call_count = {"n": 0}
 
-    def _build(*, include_binary: bool = True, bad_type: bool = False) -> ManifestConfigRepo:
+    def _build(
+        *,
+        include_binary: bool = True,
+        bad_type: bool = False,
+        raw_manifest: dict[str, object] | None = None,
+    ) -> ManifestConfigRepo:
         call_count["n"] += 1
         suffix = f"-{call_count['n']}" if call_count["n"] > 1 else ""
 
@@ -260,7 +270,10 @@ def manifest_config_repo(tmp_path: Path) -> Callable[..., ManifestConfigRepo]:
             if not bad_type:
                 skipped_names.append("rtk")
 
-        manifest = json.dumps({"schemaVersion": "1.0.0", "plugins": plugins}, indent=2) + "\n"
+        if raw_manifest is not None:
+            manifest = json.dumps(raw_manifest, indent=2) + "\n"
+        else:
+            manifest = json.dumps({"schemaVersion": "1.0.0", "plugins": plugins}, indent=2) + "\n"
         config_url = _seed_bare_repo(
             repos_root,
             f"cc-worker-config{suffix}",

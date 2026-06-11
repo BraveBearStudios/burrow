@@ -311,3 +311,66 @@ def test_redaction_backstop_works_without_live_cred(boot_script: Path) -> None:
     assert "KEEPTAIL" in out, f"redaction swallowed trailing text: {out!r}"
 
 
+@pytest.mark.parametrize(
+    ("raw_manifest", "why"),
+    [
+        (
+            {"plugins": {"p": {"source": "s", "ref": "r", "type": "binary"}}},
+            "missing top-level schemaVersion",
+        ),
+        (
+            {
+                "schemaVersion": "1.0.0",
+                "stray": 1,
+                "plugins": {"p": {"source": "s", "ref": "r", "type": "binary"}},
+            },
+            "unknown top-level key (additionalProperties:false)",
+        ),
+        (
+            {
+                "schemaVersion": "1.0.0",
+                "plugins": {"p": {"source": "s", "ref": "r", "type": "binary", "bogus": 1}},
+            },
+            "unknown per-entry key (additionalProperties:false)",
+        ),
+        (
+            {
+                "schemaVersion": "1.0.0",
+                "plugins": {"p": {"source": "", "ref": "r", "type": "binary"}},
+            },
+            "empty source (minLength:1)",
+        ),
+        (
+            {
+                "schemaVersion": "1.0.0",
+                "plugins": {"p": {"source": "s", "ref": "", "type": "binary"}},
+            },
+            "empty ref (minLength:1)",
+        ),
+    ],
+)
+def test_manifest_gate_at_schema_parity_fails_closed(
+    boot_script: Path,
+    manifest_config_repo: Callable[..., ManifestConfigRepo],
+    stub_ttyd_path: Path,
+    tmp_path: Path,
+    raw_manifest: dict[str, object],
+    why: str,
+) -> None:
+    """WR-02: the boot-time jq gate is at parity with manifest.schema.json (fails closed).
+
+    Each manifest passes the OLD loose gate (string source/ref/type + known type) but
+    violates a schema constraint the loose gate ignored (schemaVersion presence,
+    additionalProperties:false, minLength:1). All must fail the boot non-zero.
+    """
+    repo = manifest_config_repo(raw_manifest=raw_manifest)
+    with serve_bootconfig(repo) as cp:
+        proc, _home, _etc = _run_boot(
+            boot_script, control_plane=cp.url, tmp_path=tmp_path, stub_bin=stub_ttyd_path
+        )
+    assert proc.returncode != 0, f"manifest gate must fail closed on: {why}\n{proc.stderr}"
+    assert not (tmp_path / "home" / "ttyd-argv.txt").exists(), (
+        f"ttyd reached despite an invalid manifest ({why})"
+    )
+
+

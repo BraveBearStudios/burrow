@@ -196,12 +196,29 @@ process_manifest() {
     log "manifest not found at ${manifest} — failing boot"
     return 1
   fi
+  # Structural gate at PARITY with manifest.schema.json (the single source of
+  # truth) so CI and boot never diverge. Mirrors, in jq:
+  #   - required top-level: schemaVersion (string) + plugins (object)
+  #   - additionalProperties:false at top level (only schemaVersion + plugins)
+  #   - per-entry additionalProperties:false (only source/ref/type/description)
+  #   - per-entry required: source/ref/type, all strings; source/ref minLength:1
+  #   - type enum ∈ {claude-plugin,binary,npm-global} (the fail-closed check)
+  # Any drift (a stray key, an empty ref, a missing schemaVersion, an unknown
+  # type) fails the gate → return 1 → ERR trap → non-zero boot (fail-closed).
   jq -e '
-    .plugins
-    | to_entries
-    | all(.value | (.type | type == "string") and (.source | type == "string")
-                   and (.ref | type == "string")
-                   and (.type | IN("claude-plugin", "binary", "npm-global")))
+    def is_nonempty_string: (type == "string") and (length > 0);
+    (type == "object")
+    and (has("schemaVersion")) and (.schemaVersion | type == "string")
+    and (has("plugins")) and (.plugins | type == "object")
+    and (keys - ["plugins", "schemaVersion"] | length == 0)
+    and (.plugins | to_entries | all(.value
+          | (type == "object")
+          and (has("source") and has("ref") and has("type"))
+          and (keys - ["description", "ref", "source", "type"] | length == 0)
+          and (.source | is_nonempty_string)
+          and (.ref | is_nonempty_string)
+          and (.type | IN("claude-plugin", "binary", "npm-global"))
+          and ((has("description") | not) or (.description | type == "string"))))
   ' "$manifest" >/dev/null || { log "manifest failed structural validation"; return 1; }
 
   # Iterate only claude-plugin entries; binary/npm-global are baked (skip).
