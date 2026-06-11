@@ -142,11 +142,11 @@ def test_frozen_ttyd_line(boot_script: Path) -> None:
     """Static assertion: the frozen ttyd tail is intact (no --once, --interface 0.0.0.0)."""
     source = boot_script.read_text()
     # Ignore comment lines so a mention of --once in prose can't pass/fail spuriously.
-    code = "\n".join(
-        line for line in source.splitlines() if not line.lstrip().startswith("#")
-    )
+    code = "\n".join(line for line in source.splitlines() if not line.lstrip().startswith("#"))
     assert "--once" not in code, "ttyd must stay PERSISTENT — no --once (ADR-0006)"
-    assert "--interface 0.0.0.0" in code, "ttyd must stay LAN-bound — --interface 0.0.0.0 (ADR-0007)"
+    assert "--interface 0.0.0.0" in code, (
+        "ttyd must stay LAN-bound — --interface 0.0.0.0 (ADR-0007)"
+    )
 
 
 @pytest.mark.parametrize("flag", ["set -x"])

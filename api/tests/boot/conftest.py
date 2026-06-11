@@ -22,10 +22,11 @@ substrate rather than an in-process ASGI app:
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 import threading
-from collections.abc import Callable, Iterator
+from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -115,9 +116,12 @@ def bare_repos(tmp_path: Path) -> dict[str, str]:
             "GIT_COMMITTER_NAME": "Burrow Test",
             "GIT_COMMITTER_EMAIL": "test@example.invalid",
         }
-        run = lambda *args: subprocess.run(  # noqa: E731
-            ["git", *args], cwd=work, check=True, capture_output=True, text=True, env={**env}
-        )
+
+        def run(*args: str) -> None:
+            subprocess.run(
+                ["git", *args], cwd=work, check=True, capture_output=True, text=True, env={**env}
+            )
+
         run("init", "-q", "-b", "main")
         run("add", "-A")
         run("commit", "-q", "-m", "seed")
@@ -159,7 +163,7 @@ def fake_control_plane(bare_repos: dict[str, str]) -> Iterator[FakeControlPlane]
     server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(payload))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    host, port = server.server_address[:2]
+    host, port = str(server.server_address[0]), int(server.server_address[1])
     try:
         yield FakeControlPlane(
             url=f"http://{host}:{port}",
@@ -181,7 +185,7 @@ def down_control_plane() -> Iterator[str]:
     server = ThreadingHTTPServer(("127.0.0.1", 0), _make_handler(None))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
-    host, port = server.server_address[:2]
+    host, port = str(server.server_address[0]), int(server.server_address[1])
     try:
         yield f"http://{host}:{port}"
     finally:
@@ -224,8 +228,6 @@ def make_boot_env(
     vmid_hostname: str = "burrow-w-241",
 ) -> dict[str, str]:
     """Build the hermetic subprocess env for a boot run (see test module for use)."""
-    import os
-
     return {
         "PATH": f"{stub_bin}{os.pathsep}{os.environ.get('PATH', '')}",
         "HOME": str(home),
