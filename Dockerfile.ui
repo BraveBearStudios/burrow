@@ -32,7 +32,7 @@ FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef
 ARG IMAGE_REVISION=dev
 ARG IMAGE_CREATED=unknown
 ARG IMAGE_VERSION=0.1.0
-LABEL org.opencontainers.image.source="https://github.com/brave-bear-studios/burrow" \
+LABEL org.opencontainers.image.source="https://github.com/BraveBearStudios/burrow" \
       org.opencontainers.image.revision="${IMAGE_REVISION}" \
       org.opencontainers.image.created="${IMAGE_CREATED}" \
       org.opencontainers.image.licenses="AGPL-3.0-or-later" \
