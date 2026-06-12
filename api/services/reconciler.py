@@ -22,7 +22,7 @@ thin-loop's pure body.
 Seam discipline (CLAUDE.md, CI-enforced by ``test_seam_leakage.py``): this module
 imports ONLY the two provider ABCs, ``Settings``, ``WorkspaceService``, and the
 exported ``_safe`` redactor — no ``aiosqlite``, no ``proxmoxer``. The reaper drives
-``compute.destroyCt`` / ``usedVmids`` through the ABC only.
+``compute.destroyCt`` / ``listManagedCts`` through the ABC only.
 """
 
 import logging
@@ -77,11 +77,13 @@ class Reconciler:
         Two cases, both pure over the current (compute, DB) snapshot:
 
         (A) Orphan CTs — a VMID known to compute, in the worker pool, with NO live
-            DB row. Destroy it (idempotent) and log STRUCTURALLY (the events FK
-            needs a live workspaceId, so a row-less reap cannot be a DB event —
-            FROZEN guardrail 2). The pool-range bound is load-bearing: the Fake's
-            ``usedVmids()`` is unfiltered, so the ``if vmid in pool`` re-assert MUST
-            live here, never out-of-pool (T-04-01A / FROZEN guardrail 4).
+            DB row. Destroy it (idempotent) ON ITS REAL NODE (CR-01: ``listManagedCts``
+            carries each CT's node, so an orphan off ``default_node`` is still
+            destroyed, never misrouted) and log STRUCTURALLY (the events FK needs a
+            live workspaceId, so a row-less reap cannot be a DB event — FROZEN
+            guardrail 2). The pool-range bound is load-bearing: ``listManagedCts()``
+            is unfiltered by live-ownership, so the ``vmid in pool`` + ``not live``
+            re-assert MUST live here, never out-of-pool (T-04-01A / FROZEN guardrail 4).
 
         (B) Timed-out ``creating`` rows — stuck longer than ``creating_timeout_s``.
             These DO have a live row (so an in-flight saga's VMID is in
@@ -90,15 +92,21 @@ class Reconciler:
             event.
         """
         pool = range(self.settings.worker_pool_start, self.settings.worker_pool_end + 1)
-        compute_vmids = await self.compute.usedVmids()
+        managed = await self.compute.listManagedCts()
         rows = await self.db.listWorkspaces()
         live_vmids = {row.vmid for row in rows if row.vmid is not None}
 
         # (A) Row-less orphans in the pool → idempotent destroy + structured log.
-        for vmid in sorted(compute_vmids - live_vmids):
-            if vmid not in pool:
-                continue  # SAFETY BOUND: never touch an out-of-pool CT (V4).
-            await self.compute.destroyCt(self.settings.default_node, vmid)  # idempotent
+        # CR-01: destroy each orphan against the node it ACTUALLY lives on. The
+        # create saga picks an operator node per workspace (CAP-04), so an orphan
+        # can sit on any node; the old hardcoded `default_node` issued the DELETE to
+        # the wrong node, which the real provider 404s and swallows as idempotent
+        # success — leaking the CT + VMID while logging a false `reaper.destroyed`.
+        # `listManagedCts()` carries the real node, so the destroy now targets it.
+        for node, vmid in sorted(managed, key=lambda nv: nv[1]):
+            if vmid in live_vmids or vmid not in pool:
+                continue  # SAFETY BOUND: never touch a live-owned or out-of-pool CT (V4).
+            await self.compute.destroyCt(node, vmid)  # idempotent, correct node
             # Row-less → no events FK to satisfy; audit via a structured log line.
             # No secret/topology in the extra (just the integer vmid).
             logger.info("reaper.destroyed", extra={"vmid": vmid})

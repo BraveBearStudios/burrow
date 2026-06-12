@@ -106,6 +106,13 @@ class FakeComputeProvider(ComputeProvider):
         self._maybe_fail("usedVmids")
         return set(self._containers.keys())
 
+    async def listManagedCts(self) -> list[tuple[str, int]]:
+        # CR-01: surface each container's REAL node so the reaper destroys an
+        # orphan on the node it lives on, not a hardcoded default. The Fake stores
+        # `node` per container, so the pair is honest.
+        self._maybe_fail("listManagedCts")
+        return [(c.node, c.vmid) for c in self._containers.values()]
+
     async def cloneCt(
         self,
         template_vmid: int,
@@ -145,12 +152,25 @@ class FakeComputeProvider(ComputeProvider):
 
     async def destroyCt(self, node: str, vmid: int) -> ComputeTask:
         self._maybe_fail("destroyCt")
-        # CR-03: model the real provider's stop-then-destroy. A running CT is
-        # stopped first (Proxmox refuses to DELETE a running LXC), then removed —
-        # so destroy is idempotent for the cloned-but-running case and always
-        # frees the VMID (no orphan), matching ProxmoxComputeProvider.destroyCt.
+        # CR-01: model the real provider's NODE-SCOPED DELETE honestly. Proxmox
+        # routes DELETE to `nodes(node).lxc(vmid)`; a DELETE aimed at the WRONG
+        # node 404s, which destroyCt swallows as idempotent success WITHOUT
+        # removing the CT that actually lives on another node. The old Fake keyed
+        # only on `vmid`, so it removed a container regardless of node and masked a
+        # reaper that destroyed against the wrong node (CR-01). Now a wrong-node
+        # destroy is the same harmless no-op success the real provider returns —
+        # but the container survives, so a misrouted reap is observable in tests.
         container = self._containers.get(vmid)
-        if container is not None and container.running:
+        if container is None:
+            return self._ok_task()  # already gone → idempotent no-op success
+        if container.node != node:
+            # Wrong-node DELETE → 404 on the real provider, swallowed as success;
+            # the CT on its real node is untouched (the exact CR-01 leak).
+            return self._ok_task()
+        # CR-03: a running CT is stopped first (Proxmox refuses to DELETE a running
+        # LXC), then removed — so destroy is idempotent for the cloned-but-running
+        # case and always frees the VMID, matching ProxmoxComputeProvider.destroyCt.
+        if container.running:
             container.running = False
         self._containers.pop(vmid, None)
         return self._ok_task()

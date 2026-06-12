@@ -86,6 +86,23 @@ class ComputeProvider(ABC):
         ...
 
     @abstractmethod
+    async def listManagedCts(self) -> list[tuple[str, int]]:
+        """Return ``(node, vmid)`` for every worker-pool CT the backend knows about.
+
+        Unlike :meth:`usedVmids` (which discards the node), this preserves each
+        CT's REAL node so the reaper can destroy an orphan against the node it
+        actually lives on (CR-01). The create saga selects an operator node per
+        workspace (CAP-04), so a row-less orphan can live on ANY node — destroying
+        it against a hardcoded ``default_node`` issues the DELETE to the wrong node,
+        which the real provider 404s and swallows as idempotent success, leaking the
+        CT and its VMID while the reaper logs a false ``reaper.destroyed``.
+
+        Same point-in-time-snapshot caveat as :meth:`usedVmids`: no lock, the
+        reaper re-asserts the pool-range + live-owner bounds over the result.
+        """
+        ...
+
+    @abstractmethod
     async def cloneCt(
         self,
         template_vmid: int,

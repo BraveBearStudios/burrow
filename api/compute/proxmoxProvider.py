@@ -132,26 +132,53 @@ class ProxmoxComputeProvider(ComputeProvider):
         raise NoFreeVmidError(f"no free VMID in [{pool_start}, {pool_end}]")
 
     async def usedVmids(self) -> set[int]:
+        # Node-discarded projection: the pre-clone reservation scan only needs the
+        # in-pool VMID set, so a row with a parseable in-range vmid counts even if
+        # its `node` is absent (a malformed/heterogeneous row, WR-04). Kept distinct
+        # from listManagedCts (which REQUIRES a node) so a missing node never drops
+        # a VMID from the duplicate-id guard.
         resources = await asyncio.to_thread(lambda: self._api.cluster.resources.get(type="vm"))
         start, end = self._settings.worker_pool_start, self._settings.worker_pool_end
-        # WR-04: cluster/resources rows are heterogeneous — a row may carry `vmid`
-        # present but non-numeric/None (storage, sdn, or a future resource type
-        # reusing the key). int() on that raises ValueError/TypeError, which is NOT
-        # a ComputeError and would escape the seam as an uncaught 500 during the
-        # pre-clone scan. Parse defensively: skip a row whose vmid is absent or
-        # unparseable rather than crash.
         out: set[int] = set()
         for r in resources:
-            raw = r.get("vmid")
-            if raw is None:
-                continue
-            try:
-                vmid = int(raw)
-            except (TypeError, ValueError):
-                continue
-            if start <= vmid <= end:
+            vmid = self._parse_pool_vmid(r, start, end)
+            if vmid is not None:
                 out.add(vmid)
         return out
+
+    async def listManagedCts(self) -> list[tuple[str, int]]:
+        # CR-01: keep each CT's REAL node (cluster/resources is cluster-wide, so an
+        # orphan can live on any node). A row missing/blank `node` is skipped — the
+        # reaper cannot safely issue a DELETE without a target node, so it must not
+        # claim to manage a CT whose node it does not know.
+        resources = await asyncio.to_thread(lambda: self._api.cluster.resources.get(type="vm"))
+        start, end = self._settings.worker_pool_start, self._settings.worker_pool_end
+        out: list[tuple[str, int]] = []
+        for r in resources:
+            vmid = self._parse_pool_vmid(r, start, end)
+            node = r.get("node")
+            if vmid is not None and node:
+                out.append((str(node), vmid))
+        return out
+
+    @staticmethod
+    def _parse_pool_vmid(row: dict[str, Any], start: int, end: int) -> int | None:
+        """Parse a cluster/resources row's in-pool VMID, or None if unusable.
+
+        WR-04: cluster/resources rows are heterogeneous — a row may carry `vmid`
+        present but non-numeric/None (storage, sdn, or a future resource type
+        reusing the key). int() on that raises ValueError/TypeError, which is NOT a
+        ComputeError and would escape the seam as an uncaught 500 during the
+        pre-clone scan. Returns None for an absent/unparseable/out-of-pool vmid.
+        """
+        raw = row.get("vmid")
+        if raw is None:
+            return None
+        try:
+            vmid = int(raw)
+        except (TypeError, ValueError):
+            return None
+        return vmid if start <= vmid <= end else None
 
     # ── lifecycle mutations (each UPID-blocked) ───────────────────────────────
     async def cloneCt(

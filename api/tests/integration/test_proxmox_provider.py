@@ -377,3 +377,33 @@ async def test_used_vmids_skips_malformed_rows_without_crashing() -> None:
 
     used = await _provider().usedVmids()
     assert used == {201, 202}
+
+
+@responses.activate
+async def test_list_managed_cts_carries_each_cts_real_node() -> None:
+    """CR-01: listManagedCts returns (node, vmid) over cluster-wide resources.
+
+    cluster/resources is cluster-wide, so an in-pool orphan can live on ANY node.
+    listManagedCts must surface each CT's REAL node so the reaper destroys it on
+    that node, not a hardcoded default. A row whose node is absent/blank is skipped
+    (the reaper cannot route a DELETE without a target node); the node-discarded
+    usedVmids still counts it for the duplicate-id guard.
+    """
+    responses.add(
+        responses.GET,
+        f"{_BASE}/cluster/resources",
+        json={
+            "data": [
+                {"vmid": 201, "type": "lxc", "node": "pve1"},  # in range, pve1
+                {"vmid": 202, "type": "lxc", "node": "pve2"},  # in range, pve2
+                {"vmid": 203, "type": "lxc"},  # in range but no node -> skipped here
+                {"vmid": 9000, "type": "lxc", "node": "pve1"},  # out of pool -> skip
+            ]
+        },
+        status=200,
+    )
+
+    # listManagedCts yields (node, vmid); index by vmid for the assertion.
+    by_vmid = {vmid: node for node, vmid in await _provider().listManagedCts()}
+    # Each in-pool CT pairs with its REAL node; the node-less row is dropped.
+    assert by_vmid == {201: "pve1", 202: "pve2"}

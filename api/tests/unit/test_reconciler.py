@@ -140,6 +140,77 @@ async def test_reap_spares_in_pool_ct_with_a_live_row(
     assert vmid in compute._containers  # a live-owned CT is never reaped
 
 
+# ── CR-01: orphan off default_node is destroyed on its REAL node ──────────────
+async def test_reap_destroys_off_default_node_orphan_on_its_actual_node(
+    compute: FakeComputeProvider, db: SqliteProvider, caplog: pytest.LogCaptureFixture
+) -> None:
+    """CR-01: an orphan CT on a NON-default node is destroyed on THAT node.
+
+    The create saga picks an operator node per workspace (CAP-04), so a row-less
+    orphan can live on any node. The reaper learns the real node from
+    ``listManagedCts`` and destroys against it — never the hardcoded
+    ``default_node``. The Fake's ``destroyCt`` now models the real provider's
+    node-scoped DELETE (a wrong-node DELETE 404s and is swallowed without removing
+    the CT), so a misrouted reap would leave the orphan present and this test would
+    fail. ``reaper.destroyed`` is logged ONLY because the destroy hit the right
+    node and actually freed the VMID.
+    """
+    off_node = "pve2"
+    assert off_node != real_settings.default_node  # the orphan lives off-default
+    in_pool = real_settings.worker_pool_start + 60
+    compute._containers[in_pool] = _FakeContainer(
+        vmid=in_pool, name="off-node-orphan", node=off_node
+    )
+
+    with caplog.at_level("INFO", logger="burrow.reconciler"):
+        await _reconciler(compute, db, now=datetime.now(timezone.utc)).reconcile_once()
+
+    # Destroyed on its REAL node → the CT is gone and the VMID is freed.
+    assert in_pool not in compute._containers
+    assert in_pool not in await compute.usedVmids()
+    # `reaper.destroyed` was logged only because the destroy targeted the right node.
+    destroyed = [r for r in caplog.records if r.message == "reaper.destroyed"]
+    assert len(destroyed) == 1
+    assert getattr(destroyed[0], "vmid", None) == in_pool
+
+
+async def test_reap_does_not_log_destroyed_for_out_of_pool_or_owned_cts(
+    compute: FakeComputeProvider, db: SqliteProvider, caplog: pytest.LogCaptureFixture
+) -> None:
+    """CR-01 corollary: the safety bound holds AND no false `reaper.destroyed` fires.
+
+    An out-of-pool CT and a live-owned in-pool CT (each on a non-default node) are
+    both spared, and NO ``reaper.destroyed`` log line is emitted for them — proving
+    the audit line tracks real destroys, not misrouted no-ops.
+    """
+    out_of_pool = real_settings.worker_pool_end + 100  # outside the pool
+    owned = real_settings.worker_pool_start + 61
+    compute._containers[out_of_pool] = _FakeContainer(
+        vmid=out_of_pool, name="not-ours", node="pve2"
+    )
+    # A live row owns `owned` → not an orphan even though the CT is on pve2.
+    owned_ws = await db.createWorkspace(
+        {
+            "name": "owned2",
+            "node": "pve2",
+            "project_repo": "git@x:y.git",
+            "vmid": owned,
+            "status": "running",
+        }
+    )
+    assert owned_ws.node == "pve2"
+    compute._containers[owned] = _FakeContainer(
+        vmid=owned, name="owned2", node="pve2", running=True
+    )
+
+    with caplog.at_level("INFO", logger="burrow.reconciler"):
+        await _reconciler(compute, db, now=datetime.now(timezone.utc)).reconcile_once()
+
+    assert out_of_pool in compute._containers  # out-of-pool untouched
+    assert owned in compute._containers  # live-owned untouched
+    assert not [r for r in caplog.records if r.message == "reaper.destroyed"]
+
+
 # ── Test 2: timed-out creating row swept to error (CAP-03) ────────────────────
 async def test_timed_out_creating_row_is_reaped_to_error(
     compute: FakeComputeProvider, db: SqliteProvider

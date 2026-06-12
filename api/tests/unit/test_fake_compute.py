@@ -77,6 +77,40 @@ async def test_destroy_running_ct_is_idempotent_and_frees_vmid() -> None:
     assert again.status == "ok"
 
 
+async def test_list_managed_cts_carries_the_real_node() -> None:
+    """CR-01: listManagedCts pairs each VMID with the node it was cloned on."""
+    fake = FakeComputeProvider()
+    await fake.cloneCt(9000, 210, "ws-210", "pve1")
+    await fake.cloneCt(9000, 211, "ws-211", "pve2")
+
+    # listManagedCts yields (node, vmid); index by vmid for the assertion.
+    by_vmid = {vmid: node for node, vmid in await fake.listManagedCts()}
+    assert by_vmid == {210: "pve1", 211: "pve2"}
+    # usedVmids is the node-discarded projection of the same set.
+    assert await fake.usedVmids() == {210, 211}
+
+
+async def test_destroy_on_wrong_node_is_swallowed_and_leaves_ct() -> None:
+    """CR-01: a wrong-node destroy models the real provider's swallowed 404.
+
+    Proxmox routes DELETE to nodes(node).lxc(vmid); a DELETE aimed at the wrong
+    node 404s and destroyCt swallows it as idempotent success WITHOUT removing the
+    CT that lives on another node. The Fake mirrors this so a reaper that targets
+    the wrong node is observable (the CT survives), proving the CR-01 fix.
+    """
+    fake = FakeComputeProvider()
+    await fake.cloneCt(9000, 212, "ws-212", "pve2")  # lives on pve2
+
+    # Destroy aimed at the WRONG node: success envelope, but the CT is untouched.
+    task = await fake.destroyCt("pve1", 212)
+    assert task.status == "ok"
+    assert 212 in await fake.usedVmids()  # the off-node CT was NOT removed
+
+    # Destroy aimed at the RIGHT node removes it and frees the VMID.
+    await fake.destroyCt("pve2", 212)
+    assert 212 not in await fake.usedVmids()
+
+
 async def test_get_next_vmid_skips_used_and_known() -> None:
     fake = FakeComputeProvider()
     await fake.cloneCt(9000, 200, "ws-200", "pve1")  # 200 now known to the provider
