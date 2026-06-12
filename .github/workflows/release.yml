@@ -1,0 +1,159 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Burrow release supply-chain (CICD-05). A v* tag (or a published GitHub
+# Release) builds BOTH production images, pushes them to GHCR by immutable
+# digest, then for each published image: generates a syft SBOM in SPDX AND
+# CycloneDX, signs the image KEYLESS with cosign (Sigstore + GitHub OIDC — no
+# long-lived key), and emits a SLSA build-provenance attestation bound to the
+# digest. (ci-cd-and-testing.md §5.4/§5.5.)
+#
+# Splits cleanly from ci.yml: ci.yml builds + Trivy-scans on PR WITHOUT pushing
+# (CICD-04); this file owns SBOM / sign / provenance / GHCR-publish and runs
+# ONLY on a release tag, so fork PRs can never read the publish credentials
+# (§5.5). v1 is LAN-only at the running-service layer (Pitfall 12) — this is the
+# artifact-publish path to the project's OWN registry, which is fully verifiable.
+#
+# Third-party actions are SHA-pinned (ci-cd §5.5); the trailing comment records
+# the human-readable version the SHA resolves to. The workflow default below is
+# the least-privilege contents:read; the publish job adds EXACTLY the four scopes
+# keyless signing + provenance + GHCR push need — nothing broader (Pitfall 7).
+
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish + sign ${{ matrix.image }}
+    runs-on: ubuntu-latest
+    # EXACTLY these four — nothing broader (Pitfall 7 / ci-cd §5.5):
+    #   contents:     read   — checkout the tagged source
+    #   packages:     write  — push the image AND the provenance/SBOM to GHCR
+    #   id-token:     write  — OIDC for cosign keyless + attest-build-provenance
+    #   attestations: write  — actions/attest-build-provenance writes the attestation
+    # A missing scope fails keyless signing with an opaque OIDC error, so the set
+    # is pinned here and asserted in 04-VALIDATION.
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: burrow-api
+            dockerfile: Dockerfile.api
+          - image: burrow-ui
+            dockerfile: Dockerfile.ui
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+
+      # Authenticate to GHCR with the run's built-in GITHUB_TOKEN — no PAT, no
+      # stored credential. The token is scoped to this repository's packages by
+      # the packages:write permission above.
+      - name: Log in to GHCR
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Compute the §2.4 release tags (X.Y.Z, X.Y, latest, sha-<short>) and the
+      # OCI source/revision/version labels for the fully-qualified GHCR image.
+      - name: Image metadata (tags + OCI labels)
+        id: meta
+        uses: docker/metadata-action@318604b99e75e41977312d83839a89be02ca4893 # v5.9.0
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=sha,prefix=sha-,format=short
+
+      # Build and PUSH by digest. push:true makes steps.build.outputs.digest the
+      # immutable manifest digest that every downstream step signs/attests AGAINST
+      # — never a floating tag (the tamper-resistant binding, ci-cd §2.4).
+      - name: Build and push (by digest)
+        id: build
+        uses: docker/build-push-action@f9f3042f7e2789586610d6e8b85c8f03e5195baf # v7.2.0
+        with:
+          context: .
+          file: ./${{ matrix.dockerfile }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      # syft SBOM #1 — SPDX. Targets the pushed image BY DIGEST so the SBOM binds
+      # the exact published artifact (ci-cd §5.4: SPDX + CycloneDX both required).
+      - name: SBOM (SPDX)
+        uses: anchore/sbom-action@d8a2c0130026bf585de5c176ab8f7ce62d75bf04 # v0.20.7
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: spdx-json
+          output-file: sbom-${{ matrix.image }}.spdx.json
+
+      # syft SBOM #2 — CycloneDX (a second run; one action invocation emits a
+      # single format, so dual-format == two runs).
+      - name: SBOM (CycloneDX)
+        uses: anchore/sbom-action@d8a2c0130026bf585de5c176ab8f7ce62d75bf04 # v0.20.7
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          format: cyclonedx-json
+          output-file: sbom-${{ matrix.image }}.cyclonedx.json
+
+      # Install cosign, then KEYLESS-sign the image BY DIGEST. No --key: the
+      # signature uses the run's ephemeral OIDC identity (Fulcio cert recorded in
+      # Rekor) — nothing long-lived to leak or rotate (ci-cd §5.4 / T-04-05A).
+      - name: Install cosign
+        uses: sigstore/cosign-installer@d7543c93d881b35a8faa02e8e3605f69b7a1ce62 # v3.10.0
+
+      - name: Sign image (cosign keyless)
+        env:
+          COSIGN_YES: "true"
+        run: |
+          cosign sign --yes \
+            "ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}"
+
+      # SLSA build-provenance attestation, bound to the digest and pushed to the
+      # registry alongside the image. subject-name MUST be the fully-qualified
+      # GHCR name for push-to-registry to resolve the subject (T-04-05C).
+      - name: Attest build provenance (SLSA)
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+
+# ── Verification runbook (CD / human authority — ci-cd §5.4) ──────────────────
+# The structural gate in CI is YAML/actionlint validity + the permission-scope
+# and SHA-pin assertions above. The AUTHORITATIVE acceptance is run by a human
+# (or release automation) against the PUBLISHED digest, after a real v* tag —
+# it needs the live registry + OIDC and is therefore NOT a PR-CI command:
+#
+#   # Confirm the keyless cosign signature on the published digest:
+#   cosign verify \
+#     --certificate-identity-regexp 'https://github.com/BraveBearStudios/burrow/.*' \
+#     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+#     ghcr.io/BraveBearStudios/burrow-api@sha256:<digest>
+#
+#   # Confirm the SLSA build-provenance attestation on the published digest:
+#   gh attestation verify \
+#     oci://ghcr.io/BraveBearStudios/burrow-api@sha256:<digest> \
+#     --owner BraveBearStudios
+#
+# (Repeat for burrow-ui. Pin deployment configs to the digest, not a floating
+# tag — ci-cd §2.4.)
