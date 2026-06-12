@@ -54,6 +54,16 @@ jobs:
         run: uv run pytest tests/boot tests/integration/test_manifest_schema.py -q
         working-directory: api
 
+      # Phase-4 hermetic runtime-hardening tiers (CAP-02/CAP-03): a reconciler
+      # (reaper / idle auto-stop), capacity-race, or lifespan regression fails the
+      # build HERE rather than only at the dev-homelab smoke. All three run over
+      # the Fake provider with an injected clock — no real Proxmox, no real time.
+      # (test_capacity_race.py ships with Plan 04-02; test_reconciler.py and
+      # test_lifespan.py with Plan 04-01.)
+      - name: api · pytest (reconciler + capacity + lifespan tiers)
+        run: uv run pytest tests/unit/test_reconciler.py tests/integration/test_capacity_race.py tests/integration/test_lifespan.py -q
+        working-directory: api
+
       - name: api · ruff format --check
         run: uv run ruff format --check .
         working-directory: api
