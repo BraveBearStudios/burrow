@@ -300,11 +300,16 @@ export function ActivityDrawer({
 
 	return (
 		<>
-			{/* The scrim is a real <button> so click-to-dismiss is keyboard-accessible
-			    and lint-clean; the drawer (Esc-closable) sits above it. */}
+			{/* The scrim is a real <button> for click-to-dismiss, but it is EXCLUDED
+			    from the tab order (tabIndex=-1) and hidden from the a11y tree
+			    (aria-hidden) so Tab cannot escape the modal focus trap onto it
+			    (WR-03). Keyboard/SR users dismiss via Esc or the × button, both
+			    inside the trapped <aside>. */}
 			<button
 				type="button"
 				aria-label="Dismiss activity log"
+				aria-hidden="true"
+				tabIndex={-1}
 				onClick={onClose}
 				style={{
 					position: "fixed",

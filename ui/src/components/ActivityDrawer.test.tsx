@@ -212,6 +212,34 @@ describe("ActivityDrawer — a11y (criterion 11)", () => {
 		expect(onClose).toHaveBeenCalledTimes(1);
 	});
 
+	it("keeps Tab focus inside the drawer (scrim is out of the tab order, WR-03)", async () => {
+		renderDrawer();
+		const dialog = await screen.findByRole("dialog");
+		// The dismiss scrim must be excluded from the tab order and the a11y tree,
+		// otherwise Tab escapes the modal focus trap onto it.
+		const scrim = screen.getByLabelText("Dismiss activity log");
+		expect(scrim).toHaveAttribute("tabindex", "-1");
+		expect(scrim).toHaveAttribute("aria-hidden", "true");
+
+		// The trap's focusables are scoped to the drawer; the scrim (tabIndex=-1)
+		// is not among them, so Tab/Shift+Tab cycle within the <aside>.
+		const focusables = dialog.querySelectorAll<HTMLElement>(
+			'button, [href], [tabindex]:not([tabindex="-1"])',
+		);
+		expect(focusables.length).toBeGreaterThan(0);
+		for (const el of Array.from(focusables)) {
+			expect(dialog.contains(el)).toBe(true);
+		}
+		expect(dialog.contains(scrim)).toBe(false);
+
+		// Tab from the last focusable wraps to the first — still inside the drawer.
+		const last = focusables[focusables.length - 1];
+		last.focus();
+		fireEvent.keyDown(dialog, { key: "Tab" });
+		expect(dialog.contains(document.activeElement)).toBe(true);
+		expect(document.activeElement).not.toBe(scrim);
+	});
+
 	it("returns focus to the trigger on close", async () => {
 		mockEvents(seedEvents);
 		const client = new QueryClient({
