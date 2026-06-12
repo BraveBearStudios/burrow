@@ -16,6 +16,11 @@ security headers + non-``*`` CORS (PLAT-05), and the ``get_service`` DI seam are
 wired here in :func:`create_app`.
 """
 
+import asyncio
+import contextlib
+import logging
+from collections.abc import AsyncIterator
+
 from fastapi import Depends, FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -38,7 +43,10 @@ from lib.errors import (
 )
 from lib.logging import setup_logging
 from lib.middleware import SecurityHeadersMiddleware
+from services.reconciler import Reconciler
 from services.workspaceService import WorkspaceService
+
+logger = logging.getLogger("burrow.main")
 
 # Service-tier error type -> HTTP status. The envelope ``error.code`` comes from
 # the error's own ``.code`` attribute; this table only fixes the status (PLAT-02).
@@ -127,6 +135,59 @@ def get_service(
     return WorkspaceService(compute=compute, db=db, settings=settings)
 
 
+def build_reconciler() -> Reconciler:
+    """Build the fleet :class:`Reconciler` from the SAME singletons the request path uses.
+
+    The reconciler MUST receive the process-wide ``get_compute()`` instance (the
+    Fake holds container state in its own memory, PLAT-08) — a fresh provider would
+    see an empty fleet and reap nothing / everything. ``get_db()`` and the
+    ``WorkspaceService`` are composed the same way ``get_service`` composes them, so
+    the reaper and the idle auto-stop act on exactly the state the routers mutate.
+    """
+    compute = get_compute()
+    db = get_db()
+    service = WorkspaceService(compute=compute, db=db, settings=settings)
+    return Reconciler(compute=compute, db=db, settings=settings, service=service)
+
+
+async def _reconcile_loop(reconciler: Reconciler, period_s: float) -> None:
+    """Run ``reconcile_once()`` forever on a fixed cadence, surviving a bad pass.
+
+    Each pass is wrapped in a broad ``except`` so one failed reconcile (e.g. a
+    transient Proxmox blip in the homelab) is logged and the loop continues —
+    a single bad pass must NOT kill the reconciler (RESEARCH Pattern 1 / Pitfall
+    4). ``CancelledError`` is NOT caught here: it must propagate so the lifespan's
+    ``await task`` unwinds cleanly on shutdown.
+    """
+    while True:
+        try:
+            await reconciler.reconcile_once()
+        except asyncio.CancelledError:
+            raise  # shutdown: let the cancel propagate to the lifespan
+        except Exception:
+            logger.exception("reconcile pass failed; continuing")
+        await asyncio.sleep(period_s)
+
+
+@contextlib.asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    """Own the periodic reconcile task: spawn on startup, cancel cleanly on shutdown.
+
+    Spawns ``_reconcile_loop`` as an asyncio task on uvicorn's loop, built from the
+    request-path singletons (``build_reconciler``). On shutdown it cancels the task
+    and awaits it, suppressing the resulting ``CancelledError`` so the cancel does
+    not dirty the shutdown (Pitfall 4) — no leaked task, no surfaced error.
+    """
+    reconciler = build_reconciler()
+    task = asyncio.create_task(_reconcile_loop(reconciler, settings.reconciler_period_s))
+    try:
+        yield
+    finally:
+        task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await task
+
+
 def _envelope_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Wrap any uncaught error into the standard error envelope (PLAT-02)."""
     body = respond_error(code="internal_error", message="Internal server error")
@@ -165,7 +226,7 @@ def create_app() -> FastAPI:
     auth is added here.
     """
     setup_logging()
-    app = FastAPI(title="Burrow Control Plane", version="0.1.0")
+    app = FastAPI(title="Burrow Control Plane", version="0.1.0", lifespan=lifespan)
     app.add_exception_handler(Exception, _envelope_exception_handler)
     app.add_exception_handler(ServiceError, _service_error_handler)
     app.add_exception_handler(ComputeError, _compute_error_handler)
