@@ -78,6 +78,24 @@ def _safe(exc: BaseException) -> str:
     return f"{type(exc).__name__}: {message}" if message else type(exc).__name__
 
 
+def _redact_repo(url: str) -> str:
+    """Return a repo URL safe to put in event ``data`` rendered by the UI (WR-01).
+
+    ``project_repo`` is free-form operator input with no validation rejecting
+    embedded credentials, so a URL like ``https://user:ghp_xxx@github.com/a/b.git``
+    could surface verbatim in the ActivityDrawer (whose contract asserts all event
+    ``data`` is already server-redacted). Strip any ``user:pass@`` userinfo and the
+    explicit credential-prefix tokens (gh*/glpat/xox/``key=value``), then bound the
+    length. The broad 32+ char entropy backstop in ``_safe`` is deliberately NOT
+    applied here — it would over-redact a normal long repo path/host — userinfo
+    stripping is the load-bearing defence for a URL field.
+    """
+    redacted = _URL_USERINFO.sub("://" + _REDACTED + "@", url)
+    for pattern in _SECRET_PATTERNS[:-1]:  # explicit token prefixes; skip the entropy backstop
+        redacted = pattern.sub(_REDACTED, redacted)
+    return redacted[:200]
+
+
 class WorkspaceService:
     """Create/stop/start/destroy orchestration over the provider ABCs."""
 
@@ -405,13 +423,16 @@ class WorkspaceService:
             raise WorkspaceBootError(
                 f"persisted boot intent does not match the create payload for workspace {ws.id}"
             )
+        # WR-01: the ActivityDrawer renders event `data` verbatim and the type
+        # contract asserts it is server-redacted. Repo URLs are free-form operator
+        # input, so strip any embedded credentials before they reach the event.
         await self.db.logEvent(
             ws.id,
             "bootconfig.persisted",
             {
-                "config_repo": config.config_repo,
+                "config_repo": _redact_repo(config.config_repo),
                 "config_branch": config.config_branch,
-                "project_repo": config.project_repo,
+                "project_repo": _redact_repo(config.project_repo),
                 "project_branch": config.project_branch,
             },
         )

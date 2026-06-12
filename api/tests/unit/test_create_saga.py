@@ -114,6 +114,33 @@ async def test_create_saga_persists_boot_intent_checkpoint(
     assert types.index("bootconfig.persisted") < types.index("workspace.created")
 
 
+async def test_bootconfig_persisted_event_redacts_repo_credentials(
+    service: WorkspaceService, db: SqliteProvider
+) -> None:
+    """WR-01: a userinfo-bearing project_repo is never logged verbatim.
+
+    project_repo is free-form operator input and the ActivityDrawer renders event
+    data verbatim under a "server-redacted" contract, so a credential embedded in
+    the URL must be stripped before it reaches the bootconfig.persisted event.
+    """
+    secret = "ghp_supersecrettoken1234567890"
+    payload = WorkspaceCreate(
+        name="creds",
+        project_repo=f"https://user:{secret}@github.com/acme/app.git",
+        node="pve1",
+    )
+    ws = await service.createWorkspace(payload)
+    events = await db.getEvents(ws.id)
+
+    persisted = next(e for e in events if e.type == "bootconfig.persisted")
+    serialized = str(persisted.data)
+    assert secret not in serialized, "repo credential leaked into bootconfig.persisted"
+    assert "ghp_" not in serialized, "credential prefix leaked into bootconfig.persisted"
+    assert "user:" not in persisted.data["project_repo"], "userinfo not stripped"
+    # The non-secret scheme/host/path is preserved (it is not over-redacted).
+    assert "github.com/acme/app.git" in persisted.data["project_repo"]
+
+
 async def test_create_saga_clone_starts_the_container(
     service: WorkspaceService, compute: FakeComputeProvider
 ) -> None:
