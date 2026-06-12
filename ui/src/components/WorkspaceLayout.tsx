@@ -18,7 +18,7 @@ import { useEffect, useMemo } from "react";
 import type { MosaicNode } from "react-mosaic-component";
 import { Mosaic } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
-import { useWorkspaces } from "../hooks/useWorkspaces";
+import { useDestroyWorkspace, useWorkspaces } from "../hooks/useWorkspaces";
 import { useLayoutStore } from "../store/layoutStore";
 import type { Workspace } from "../types/workspace";
 import { TerminalPanel } from "./TerminalPanel";
@@ -54,7 +54,26 @@ function LeafPanel({ id, workspace }: { id: string; workspace?: Workspace }) {
 	const setActive = useLayoutStore((s) => s.setActive);
 	const closePanel = useLayoutStore((s) => s.closePanel);
 	const splitPanel = useLayoutStore((s) => s.splitPanel);
+	const destroyWorkspace = useDestroyWorkspace();
 	const isActive = activeWorkspaceId === id;
+
+	// Terminate = DESTROY the workspace (WS-08 / UI-05), not a client-only panel
+	// close. The leaf id IS the workspace id (openPanel(workspace.id)), so the
+	// confirm fires DELETE /api/v1/workspaces/{id} (stop+destroy the CT, free the
+	// VMID, soft-delete the row) and only THEN prunes the mosaic leaf optimistically.
+	// destroy's onSettled invalidates the list; the ~3s poll + reconcile keep the
+	// panel gone. A failed DELETE surfaces via the mutation's onError (the panel is
+	// already pruned, but the next poll re-lists the still-running workspace so the
+	// failure is not silently masked as success). Detach (non-destructive) stays a
+	// pure socket close in TerminalPanel — only terminate destroys.
+	const onTerminate = (panelId: string) => {
+		destroyWorkspace.mutate(panelId, {
+			onError: (error) => {
+				console.error(`Failed to destroy workspace ${panelId}:`, error);
+			},
+		});
+		closePanel(panelId);
+	};
 
 	return (
 		// Active sync (UI-02) is driven by focus, not a click handler: clicking into
@@ -80,7 +99,7 @@ function LeafPanel({ id, workspace }: { id: string; workspace?: Workspace }) {
 				status={workspace?.status ?? "running"}
 				branch={workspace?.projectBranch}
 				onSplit={(panelId) => splitPanel(panelId, "row")}
-				onTerminate={(panelId) => closePanel(panelId)}
+				onTerminate={onTerminate}
 			/>
 		</div>
 	);

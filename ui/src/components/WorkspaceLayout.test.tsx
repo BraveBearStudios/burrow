@@ -9,12 +9,14 @@
 // the live list on load (UI-05) while keeping the running ones.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installMockWebSocket } from "../../tests/helpers/mockWebSocket";
 import { resetXtermMocks } from "../../tests/helpers/mockXterm";
 import { installMockResizeObserver } from "../../tests/helpers/resizeObserver";
+import { server } from "../../tests/msw/server";
 import { useLayoutStore } from "../store/layoutStore";
 import { WorkspaceLayout } from "./WorkspaceLayout";
 
@@ -71,6 +73,68 @@ describe("WorkspaceLayout — renders a panel per leaf (UI-02)", () => {
 		await waitFor(() => {
 			expect(screen.getByText("project-eta")).toBeInTheDocument();
 			expect(screen.getByText("project-iota")).toBeInTheDocument();
+		});
+	});
+});
+
+describe("WorkspaceLayout — terminate destroys the workspace (WS-08 / UI-05)", () => {
+	it("Destroy issues DELETE /api/v1/workspaces/{id} and prunes the panel", async () => {
+		// A single open panel for a live, running workspace from the MSW seed.
+		useLayoutStore.setState({
+			mosaicNode: "ws-running",
+			activeWorkspaceId: "ws-running",
+		});
+
+		// Spy the DELETE: record the destroyed id so we can assert the backend call
+		// actually fired (the regression was a client-only closePanel that NEVER hit
+		// the API). This test bites if onTerminate is reverted to closePanel-only.
+		let destroyedId: string | null = null;
+		server.use(
+			http.delete("/api/v1/workspaces/:id", ({ params }) => {
+				destroyedId = params.id as string;
+				return HttpResponse.json({
+					data: {
+						id: params.id,
+						name: "project-eta",
+						status: "destroyed",
+						vmid: 101,
+						node: "node1",
+						lxcIp: null,
+						projectRepo: "github.com/acme/eta",
+						projectBranch: "main",
+						pluginSet: "default",
+						createdAt: "2026-06-10T00:00:00Z",
+						stoppedAt: null,
+						destroyedAt: "2026-06-10T03:00:00Z",
+						deletedAt: null,
+					},
+					meta: {
+						requestId: "test-request",
+						timestamp: "2026-06-10T03:00:00Z",
+					},
+					error: null,
+				});
+			}),
+		);
+
+		renderLayout();
+		// The panel mounts for the live leaf.
+		await waitFor(() => {
+			expect(screen.getByText("project-eta")).toBeInTheDocument();
+		});
+
+		// Confirm-gated terminate: × opens the confirm, Destroy fires onTerminate.
+		fireEvent.click(screen.getByRole("button", { name: "Terminate" }));
+		fireEvent.click(screen.getByRole("button", { name: "Destroy" }));
+
+		// The DELETE actually reached the backend (NOT a client-only panel close).
+		await waitFor(() => {
+			expect(destroyedId).toBe("ws-running");
+		});
+
+		// The mosaic leaf is pruned optimistically (last leaf → empty grid).
+		await waitFor(() => {
+			expect(useLayoutStore.getState().mosaicNode).toBeNull();
 		});
 	});
 });

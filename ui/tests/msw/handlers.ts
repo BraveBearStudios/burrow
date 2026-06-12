@@ -156,6 +156,33 @@ export const handlers = [
 		return HttpResponse.json(envelope(created), { status: 201 });
 	}),
 
+	// DELETE /api/v1/workspaces/:id — destroy (stop+destroy CT, soft-delete row).
+	// Mirrors the backend: the destroyed workspace returns with status `destroyed`,
+	// dropping out of the live list the sidebar/grid render (WS-08 / UI-05).
+	http.delete("/api/v1/workspaces/:id", ({ params }) => {
+		const found = seedWorkspaces.find((w) => w.id === params.id);
+		if (!found) {
+			return HttpResponse.json(
+				{
+					data: null,
+					meta: {
+						requestId: "test-request",
+						timestamp: "2026-06-10T00:00:00Z",
+					},
+					error: { code: "not_found", message: "Not found." },
+				},
+				{ status: 404 },
+			);
+		}
+		return HttpResponse.json(
+			envelope({
+				...found,
+				status: "destroyed" as WorkspaceStatus,
+				destroyedAt: "2026-06-10T03:00:00Z",
+			}),
+		);
+	}),
+
 	// GET /api/v1/nodes — per-node capacity (Plan 02-01 backend; UI-04)
 	http.get("/api/v1/nodes", () => HttpResponse.json(envelope(seedNodes))),
 ];
