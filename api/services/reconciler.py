@@ -33,6 +33,7 @@ from compute.provider import ComputeProvider
 from db.provider import DbProvider
 
 from config import Settings
+from lib.errors import IllegalTransitionError
 from services.workspaceService import WorkspaceService, _safe
 
 # Module logger: row-less orphan reaps log here (the events FK needs a live
@@ -144,8 +145,18 @@ class Reconciler:
             if not terminal_events or terminal_events[-1].type != "terminal.disconnected":
                 continue  # active session, or never connected → not idle
             last_disconnect = self._parse(terminal_events[-1].created_at)
-            if self._now() - last_disconnect > window:
+            if self._now() - last_disconnect <= window:
+                continue
+            # WR-02: the running snapshot is taken once, but a workspace can leave
+            # `running` (an operator stop, a destroy) between the snapshot and this
+            # stop — `stopWorkspace` re-reads under its lock and the guard raises
+            # IllegalTransitionError for the now-stopped row. Isolate each stop so
+            # one raced transition does not abort the rest of THIS idle pass (which
+            # would delay auto-stop fleet-wide until the next cadence tick).
+            try:
                 await self.service.stopWorkspace(row.id, reason="idle")
+            except IllegalTransitionError:
+                continue  # raced out of running between snapshot and stop — fine
 
     # ── helpers ────────────────────────────────────────────────────────────
     @staticmethod

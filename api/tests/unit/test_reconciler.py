@@ -31,10 +31,12 @@ import pytest
 
 from compute.fakeProvider import FakeComputeProvider, _FakeContainer
 from db.sqliteProvider import SqliteProvider
+from models.workspace import Workspace
 from services.reconciler import Reconciler
 from services.workspaceService import WorkspaceService
 
 from config import settings as real_settings
+from lib.errors import IllegalTransitionError
 
 # A token shaped like a GitHub PAT — must never appear in a reaper.* event.
 _SECRET = "ghp_supersecrettoken1234567890"
@@ -279,6 +281,52 @@ async def test_idle_running_workspace_is_auto_stopped_with_reason_idle(
     events = await db.getEvents(ws_id)
     stopped = next(e for e in events if e.type == "workspace.stopped")
     assert stopped.data.get("reason") == "idle"
+
+
+# ── WR-02: one raced stop failure does not abort the rest of the idle pass ────
+async def test_idle_stop_isolates_one_raced_transition_and_stops_the_rest(
+    compute: FakeComputeProvider, db: SqliteProvider
+) -> None:
+    """WR-02: a raised IllegalTransitionError on one stop does not skip the rest.
+
+    Two idle running workspaces are picked up in one pass. The FIRST raises
+    IllegalTransitionError on stop (it raced out of `running` between the snapshot
+    and the stop); the reconciler must log-and-continue so the SECOND idle
+    workspace is still stopped this cadence, not deferred to the next tick.
+    """
+    vmid_a = real_settings.worker_pool_start + 14
+    vmid_b = real_settings.worker_pool_start + 15
+    ws_a = await _running_row(db, "idle-a", vmid_a)
+    ws_b = await _running_row(db, "idle-b", vmid_b)
+    for ws_id, vmid, name in ((ws_a, vmid_a, "idle-a"), (ws_b, vmid_b, "idle-b")):
+        compute._containers[vmid] = _FakeContainer(vmid=vmid, name=name, node="pve1", running=True)
+        await db.logEvent(ws_id, "terminal.connected", {})
+        await db.logEvent(ws_id, "terminal.disconnected", {})
+    events_a = await db.getEvents(ws_a)
+    last = next(e for e in reversed(events_a) if e.type == "terminal.disconnected")
+    now = _parse(last.created_at) + timedelta(seconds=real_settings.idle_window_s + 60)
+
+    reconciler = _reconciler(compute, db, now=now)
+    # Make ONLY ws_a's stop raise (the raced transition); ws_b uses the real stop.
+    real_stop = reconciler.service.stopWorkspace
+
+    async def _flaky_stop(workspace_id: str, *, reason: str | None = None) -> Workspace:
+        if workspace_id == ws_a:
+            raise IllegalTransitionError("stopped", "stop")
+        return await real_stop(workspace_id, reason=reason)
+
+    reconciler.service.stopWorkspace = _flaky_stop  # type: ignore[method-assign]
+
+    await reconciler.reconcile_once()
+
+    # ws_a raced out (still running in the DB — its stop never applied), but ws_b
+    # was NOT skipped: the batch survived the one raised transition.
+    updated_b = await db.getWorkspace(ws_b)
+    assert updated_b is not None
+    assert updated_b.status == "stopped"
+    events_b = await db.getEvents(ws_b)
+    stopped_b = next(e for e in events_b if e.type == "workspace.stopped")
+    assert stopped_b.data.get("reason") == "idle"
 
 
 # ── Test 5: connect→disconnect→connect within window is NOT stopped (Pitfall 2) ─
