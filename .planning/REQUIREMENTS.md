@@ -92,7 +92,7 @@ One-time, operator-run bootstrap of the Proxmox host — the prerequisite for ev
 
 - [x] **CAP-01**: Workspace creation is refused when the target node's memory exceeds the capacity threshold
 - [x] **CAP-02**: Idle workspaces (no active terminal connection beyond a configured window) are auto-stopped
-- [ ] **CAP-03**: A reaper reconciles and destroys orphaned LXCs and frees leaked VMIDs (SC-9)
+- [x] **CAP-03**: A reaper reconciles and destroys orphaned LXCs and frees leaked VMIDs (SC-9)
 - [x] **CAP-04**: Operator can select the worker node at create time
 
 ### CI/CD & Supply Chain (CICD)
@@ -196,7 +196,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | WORK-05 | Phase 3 | Complete |
 | CAP-01 | Phase 1 | Complete |
 | CAP-02 | Phase 4 | Complete |
-| CAP-03 | Phase 4 | Pending |
+| CAP-03 | Phase 4 | Complete |
 | CAP-04 | Phase 1 | Complete |
 | CICD-01 | Phase 0 | Complete |
 | CICD-02 | Phase 1 | Complete |

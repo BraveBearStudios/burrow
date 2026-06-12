@@ -180,7 +180,7 @@ Plans:
 
 **Wave 2** *(blocked: 04-01 needs stopWorkspace(reason=) from 04-02; 04-05 needs the Dockerfiles from 04-04)*
 
-- [ ] 04-01-PLAN.md — Reconciler (CAP-02/03): Reconciler.reconcile_once() reaper (orphan + leaked-vmid + timed-out creating, pool-range safety bound) + idle auto-stop (reason=idle, event-log derived) + FastAPI lifespan + unit/lifespan tests + CI wiring
+- [x] 04-01-PLAN.md — Reconciler (CAP-02/03): Reconciler.reconcile_once() reaper (orphan + leaked-vmid + timed-out creating, pool-range safety bound) + idle auto-stop (reason=idle, event-log derived) + FastAPI lifespan + unit/lifespan tests + CI wiring
 - [ ] 04-05-PLAN.md — Release supply-chain (CICD-05): release.yml on v* — build+push GHCR by digest → syft SBOM (SPDX+CycloneDX) → cosign keyless → SLSA provenance, least-priv perms + SHA-pinned actions
 
 **UI hint**: yes
@@ -197,4 +197,4 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
 | 2. Terminal Proxy + React UI | 6/6 | Complete   | 2026-06-10 |
 | 3. Reproducible Workers | 3/3 | Complete   | 2026-06-11 |
-| 4. Hardening & Release | 3/5 | In Progress|  |
+| 4. Hardening & Release | 4/5 | In Progress|  |
