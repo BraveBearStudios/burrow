@@ -94,21 +94,72 @@ test("full journey: create → echo → split/tile → detach→reconnect → te
 		timeout: 20_000,
 	});
 
-	// ── Terminate (confirm-gated) → one panel removed ──────────────────────────
+	// ── Terminate (confirm-gated) → DESTROYS the workspace (WS-08 / UI-05) ──────
+	// This is the load-bearing assertion that guards the milestone BLOCKER: the ×
+	// confirm must issue DELETE /api/v1/workspaces/{id} (stop+destroy the CT, free
+	// the VMID, soft-delete the row) — NOT a client-only panel close. Before
+	// confirming we capture which workspace the active terminate targets, then assert
+	// (a) the DELETE actually fires over the Fake and (b) the workspace is gone from
+	// the BACKEND list afterward. If onTerminate ever reverts to closePanel-only this
+	// case fails on the DELETE wait — it can no longer pass on a mere panel-count drop.
 	await page.getByRole("button", { name: "Terminate" }).first().click();
 	// The confirm copy gates the destroy (UI-SPEC criterion 12) — distinct from detach.
 	const confirmCopy = page.getByText(
 		/Destroy .+\? The container and its session/,
 	);
 	await expect(confirmCopy).toBeVisible();
-	// Cancel keeps the panel.
+	// Cancel keeps the panel — and must NOT have destroyed anything (no DELETE fired).
 	await page.getByRole("button", { name: "Cancel" }).click();
 	await expect(page.locator('[data-testid^="term-"]')).toHaveCount(2);
 
-	// Re-open the confirm and Destroy: the panel is removed (one terminal left).
+	// Snapshot the live backend list BEFORE the destroy so we can prove a row left it.
+	const beforeIds = await listWorkspaceIds(page);
+	expect(beforeIds.length).toBeGreaterThanOrEqual(2);
+
+	// Re-open the confirm and Destroy. Wait for the actual DELETE request/response —
+	// this is the assertion the masking test lacked (it only checked panel count).
 	await page.getByRole("button", { name: "Terminate" }).first().click();
-	await page.getByRole("button", { name: "Destroy" }).click();
+	const [deleteResponse] = await Promise.all([
+		page.waitForResponse(
+			(res) =>
+				/\/api\/v1\/workspaces\/[^/]+$/.test(new URL(res.url()).pathname) &&
+				res.request().method() === "DELETE",
+			{ timeout: 15_000 },
+		),
+		page.getByRole("button", { name: "Destroy" }).click(),
+	]);
+	expect(deleteResponse.ok()).toBe(true);
+
+	// The destroyed workspace's id, pulled from the DELETE request path.
+	const destroyedId = new URL(deleteResponse.url()).pathname.split("/").pop();
+	expect(destroyedId).toBeTruthy();
+
+	// The panel is removed (optimistic prune): one terminal left in the grid.
 	await expect(page.locator('[data-testid^="term-"]')).toHaveCount(1, {
 		timeout: 10_000,
 	});
+
+	// BACKEND STATE: the destroyed workspace no longer appears in the live list the
+	// control plane serves — the row is gone for good over the Fake, not just hidden
+	// client-side. This is what the closePanel-only regression silently broke.
+	await expect
+		.poll(
+			async () => (await listWorkspaceIds(page)).includes(destroyedId ?? ""),
+			{
+				timeout: 15_000,
+			},
+		)
+		.toBe(false);
 });
+
+/**
+ * Read the ids the control-plane list endpoint serves (the live, non-destroyed set
+ * the UI polls). Used to prove a terminate actually removed the row server-side, not
+ * just from the client mosaic.
+ */
+async function listWorkspaceIds(page: Page): Promise<string[]> {
+	const res = await page.request.get("/api/v1/workspaces");
+	expect(res.ok()).toBe(true);
+	const body = (await res.json()) as { data: Array<{ id: string }> };
+	return body.data.map((w) => w.id);
+}
