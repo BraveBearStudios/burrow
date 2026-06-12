@@ -37,7 +37,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 1: Control Plane API** - The create saga, state machine, real SQLite + Proxmox providers, `/api/v1` envelope, `/health`, structured logs, security headers, test pyramid (all 5 plans complete; ready for phase verification)
 - [x] **Phase 2: Terminal Proxy + React UI** - ttyd-subprotocol WS bridge, xterm.js, react-mosaic tiling, reconnect overlay, sidebar, new-workspace modal, status bar, restore-after-refresh (completed 2026-06-10)
 - [x] **Phase 3: Reproducible Workers** - Manifest-driven plugin/CLAUDE.md pull, hardened `burrow-boot.sh`, secret-safe boot config injection (completed 2026-06-11)
-- [ ] **Phase 4: Hardening & Release** - Orphan reaper, auto-stop idle, capacity tuning, event-log drawer, and the supply-chain release path (scan/SBOM/sign/provenance/GHCR)
+- [x] **Phase 4: Hardening & Release** - Orphan reaper, auto-stop idle, capacity tuning, event-log drawer, and the supply-chain release path (scan/SBOM/sign/provenance/GHCR) (completed 2026-06-12)
 
 ## Phase Details
 
@@ -181,7 +181,7 @@ Plans:
 **Wave 2** *(blocked: 04-01 needs stopWorkspace(reason=) from 04-02; 04-05 needs the Dockerfiles from 04-04)*
 
 - [x] 04-01-PLAN.md — Reconciler (CAP-02/03): Reconciler.reconcile_once() reaper (orphan + leaked-vmid + timed-out creating, pool-range safety bound) + idle auto-stop (reason=idle, event-log derived) + FastAPI lifespan + unit/lifespan tests + CI wiring
-- [ ] 04-05-PLAN.md — Release supply-chain (CICD-05): release.yml on v* — build+push GHCR by digest → syft SBOM (SPDX+CycloneDX) → cosign keyless → SLSA provenance, least-priv perms + SHA-pinned actions
+- [x] 04-05-PLAN.md — Release supply-chain (CICD-05): release.yml on v* — build+push GHCR by digest → syft SBOM (SPDX+CycloneDX) → cosign keyless → SLSA provenance, least-priv perms + SHA-pinned actions
 
 **UI hint**: yes
 **Infra note**: The reaper, auto-stop, and capacity-under-concurrency behaviors are only meaningful against real workspaces on real Proxmox — their true acceptance is the dev-homelab smoke gate (the "Looks Done But Isn't" checklist), not CI. The supply-chain gates (CICD-04/05) are fully CI-verifiable.
@@ -197,4 +197,4 @@ Phases execute in numeric order: 0 → 1 → 2 → 3 → 4
 | 1. Control Plane API | 5/5 | Complete   | 2026-06-10 |
 | 2. Terminal Proxy + React UI | 6/6 | Complete   | 2026-06-10 |
 | 3. Reproducible Workers | 3/3 | Complete   | 2026-06-11 |
-| 4. Hardening & Release | 4/5 | In Progress|  |
+| 4. Hardening & Release | 5/5 | Complete   | 2026-06-12 |
