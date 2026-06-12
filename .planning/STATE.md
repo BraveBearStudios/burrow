@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: executing
-stopped_at: "Completed 04-05-PLAN.md — release supply-chain workflow (CICD-05), the LAST Phase-4 / milestone plan. New .github/workflows/release.yml on v* tag / release published: a publish job with EXACTLY contents:read + packages:write + id-token:write + attestations:write (workflow default stays contents:read) over a two-image matrix (burrow-api/Dockerfile.api, burrow-ui/Dockerfile.ui). build-push push:true exposes the immutable steps.build.outputs.digest; every downstream step targets @<digest> — syft SBOM twice (SPDX + CycloneDX), cosign sign KEYLESS (no --key, Sigstore + GitHub OIDC), actions/attest-build-provenance subject-digest + push-to-registry (SLSA). GHCR target via github.repository_owner + GITHUB_TOKEN (no PAT/hardcoded org). All 5 new actions pinned to REAL resolved commit SHAs (login 5e57cd1, metadata 318604b, sbom d8a2c01, cosign-installer d7543c9, attest 977bb37) — NO PIN_AT_WRITE placeholders; checkout/setup-buildx/build-push reuse ci.yml pins. Verify runbook (cosign verify / gh attestation verify) documented in the workflow trailer. Commit fd58d5e. ci.yml untouched; YAML parses; reuse 272/272; api suite 166 passed (non-regression); ruff format clean. actionlint absent on host (YAML validated via python yaml.safe_load); the real GHCR push + cosign verify against a published digest is the CD/human authority, NOT PR-CI."
-last_updated: "2026-06-12T00:24:00.000Z"
-last_activity: 2026-06-12
+status: Awaiting next milestone
+stopped_at: "Completed 04-05-PLAN.md — release supply-chain workflow (CICD-05), the LAST Phase-4 / milestone plan. New .github/workflows/release.yml on v* tag / release published: a publish job (EXACTLY contents:read + packages:write + id-token:write + attestations:write) over a two-image matrix; build-push push:true → immutable digest; syft SBOM ×2 (SPDX + CycloneDX), cosign keyless sign, attest-build-provenance — all @<digest>. GHCR via github.repository_owner + GITHUB_TOKEN. All 5 new actions pinned to REAL commit SHAs (NO PIN_AT_WRITE). Verify runbook in the trailer. Commit fd58d5e. ci.yml untouched; YAML parses; reuse 272/272; api suite 166 passed; ruff format clean."
+last_updated: "2026-06-12T01:57:25.720Z"
+last_activity: 2026-06-12 — Milestone v1.0 completed and archived
 progress:
   total_phases: 5
   completed_phases: 5
@@ -30,12 +30,10 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 ## Current Position
 
-Phase: 4 (Hardening & Release) — COMPLETE
-Plan: 04-05 complete (all Phase-4 plans done; milestone v1.0 plan-complete)
-Status: Phase 4 complete — all 5 plans landed
-Last activity: 2026-06-12 -- Completed 04-05-PLAN.md (release.yml supply-chain: SBOM + cosign keyless + SLSA provenance -> GHCR, CICD-05)
-
-Progress: [██████████] 100% (26/26 plans; Phase 4: 5/5 plans complete)
+Phase: Milestone v1.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-12 — Milestone v1.0 completed and archived
 
 ## Performance Metrics
 
@@ -180,11 +178,19 @@ None yet.
 
 ## Deferred Items
 
-Items acknowledged and carried forward from previous milestone close:
+Items acknowledged and deferred at the v1.0 milestone close on 2026-06-11 (all by-design
+real-infra acceptances — CI never touches real Proxmox; see v1.0-MILESTONE-AUDIT.md tech_debt
+and each phase's *-HUMAN-UAT.md):
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| *(none)* | | | |
+| uat_gap | Phase 03 — 03-HUMAN-UAT.md (real worker boot + plugin load smoke) | deferred | 2026-06-11 |
+| uat_gap | Phase 04 — 04-HUMAN-UAT.md (real reaper/auto-stop/capacity + GHCR publish/cosign verify) | deferred | 2026-06-11 |
+| verification_gap | Phase 01 — 01-VERIFICATION.md (human_needed; CI-provable saga passed, real Proxmox = smoke) | deferred | 2026-06-11 |
+| verification_gap | Phases 00/02/04 — human_needed (CI-provable contracts passed; real-infra = dev-homelab smoke) | deferred | 2026-06-11 |
+| coverage | WS-06 / WS-07 — stop/start endpoints + UI hooks exist, no UI surface (confirm v1 intent) | deferred | 2026-06-11 |
+| ui_polish | Activity drawer responsive width + focus-ring/scrollbar (04-UI-REVIEW 22/24) | deferred | 2026-06-11 |
+| tooling | CI reuse-lint encoding dep (uvx --with charset-normalizer); SPDX-comment vs phase-plan-index parser | deferred | 2026-06-11 |
 
 ## Session Continuity
 
@@ -192,3 +198,7 @@ Last session: 2026-06-12T00:24:00.000Z
 Stopped at: Completed 04-05-PLAN.md — release supply-chain workflow (CICD-05), the LAST Phase-4 / milestone plan. New .github/workflows/release.yml on v* tag / release published: a publish job (EXACTLY contents:read + packages:write + id-token:write + attestations:write) over a two-image matrix; build-push push:true → immutable digest; syft SBOM ×2 (SPDX + CycloneDX), cosign keyless sign, attest-build-provenance — all @<digest>. GHCR via github.repository_owner + GITHUB_TOKEN. All 5 new actions pinned to REAL commit SHAs (NO PIN_AT_WRITE). Verify runbook in the trailer. Commit fd58d5e. ci.yml untouched; YAML parses; reuse 272/272; api suite 166 passed; ruff format clean.
 Resume file: None
 Next plan: Phase 4 is COMPLETE (5/5: 04-01 reconciler, 04-02 capacity-race, 04-03 drawer, 04-04 images+scan, 04-05 release.yml). Milestone v1.0 is plan-complete (26/26). Remaining authority is CD/human + dev-homelab smoke, NOT PR-CI: (1) 04-05 — a real v* tag + GHCR push + cosign verify / gh attestation verify against the published digest (Manual-Only in 04-VALIDATION); (2) 04-04 — the build-scan job's first CI run (Docker absent on the Windows host); (3) 04-01/02 — real-Proxmox reaper/auto-stop/capacity acceptance (the Fake tests are the CI proof). actionlint was unavailable on this host → release.yml validated via python yaml.safe_load; the first CI run is the structural authority.
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd:new-milestone

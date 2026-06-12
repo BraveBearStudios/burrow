@@ -29,29 +29,33 @@ getting a live, interactive Claude Code terminal in the browser* must work.
 
 ### Validated
 
-<!-- Shipped and confirmed valuable. -->
+<!-- Shipped and confirmed valuable. CI-provable contracts proven green over the Fake
+provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by design. -->
 
-(None yet — greenfield. No application code exists; the repo is spec + scaffolding.
-Active requirements are hypotheses until shipped and validated.)
+- ✓ Browser UI lists all workspaces with live status (creating / running / stopped / error) — v1.0
+- ✓ Operator creates a workspace from a git repo + branch (clone golden LXC, boot, wait for health) — v1.0 ★ real boot = homelab smoke
+- ✓ Tiling multi-panel terminal UI (xterm.js + react-mosaic): open, split, drag, resize — v1.0
+- ✓ Live terminal streaming via WebSocket proxy bridging the browser to ttyd — v1.0 ★ real ttyd = homelab smoke
+- ✓ Terminal auto-reconnects on transient disconnect, with a reconnecting overlay — v1.0
+- ✓ Operator can stop, start, and destroy a workspace; state machine enforced — v1.0 (destroy wired to the terminate action during the v1.0 audit; explicit stop/start UI is backend-ready but unsurfaced — see Active)
+- ✓ Per-workspace event log + a slide-in activity drawer surfacing it — v1.0
+- ✓ Capacity guard refuses creation over the node-RAM threshold; atomic check+reserve closes the concurrency overcommit race — v1.0 ★ under-real-load = homelab smoke
+- ✓ Workers are reproducible: CLAUDE.md + a ref-pinned plugin manifest pulled fresh at boot, no credentials left behind — v1.0 ★ real boot = homelab smoke
+- ✓ Golden template LXC + worker boot pipeline (`provision-template.sh`, `burrow-boot.sh`) — v1.0 ★ real provision/boot = homelab smoke
+- ✓ `DbProvider` / `ComputeProvider` seams kept abstract (hosted path additive) — v1.0 (seam-leakage test enforced)
+- ✓ Standard `data`/`meta`/`error` envelope on every `/api/v1` route; structured JSON logging; security headers — v1.0
+- ✓ CI/CD: static gates → tiered tests → build → image scan → SBOM → sign → SLSA provenance → GHCR — v1.0 ★ real GHCR publish + cosign/attestation verify = CD
+- ✓ Auto-stop idle workspaces (in-process reconciler) + restore/reconnect terminal after refresh — v1.0 ★ real idle window = homelab smoke
+- ✓ Orphan reaper reconciles desired vs actual (destroys row-less pool CTs on their actual node, frees leaked VMIDs, fails timed-out `creating` rows) — v1.0 ★ real orphan = homelab smoke
 
 ### Active
 
-<!-- Current scope. Building toward these. Detailed REQ-IDs live in REQUIREMENTS.md. -->
+<!-- v1.1 candidates — the tech-debt carried out of the v1.0 close-out audit. -->
 
-- [ ] Browser UI lists all workspaces with live status (creating / running / stopped / error)
-- [ ] Operator can create a workspace from a git repo + branch (clone golden LXC, boot, wait for Claude/ttyd health)
-- [ ] Tiling multi-panel terminal UI (xterm.js + react-mosaic): open, split (H/V), drag, resize panels
-- [ ] Live terminal streaming via WebSocket proxy bridging the browser to ttyd in the worker LXC
-- [ ] Terminal auto-reconnects on transient disconnect, with a visible reconnecting overlay
-- [ ] Operator can stop, start, and destroy a workspace; state machine enforced (creating→running→stopped/destroyed/error)
-- [ ] Per-workspace event log (created/started/stopped/destroyed/terminal connect+disconnect/boot error)
-- [ ] Capacity guard: refuse workspace creation when the target node's RAM exceeds threshold
-- [ ] Workers are reproducible: CLAUDE.md + plugin manifest pulled fresh from cc-worker-config on boot
-- [ ] Golden template LXC + worker boot pipeline (`provision-template.sh`, `burrow-boot.sh`) defined and reproducible
-- [ ] `DbProvider` and `ComputeProvider` seams kept abstract so a hosted path is additive, never a rewrite
-- [ ] Standard API envelope (`data`/`meta`/`error`) on every `/api/v1` route; structured JSON backend logging; security headers
-- [ ] CI/CD pipeline: static gates → tiered tests → build → image scan → SBOM → sign → GHCR publish
-- [ ] Auto-stop idle workspaces; restore/reconnect terminal after browser refresh while workspace still running
+- [ ] Surface explicit stop/start in the UI (WS-06/WS-07 endpoints + hooks exist; no button) — confirm whether operator stop/start is intentionally reaper-only in v1
+- [ ] Activity-drawer polish: phone full-width responsive sheet + restore the `--accent-line` focus ring / custom scrollbar (04-UI-REVIEW 22/24)
+- [ ] CI robustness: pin the reuse-lint encoding dep (`uvx --with charset-normalizer`); reconcile the SPDX-comment-before-frontmatter convention with the gsd-sdk `phase-plan-index` parser
+- [ ] Run and record the dev-homelab smoke + first CI release (flip the ★ items above + the per-phase `*-HUMAN-UAT.md` checklists to passed)
 
 ### Out of Scope
 
@@ -66,11 +70,16 @@ Active requirements are hypotheses until shipped and validated.)
 
 ## Context
 
-- **Repo state:** greenfield. The repo currently holds a full specification
-  (`docs/tech-spec.md`, `docs/ci-cd-and-testing.md`), governance docs (CLA, DCO,
-  SECURITY, CONTRIBUTING, LICENSE/NOTICE), a UI design handoff under `design/`, and
-  the project `CLAUDE.md`. No `api/` or `ui/` application code exists yet. The
-  kickoff job is to implement the spec, not invent a different design.
+- **Repo state (post-v1.0):** the spec is implemented. `api/` is a FastAPI control plane
+  (create saga, state machine, both providers behind the seams, bootconfig endpoint, the
+  in-process reconciler/reaper, capacity lock) with a hermetic pytest pyramid (173 tests over
+  the Fake provider). `ui/` is a Vite + React 19 + xterm + react-mosaic app (tiling terminals,
+  reconnect/restore, activity drawer) with vitest (97) + Playwright e2e. `cc-worker-config/`
+  carries the host-prime kit + the worker template (`provision-template.sh`, `burrow-boot.sh`,
+  plugin manifest + schema). `Dockerfile.api`/`Dockerfile.ui` + `ci.yml` (build/scan) + a
+  `release.yml` supply-chain path complete the release surface. REUSE-compliant (275/275).
+  **Real-Proxmox / real-GHCR acceptance remains the dev-homelab smoke + first CI run** — see
+  the per-phase `*-HUMAN-UAT.md` and `milestones/v1.0-MILESTONE-AUDIT.md`.
 - **Two repos:** `burrow` (this repo — control plane API + UI + CI) and a separate
   `cc-worker-config` (worker golden-template spec, plugin manifest, master CLAUDE.md,
   systemd/nginx). Worker reproducibility depends on the second repo.
@@ -138,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-09 after initialization + Proxmox priming gap analysis*
+*Last updated: 2026-06-11 after the v1.0 MVP milestone (Phases 0-4 shipped; CI-provable contracts green, real-infra acceptance deferred to the dev-homelab smoke).*
