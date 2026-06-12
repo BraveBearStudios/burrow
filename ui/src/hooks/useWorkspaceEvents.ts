@@ -27,7 +27,13 @@ export function useWorkspaceEvents(id: string | null, enabled: boolean) {
 	return useQuery({
 		queryKey: [WORKSPACE_EVENTS_KEY, id],
 		queryFn: () => api<WorkspaceEvent[]>(`/workspaces/${id}/events`),
-		refetchInterval: POLL_INTERVAL_MS,
+		// WR-04: stop polling once the query is in an error state (e.g. the
+		// workspace was destroyed and the events endpoint now 404s). A static 3s
+		// interval kept hammering a permanently-gone workspace for as long as the
+		// drawer stayed open; the function form backs off on error and keeps the
+		// live tempo only while the query is healthy.
+		refetchInterval: (query) =>
+			query.state.status === "error" ? false : POLL_INTERVAL_MS,
 		enabled: enabled && !!id,
 	});
 }
