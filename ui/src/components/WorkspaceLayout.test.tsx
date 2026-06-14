@@ -244,7 +244,11 @@ describe("WorkspaceLayout — stop/start mutation wiring (UI-07 / UI-08)", () =>
 			expect(screen.getByText("project-iota")).toBeInTheDocument();
 		});
 
-		fireEvent.click(screen.getByRole("button", { name: "Start workspace" }));
+		// A stopped panel renders two Start affordances (header button + placeholder
+		// CTA, both "Start workspace"); click the first — getByRole throws on 2.
+		fireEvent.click(
+			screen.getAllByRole("button", { name: "Start workspace" })[0],
+		);
 
 		await waitFor(() => {
 			expect(startedId).toBe("ws-stopped");

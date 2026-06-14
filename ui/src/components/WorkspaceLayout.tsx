@@ -18,7 +18,12 @@ import { useEffect, useMemo } from "react";
 import type { MosaicNode } from "react-mosaic-component";
 import { Mosaic } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
-import { useDestroyWorkspace, useWorkspaces } from "../hooks/useWorkspaces";
+import {
+	useDestroyWorkspace,
+	useStartWorkspace,
+	useStopWorkspace,
+	useWorkspaces,
+} from "../hooks/useWorkspaces";
 import { useLayoutStore } from "../store/layoutStore";
 import type { Workspace } from "../types/workspace";
 import { TerminalPanel } from "./TerminalPanel";
@@ -55,6 +60,8 @@ function LeafPanel({ id, workspace }: { id: string; workspace?: Workspace }) {
 	const closePanel = useLayoutStore((s) => s.closePanel);
 	const splitPanel = useLayoutStore((s) => s.splitPanel);
 	const destroyWorkspace = useDestroyWorkspace();
+	const stopWorkspace = useStopWorkspace();
+	const startWorkspace = useStartWorkspace();
 	const isActive = activeWorkspaceId === id;
 
 	// Terminate = DESTROY the workspace (WS-08 / UI-05), not a client-only panel
@@ -73,6 +80,26 @@ function LeafPanel({ id, workspace }: { id: string; workspace?: Workspace }) {
 			},
 		});
 		closePanel(panelId);
+	};
+
+	// Stop (WS-06) / Start (WS-07) are lifecycle transitions, NOT a panel close:
+	// they mirror onTerminate's mutate+onError shape but never closePanel — the
+	// panel stays mounted while the ~3s useWorkspaces poll (onSettled invalidation)
+	// reconciles the real server status, swapping the header control + the body.
+	const onStop = (panelId: string) => {
+		stopWorkspace.mutate(panelId, {
+			onError: (error) => {
+				console.error(`Failed to stop workspace ${panelId}:`, error);
+			},
+		});
+	};
+
+	const onStart = (panelId: string) => {
+		startWorkspace.mutate(panelId, {
+			onError: (error) => {
+				console.error(`Failed to start workspace ${panelId}:`, error);
+			},
+		});
 	};
 
 	return (
@@ -100,6 +127,10 @@ function LeafPanel({ id, workspace }: { id: string; workspace?: Workspace }) {
 				branch={workspace?.projectBranch}
 				onSplit={(panelId) => splitPanel(panelId, "row")}
 				onTerminate={onTerminate}
+				onStop={onStop}
+				onStart={onStart}
+				stopPending={stopWorkspace.isPending}
+				startPending={startWorkspace.isPending}
 			/>
 		</div>
 	);
