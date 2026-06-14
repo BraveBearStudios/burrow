@@ -4,14 +4,14 @@ milestone: v1.1
 milestone_name: UI Polish + Stop/Start Controls
 status: executing
 stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-06-14T06:09:01.309Z"
+last_updated: "2026-06-14T06:39:51.853Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 2
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 50
 ---
 
 <!--
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: 5 (Stop/Start Controls + Drawer Polish) — EXECUTING
-Plan: 4 of 4
+Phase: 6
+Plan: Not started
 Status: Ready to execute
 Last activity: 2026-06-14
 
@@ -47,7 +47,7 @@ scope is CI-provable over the Fake provider — no real-Proxmox path this milest
 
 **Velocity:**
 
-- Total plans completed: 22
+- Total plans completed: 26
 - Average duration: 16 min
 - Total execution time: 3.50 hours
 
@@ -57,6 +57,7 @@ scope is CI-provable over the Fake provider — no real-Proxmox path this milest
 |-------|-------|-------|----------|
 | 0 | 7 | 137 min | 20 min |
 | 1 | 5 | 75 min | 15 min |
+| 5 | 4 | - | - |
 
 **Per-plan:**
 

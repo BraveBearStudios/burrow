@@ -123,5 +123,5 @@ Phases execute in numeric order: 5 → 6 (Phase 6 has no dependency on Phase 5 a
 | 2. Terminal Proxy + React UI | v1.0 | 6/6 | Complete | 2026-06-10 |
 | 3. Reproducible Workers | v1.0 | 3/3 | Complete | 2026-06-11 |
 | 4. Hardening & Release | v1.0 | 5/5 | Complete | 2026-06-11 |
-| 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete   | 2026-06-14 |
+| 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete    | 2026-06-14 |
 | 6. CI / Tooling Robustness | v1.1 | 0/? | Not started | - |
