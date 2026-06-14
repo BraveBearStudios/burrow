@@ -181,6 +181,18 @@ describe("ActivityDrawer — badge map + emphasis (criteria 3, 4)", () => {
 	});
 });
 
+describe("ActivityDrawer — responsive width token (UI-09 / V2)", () => {
+	// FAILING-FIRST (Wave 0): Plan 03 swaps the hardcoded `min(360px,100vw)`
+	// literal for the `--w-drawer` token (whose @media override makes the phone
+	// full-width sheet real). jsdom cannot COMPUTE the width, but the inline
+	// `.style.width` value IS readable — assert the token is wired. RED until then.
+	it("reads width: var(--w-drawer) on the drawer <aside>", async () => {
+		renderDrawer();
+		const dialog = await screen.findByRole("dialog");
+		expect(dialog.style.width).toBe("var(--w-drawer)");
+	});
+});
+
 describe("ActivityDrawer — poll gating (criterion 5)", () => {
 	it("makes no request while closed (workspaceId null → enabled false)", async () => {
 		const hit = vi.fn();
