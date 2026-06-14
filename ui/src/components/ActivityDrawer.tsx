@@ -36,9 +36,6 @@ const EMPTY_BODY =
 	"Events appear here as this workspace boots, connects, and stops.";
 const POLL_ERROR = "Couldn't load the event log. Retrying…";
 
-/** Drawer width: 360px desktop, min(360px,80vw) tablet, 100vw phone (criterion 10). */
-const DRAWER_WIDTH = "min(360px, 100vw)";
-
 const ICON = {
 	stroke: "currentColor",
 	strokeWidth: 1.5,
@@ -80,7 +77,9 @@ const drawerStyle: React.CSSProperties = {
 	top: 0,
 	right: 0,
 	bottom: 0,
-	width: DRAWER_WIDTH,
+	// Width is token-driven: --w-drawer is min(360px, 100vw) by default and 100vw
+	// under @media (max-width: 375px), so the phone full-width sheet ships (UI-09).
+	width: "var(--w-drawer)",
 	display: "flex",
 	flexDirection: "column",
 	background: "var(--bg-surf)",

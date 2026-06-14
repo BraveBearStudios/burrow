@@ -50,6 +50,7 @@
 	--w-sidebar: 228px;
 	--h-panel-header: 36px;
 	--w-modal: 400px;
+	--w-drawer: min(360px, 100vw);
 	--h-input: 36px;
 	--sz-status-dot: 7px;
 	--sz-avatar: 30px;
@@ -268,5 +269,18 @@
 		animation-duration: 0.001ms !important;
 		animation-iteration-count: 1 !important;
 		transition-duration: 0.001ms !important;
+	}
+}
+
+/*
+ * Responsive drawer width (UI-09 / V2). The --w-drawer token defaults to
+ * min(360px, 100vw) (declared in @theme); on a phone-width viewport (≤375px) it
+ * goes full-width. An @theme block is NOT nestable under @media (Tailwind v4,
+ * RESEARCH Pitfall 6), so the override re-declares the custom property on :root
+ * in plain CSS. 375px is the locked phone breakpoint.
+ */
+@media (max-width: 375px) {
+	:root {
+		--w-drawer: 100vw;
 	}
 }
