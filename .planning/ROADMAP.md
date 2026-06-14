@@ -79,7 +79,21 @@ cosign/attestation verify. Tracked per-phase in `*-HUMAN-UAT.md` and in the clos
   4. On a phone-width viewport (≤375px) the activity drawer renders as a full-width sheet instead of the fixed 360px panel, and reverts to the 360px panel above that breakpoint (V2 responsive-gap finding).
   5. Keyboard-focusing any interactive control shows the `--accent-line` focus ring (V3) and scrollable drawer/terminal-adjacent surfaces use the custom Burrow scrollbar styling instead of the native one (V4) — both honoring `design/Burrow-handoff/` + `docs/design/` tokens across all four themes.
 
-**Plans**: TBD
+**Plans**: 4 plans (3 waves)
+Plans:
+**Wave 1**
+
+- [ ] 05-01-PLAN.md — Wave 0 test infra: MSW stop/start handlers + failing-first UI-07..UI-11 tests + e2e scaffold
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-02-PLAN.md — Stop/Start controls + stopped placeholder + LeafPanel wiring (UI-07, UI-08)
+- [ ] 05-03-PLAN.md — Drawer polish CSS: --w-drawer responsive token, :focus-visible ring, custom scrollbar (UI-09, UI-10, UI-11)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 05-04-PLAN.md — Playwright e2e phase gate: stop->start round-trip + 375px drawer + live focus-ring/scrollbar
+
 **UI hint**: yes
 **Scope note**: All five criteria are CI-provable over the Fake provider (vitest + Playwright + MSW) — the stop/start saga, status transitions, and terminal disconnect/reconnect all run against `BURROW_COMPUTE=fake` + the protocol-accurate stub ttyd already in the harness. No real Proxmox is touched. Every changed source file carries the SPDX header; tests land with the change.
 
@@ -109,5 +123,5 @@ Phases execute in numeric order: 5 → 6 (Phase 6 has no dependency on Phase 5 a
 | 2. Terminal Proxy + React UI | v1.0 | 6/6 | Complete | 2026-06-10 |
 | 3. Reproducible Workers | v1.0 | 3/3 | Complete | 2026-06-11 |
 | 4. Hardening & Release | v1.0 | 5/5 | Complete | 2026-06-11 |
-| 5. Stop/Start Controls + Drawer Polish | v1.1 | 0/? | Not started | - |
+| 5. Stop/Start Controls + Drawer Polish | v1.1 | 0/4 | Planned | - |
 | 6. CI / Tooling Robustness | v1.1 | 0/? | Not started | - |

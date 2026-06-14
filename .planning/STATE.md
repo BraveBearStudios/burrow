@@ -2,13 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Polish + Stop/Start Controls
-status: roadmapped
-last_updated: "2026-06-14T00:29:41.243Z"
-last_activity: 2026-06-14
+status: executing
+stopped_at: Phase 5 UI-SPEC approved
+last_updated: "2026-06-14T05:17:19.575Z"
+last_activity: 2026-06-14 -- Phase 5 planning complete
 progress:
   total_phases: 2
   completed_phases: 0
-  total_plans: 0
+  total_plans: 4
   completed_plans: 0
   percent: 0
 ---
@@ -31,8 +32,8 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 Phase: Phase 5 — Stop/Start Controls + Drawer Polish (not started)
 Plan: —
-Status: Roadmapped — awaiting phase planning
-Last activity: 2026-06-14 — v1.1 roadmap created (Phases 5-6; 7/7 requirements mapped)
+Status: Ready to execute
+Last activity: 2026-06-14 -- Phase 5 planning complete
 
 **v1.1 phase map:**
 
@@ -204,9 +205,9 @@ and each phase's *-HUMAN-UAT.md). The last three rows are now CLAIMED by v1.1:
 
 ## Session Continuity
 
-Last session: 2026-06-14
-Stopped at: Created the v1.1 roadmap. Two phases continuing the numbering from v1.0 (which ended at Phase 4): Phase 5 — Stop/Start Controls + Drawer Polish (UI-07..UI-11, frontend, depends on the v1.0 control plane + UI) and Phase 6 — CI / Tooling Robustness (CICD-07/CICD-08, CI workflow + tooling/docs, independent of Phase 5). All 7 v1.1 requirements mapped (0 unmapped). Every criterion is CI-provable over the Fake provider; the v1.0 acceptance debt (ACC-01/02/03) is excluded by design. Wrote .planning/ROADMAP.md (appended v1.1 phases + progress rows, preserved the v1.0 shipped section), .planning/REQUIREMENTS.md (Traceability filled), and this STATE.md.
-Resume file: None
+Last session: 2026-06-14T04:52:34.441Z
+Stopped at: Phase 5 UI-SPEC approved
+Resume file: .planning/phases/05-stop-start-controls-drawer-polish/05-UI-SPEC.md
 Next plan: Plan Phase 5 with `/gsd:plan-phase 5` (Stop/Start Controls + Drawer Polish). Phase 6 (CI/tooling) has no dependency on Phase 5 and may be planned in parallel.
 
 ## Operator Next Steps
