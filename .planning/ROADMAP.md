@@ -61,7 +61,7 @@ cosign/attestation verify. Tracked per-phase in `*-HUMAN-UAT.md` and in the clos
 
 ### v1.1 UI Polish + Stop/Start Controls (Phases 5-6)
 
-- [ ] **Phase 5: Stop/Start Controls + Drawer Polish** - Surface the backend-ready stop/start lifecycle as explicit, state-machine-gated UI controls and restore the three drawer-polish details (responsive sheet, focus ring, custom scrollbar)
+- [x] **Phase 5: Stop/Start Controls + Drawer Polish** - Surface the backend-ready stop/start lifecycle as explicit, state-machine-gated UI controls and restore the three drawer-polish details (responsive sheet, focus ring, custom scrollbar) (completed 2026-06-14)
 - [ ] **Phase 6: CI / Tooling Robustness** - Pin the `reuse` encoding dependency and reconcile the SPDX-header-before-frontmatter convention with the gsd-sdk `phase-plan-index` parser
 
 ## Phase Details
@@ -92,7 +92,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 05-04-PLAN.md — Playwright e2e phase gate: stop->start round-trip + 375px drawer + live focus-ring/scrollbar
+- [x] 05-04-PLAN.md — Playwright e2e phase gate: stop->start round-trip + 375px drawer + live focus-ring/scrollbar
 
 **UI hint**: yes
 **Scope note**: All five criteria are CI-provable over the Fake provider (vitest + Playwright + MSW) — the stop/start saga, status transitions, and terminal disconnect/reconnect all run against `BURROW_COMPUTE=fake` + the protocol-accurate stub ttyd already in the harness. No real Proxmox is touched. Every changed source file carries the SPDX header; tests land with the change.
@@ -123,5 +123,5 @@ Phases execute in numeric order: 5 → 6 (Phase 6 has no dependency on Phase 5 a
 | 2. Terminal Proxy + React UI | v1.0 | 6/6 | Complete | 2026-06-10 |
 | 3. Reproducible Workers | v1.0 | 3/3 | Complete | 2026-06-11 |
 | 4. Hardening & Release | v1.0 | 5/5 | Complete | 2026-06-11 |
-| 5. Stop/Start Controls + Drawer Polish | v1.1 | 3/4 | In Progress|  |
+| 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete   | 2026-06-14 |
 | 6. CI / Tooling Robustness | v1.1 | 0/? | Not started | - |
