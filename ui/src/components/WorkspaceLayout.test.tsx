@@ -139,6 +139,122 @@ describe("WorkspaceLayout — terminate destroys the workspace (WS-08 / UI-05)",
 	});
 });
 
+describe("WorkspaceLayout — stop/start mutation wiring (UI-07 / UI-08)", () => {
+	// FAILING-FIRST (Wave 0): these reference the `Stop workspace` / `Start
+	// workspace` controls Plan 02 adds to TerminalPanel. They are RED until then —
+	// the expected Wave 0 state. The MSW stop/start handlers (Wave 0, this plan)
+	// resolve the mutation so the test fails on the missing button, NOT on an
+	// onUnhandledRequest error.
+	it("Stop issues POST /api/v1/workspaces/{id}/stop and keeps the panel mounted", async () => {
+		// A single open panel for a live, running workspace from the MSW seed.
+		useLayoutStore.setState({
+			mosaicNode: "ws-running",
+			activeWorkspaceId: "ws-running",
+		});
+
+		// Spy the POST /stop: record the id so we can assert the mutation actually
+		// reached the backend (mirrors the `Destroy issues DELETE` spy). Unlike
+		// terminate, stop must NOT prune the panel — the poll reconciles the status.
+		let stoppedId: string | null = null;
+		server.use(
+			http.post("/api/v1/workspaces/:id/stop", ({ params }) => {
+				stoppedId = params.id as string;
+				return HttpResponse.json({
+					data: {
+						id: params.id,
+						name: "project-eta",
+						status: "stopped",
+						vmid: 101,
+						node: "node1",
+						lxcIp: "10.99.0.101",
+						projectRepo: "github.com/acme/eta",
+						projectBranch: "main",
+						pluginSet: "default",
+						createdAt: "2026-06-10T00:00:00Z",
+						stoppedAt: "2026-06-10T04:00:00Z",
+						destroyedAt: null,
+						deletedAt: null,
+					},
+					meta: {
+						requestId: "test-request",
+						timestamp: "2026-06-10T04:00:00Z",
+					},
+					error: null,
+				});
+			}),
+		);
+
+		renderLayout();
+		await waitFor(() => {
+			expect(screen.getByText("project-eta")).toBeInTheDocument();
+		});
+
+		// Stop fires immediately (no confirm) — distinct from terminate.
+		fireEvent.click(screen.getByRole("button", { name: "Stop workspace" }));
+
+		// The POST actually reached the backend with the right id.
+		await waitFor(() => {
+			expect(stoppedId).toBe("ws-running");
+		});
+
+		// The panel stays mounted (NOT pruned like terminate); the poll drives the
+		// header Stop↔Start swap and the placeholder body.
+		expect(screen.getByText("project-eta")).toBeInTheDocument();
+		expect(useLayoutStore.getState().mosaicNode).toBe("ws-running");
+	});
+
+	it("Start issues POST /api/v1/workspaces/{id}/start and keeps the panel mounted", async () => {
+		// A single open panel for a live, stopped workspace from the MSW seed.
+		useLayoutStore.setState({
+			mosaicNode: "ws-stopped",
+			activeWorkspaceId: "ws-stopped",
+		});
+
+		let startedId: string | null = null;
+		server.use(
+			http.post("/api/v1/workspaces/:id/start", ({ params }) => {
+				startedId = params.id as string;
+				return HttpResponse.json({
+					data: {
+						id: params.id,
+						name: "project-iota",
+						status: "running",
+						vmid: 103,
+						node: "node2",
+						lxcIp: "10.99.0.103",
+						projectRepo: "github.com/acme/iota",
+						projectBranch: "main",
+						pluginSet: "default",
+						createdAt: "2026-06-10T00:02:00Z",
+						stoppedAt: null,
+						destroyedAt: null,
+						deletedAt: null,
+					},
+					meta: {
+						requestId: "test-request",
+						timestamp: "2026-06-10T05:00:00Z",
+					},
+					error: null,
+				});
+			}),
+		);
+
+		renderLayout();
+		await waitFor(() => {
+			expect(screen.getByText("project-iota")).toBeInTheDocument();
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Start workspace" }));
+
+		await waitFor(() => {
+			expect(startedId).toBe("ws-stopped");
+		});
+
+		expect(screen.getByText("project-iota")).toBeInTheDocument();
+		expect(useLayoutStore.getState().mosaicNode).toBe("ws-stopped");
+	});
+});
+
 describe("WorkspaceLayout — restore-after-refresh reconcile (UI-05)", () => {
 	it("drops a persisted leaf whose workspace is absent from the live list", async () => {
 		// A persisted tree referencing a running ws + a ghost id not in the seed.

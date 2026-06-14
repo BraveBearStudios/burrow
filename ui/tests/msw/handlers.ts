@@ -183,6 +183,61 @@ export const handlers = [
 		);
 	}),
 
+	// POST /api/v1/workspaces/:id/stop — lifecycle stop (WS-06). The state machine
+	// is the authority: the stopped workspace returns with status `stopped` and a
+	// fixed stoppedAt. A missing id returns the same inlined 404 shape the DELETE
+	// handler uses. (UI-07 — the Stop control surfaces this transition.)
+	http.post("/api/v1/workspaces/:id/stop", ({ params }) => {
+		const found = seedWorkspaces.find((w) => w.id === params.id);
+		if (!found) {
+			return HttpResponse.json(
+				{
+					data: null,
+					meta: {
+						requestId: "test-request",
+						timestamp: "2026-06-10T00:00:00Z",
+					},
+					error: { code: "not_found", message: "Not found." },
+				},
+				{ status: 404 },
+			);
+		}
+		return HttpResponse.json(
+			envelope({
+				...found,
+				status: "stopped" as WorkspaceStatus,
+				stoppedAt: "2026-06-10T04:00:00Z",
+			}),
+		);
+	}),
+
+	// POST /api/v1/workspaces/:id/start — lifecycle start (WS-07). The started
+	// workspace returns with status `running` and a cleared stoppedAt; a missing id
+	// returns the shared 404 shape. (UI-08 — the Start control surfaces this.)
+	http.post("/api/v1/workspaces/:id/start", ({ params }) => {
+		const found = seedWorkspaces.find((w) => w.id === params.id);
+		if (!found) {
+			return HttpResponse.json(
+				{
+					data: null,
+					meta: {
+						requestId: "test-request",
+						timestamp: "2026-06-10T00:00:00Z",
+					},
+					error: { code: "not_found", message: "Not found." },
+				},
+				{ status: 404 },
+			);
+		}
+		return HttpResponse.json(
+			envelope({
+				...found,
+				status: "running" as WorkspaceStatus,
+				stoppedAt: null,
+			}),
+		);
+	}),
+
 	// GET /api/v1/nodes — per-node capacity (Plan 02-01 backend; UI-04)
 	http.get("/api/v1/nodes", () => HttpResponse.json(envelope(seedNodes))),
 ];
