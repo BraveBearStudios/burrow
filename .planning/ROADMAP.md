@@ -83,7 +83,7 @@ cosign/attestation verify. Tracked per-phase in `*-HUMAN-UAT.md` and in the clos
 Plans:
 **Wave 1**
 
-- [ ] 05-01-PLAN.md — Wave 0 test infra: MSW stop/start handlers + failing-first UI-07..UI-11 tests + e2e scaffold
+- [x] 05-01-PLAN.md — Wave 0 test infra: MSW stop/start handlers + failing-first UI-07..UI-11 tests + e2e scaffold
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -123,5 +123,5 @@ Phases execute in numeric order: 5 → 6 (Phase 6 has no dependency on Phase 5 a
 | 2. Terminal Proxy + React UI | v1.0 | 6/6 | Complete | 2026-06-10 |
 | 3. Reproducible Workers | v1.0 | 3/3 | Complete | 2026-06-11 |
 | 4. Hardening & Release | v1.0 | 5/5 | Complete | 2026-06-11 |
-| 5. Stop/Start Controls + Drawer Polish | v1.1 | 0/4 | Planned | - |
+| 5. Stop/Start Controls + Drawer Polish | v1.1 | 1/4 | In Progress|  |
 | 6. CI / Tooling Robustness | v1.1 | 0/? | Not started | - |

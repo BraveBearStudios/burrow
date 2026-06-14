@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: UI Polish + Stop/Start Controls
 status: executing
 stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-06-14T05:17:19.575Z"
-last_activity: 2026-06-14 -- Phase 5 planning complete
+last_updated: "2026-06-14T05:42:50.409Z"
+last_activity: 2026-06-14
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 0
+  completed_plans: 1
   percent: 0
 ---
 
@@ -26,14 +26,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Milestone v1.1 — UI Polish + Stop/Start Controls (Phases 5-6); next up is planning Phase 5.
+**Current focus:** Phase 5 — Stop/Start Controls + Drawer Polish
 
 ## Current Position
 
-Phase: Phase 5 — Stop/Start Controls + Drawer Polish (not started)
-Plan: —
+Phase: 5 (Stop/Start Controls + Drawer Polish) — EXECUTING
+Plan: 2 of 4
 Status: Ready to execute
-Last activity: 2026-06-14 -- Phase 5 planning complete
+Last activity: 2026-06-14
 
 **v1.1 phase map:**
 
@@ -93,6 +93,7 @@ scope is CI-provable over the Fake provider — no real-Proxmox path this milest
 | Phase 04 P04 | 41min | 2 tasks | 4 files |
 | Phase 04 P01 | 12min | 3 tasks | 5 files |
 | Phase 04 P05 | 18min | 1 task | 1 file |
+| Phase 5 P01 | 16min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -173,6 +174,9 @@ Recent decisions affecting current work:
 - [Phase 04]: [Plan 04-01]: `main.py` gained its FIRST FastAPI lifespan. `build_reconciler()` composes the reconciler from the SAME `get_compute()`/`get_db()` singletons the routers use (the Fake is process-wide; a fresh provider would see an empty fleet and reap nothing). `_reconcile_loop` wraps each `reconcile_once()` in a broad `except Exception` (one bad pass logs + continues, RESEARCH Pattern 1) but RE-RAISES `CancelledError` so the lifespan's `await task` unwinds cleanly; the lifespan `finally` does `task.cancel()` + `suppress(CancelledError)` (Pitfall 4). Wired via `FastAPI(..., lifespan=lifespan)`. The lifespan test drives `lifespan(app)` as an async context manager DIRECTLY (no live server, no `asgi_lifespan` dep — FROZEN guardrail 7) and asserts start->running->cancelled with no task leak, same-singleton, and loop-survives-a-failing-pass. ci.yml `static-gates` now runs `test_reconciler` + `test_capacity_race` + `test_lifespan` over the Fake (no new action; perms/SHA pins unchanged). Gate: full api suite 166 passed (+11 over 04-02), mypy --strict + ruff + reuse(270) green. Real-Proxmox reaper/auto-stop acceptance stays the dev-homelab smoke.
 - [Phase 04]: [Plan 04-05]: Release supply-chain workflow (CICD-05) — the LAST Phase-4 / milestone plan. New `.github/workflows/release.yml` on `v*` tag / release published: one `publish` job with EXACTLY `contents:read + packages:write + id-token:write + attestations:write` (workflow default stays `contents:read`, Pitfall 7) over a two-image matrix (burrow-api/Dockerfile.api, burrow-ui/Dockerfile.ui). `build-push push:true` exposes the immutable `steps.build.outputs.digest`, and EVERY downstream step binds `@<digest>` not a floating tag (T-04-05C): `anchore/sbom-action` run TWICE (spdx-json + cyclonedx-json), `cosign sign --yes …@<digest>` KEYLESS (no `--key`; Sigstore + GitHub OIDC, no long-lived key — T-04-05A), and `actions/attest-build-provenance` with `subject-digest:<digest>` + `push-to-registry:true` (SLSA). GHCR target is `ghcr.io/${{ github.repository_owner }}/<image>` with the run's built-in `GITHUB_TOKEN` — no PAT, no hardcoded org. All 5 new actions pinned to REAL commit SHAs resolved via the GitHub git/refs API (login 5e57cd1, metadata 318604b, sbom d8a2c01, cosign-installer d7543c9, attest 977bb37) + a `# vX.Y.Z` comment — NO PIN_AT_WRITE placeholders; checkout/setup-buildx/build-push reuse the ci.yml pins. The `cosign verify` / `gh attestation verify` runbook is documented in the workflow trailer so the release runbook is self-contained (ci-cd §5.4). harden-runner intentionally NOT added (CONTEXT-deferred release-polish). Commit fd58d5e. Zero deviations. Gate: YAML parses (python yaml.safe_load — actionlint absent on the Windows host, first CI run is the structural authority); the 4-permission + SHA-pin + by-digest + dual-SBOM + keyless asserts all PASS; ci.yml untouched; reuse 272/272; api suite 166 passed (non-regression); ruff format clean. The actual GHCR push + cosign/attestation verify against a published digest is the CD/human acceptance (Manual-Only in 04-VALIDATION), NOT a PR-CI command. Phase 4 COMPLETE (5/5); milestone v1.0 plan-complete (26/26).
 - [Phase ?]: [Phase 04]: [Plan 04-03]: Activity drawer (UI-06) hand-built on the Phase-2 tokens — NO new runtime dependency (FROZEN guardrail 7). useWorkspaceEvents is an enabled-gated TanStack poll (refetchInterval gated on enabled && !!id) so it runs ONLY while the drawer is open (criterion 5). EVENT_BADGE is a flat tokens-only literal map of the VERIFIED namespaced backend strings (mirrors status.ts); all non-static logic lives in badgeFor() — reaper.* prefix to --warn 'Reaper · {suffix}', workspace.stopped data.reason==='idle' to 'Auto-stopped (idle)' --warn, unknown to the raw type string in mono --text-sub (forward-compatible, criterion 3). The drawer reverses the oldest-first feed client-side (newest-first, criterion 2), renders the already-_safe()-redacted data verbatim and issues ONLY the same-origin events poll — no second/un-redact request (T-04-03A/B). boot.error gets the row emphasis (2px --err left bar + tint + reason in red mono, criterion 4); no other row does. a11y: role=dialog, focus trap, Esc, and focus-RETURN-to-trigger via the open-effect cleanup. The panel trigger sets a single ephemeral activeEventsWorkspaceId (one drawer at a time, not persisted). Deviation (Rule 3): TerminalPanel.test.tsx renders wrapped in QueryClientProvider since the panel now mounts the closed drawer whose useQuery needs context even when disabled. Gate: 92 vitest + tsc + biome(47) + build + Playwright drawer e2e all green over the Fake + stub ttyd; zero hex, zero gold. **(v1.1 Phase 5 polishes THIS drawer: UI-09 phone-width full-width sheet, UI-10 `--accent-line` focus ring, UI-11 custom Burrow scrollbar — the three details 04-UI-REVIEW scored 22/24.)**
+- [Phase 5]: [Plan 05-01]: Wave-0 failing-first locked — the 2 MSW stop/start handlers + the RED tests for UI-07..UI-11 (Stop/Start gating, pending, the stopped placeholder, the V2/V3/V4 CSS-source rules, the drawer width token) + the e2e stop->start scaffold land BEFORE the feature (05-02/05-03/05-04 turn them green). 13 RED-by-design, 100 green, lint+tsc clean.
+- [Phase 5]: [Plan 05-01]: The Stop/Start mutation seam is LOCKED to LeafPanel-owns-the-mutations — onStop/onStart/stopPending/startPending declared (type-only) on TerminalPanelProps so the failing-first tests compile against the contract 05-02 renders against (RESEARCH A2 / UI-SPEC §1). No behavior shipped; props inert until 05-02.
+- [Phase 5]: [Plan 05-01]: useTerminal needs NO production change for the stopped gate — the existing status!=='running' early-return (line 178) + the [workspaceId,status] teardown already satisfy UI-07/UI-08; the 3 hook tests are GREEN confirmations (RESEARCH A1). V2/V3/V4 are CSS-source asserts in vitest (jsdom can't evaluate :focus-visible/scrollbar/@media-width); live-paint proofs are the Plan-04 Playwright leg.
 
 ### Pending Todos
 
@@ -205,9 +209,9 @@ and each phase's *-HUMAN-UAT.md). The last three rows are now CLAIMED by v1.1:
 
 ## Session Continuity
 
-Last session: 2026-06-14T04:52:34.441Z
+Last session: 2026-06-14T05:36:09.864Z
 Stopped at: Phase 5 UI-SPEC approved
-Resume file: .planning/phases/05-stop-start-controls-drawer-polish/05-UI-SPEC.md
+Resume file: None
 Next plan: Plan Phase 5 with `/gsd:plan-phase 5` (Stop/Start Controls + Drawer Polish). Phase 6 (CI/tooling) has no dependency on Phase 5 and may be planned in parallel.
 
 ## Operator Next Steps
