@@ -120,6 +120,36 @@ function CloseIcon() {
 	);
 }
 
+/** Stop glyph (UI-07): an outline rounded square — neutral, never the solid block. */
+function StopIcon() {
+	return (
+		<svg
+			width="15"
+			height="15"
+			viewBox="0 0 24 24"
+			aria-hidden="true"
+			{...ICON}
+		>
+			<rect x="6" y="6" width="12" height="12" rx="1.5" />
+		</svg>
+	);
+}
+
+/** Start glyph (UI-08): an outline play-triangle, matching the outline icon set. */
+function StartIcon() {
+	return (
+		<svg
+			width="15"
+			height="15"
+			viewBox="0 0 24 24"
+			aria-hidden="true"
+			{...ICON}
+		>
+			<path d="M8 5v14l11-7z" />
+		</svg>
+	);
+}
+
 /** Activity-log glyph (a pulse/list line) — opens the per-workspace event drawer. */
 function ActivityIcon() {
 	return (
@@ -198,6 +228,32 @@ function Spinner({ gold }: { gold?: boolean }) {
 	);
 }
 
+/**
+ * A 14px ring spinner for the in-flight Stop/Start header button (UI-07/UI-08).
+ * Sized down from the 22px overlay `Spinner` so the 24px icon button does not
+ * reflow; track `--border-mid`, top-arc `--accent-line` (never gold).
+ */
+function HeaderSpinner() {
+	return (
+		<span
+			aria-hidden="true"
+			style={{
+				width: "14px",
+				height: "14px",
+				borderRadius: "var(--radius-full)",
+				border: "2px solid var(--border-mid)",
+				borderTopColor: "var(--accent-line)",
+				animation: "spin 0.8s linear infinite",
+			}}
+		/>
+	);
+}
+
+/** 05-UI-SPEC Copywriting — the `stopped` placeholder heading + body copy. */
+const STOPPED_HEADING = "Workspace stopped";
+const STOPPED_BODY =
+	"This workspace is stopped. Start it to reconnect the terminal and pick up where you left off.";
+
 export function TerminalPanel({
 	id,
 	name,
@@ -207,6 +263,10 @@ export function TerminalPanel({
 	onSplit,
 	onDetach,
 	onTerminate,
+	onStop,
+	onStart,
+	stopPending,
+	startPending,
 	onTerminalEvent,
 }: TerminalPanelProps) {
 	const {
@@ -290,6 +350,34 @@ export function TerminalPanel({
 				>
 					<ActivityIcon />
 				</button>
+				{/* Show-only-applicable lifecycle control (UI-07/UI-08): exactly one of
+					Stop (running) / Start (stopped) occupies this slot, left of Split;
+					creating/error/destroyed render neither (the UI offers no illegal
+					action). Stop fires immediately (reversible, no confirm); both
+					disable + aria-busy while their mutation is pending (no double-fire). */}
+				{status === "running" ? (
+					<button
+						type="button"
+						aria-label="Stop workspace"
+						style={iconButtonStyle}
+						disabled={stopPending}
+						aria-busy={stopPending || undefined}
+						onClick={() => onStop?.(id)}
+					>
+						{stopPending ? <HeaderSpinner /> : <StopIcon />}
+					</button>
+				) : status === "stopped" ? (
+					<button
+						type="button"
+						aria-label="Start workspace"
+						style={iconButtonStyle}
+						disabled={startPending}
+						aria-busy={startPending || undefined}
+						onClick={() => onStart?.(id)}
+					>
+						{startPending ? <HeaderSpinner /> : <StartIcon />}
+					</button>
+				) : null}
 				<button
 					type="button"
 					aria-label="Split"
@@ -328,109 +416,168 @@ export function TerminalPanel({
 					minHeight: 0,
 				}}
 			>
-				<div
-					ref={containerRef}
-					className="term"
-					data-testid={`term-${id}`}
-					style={{
-						position: "absolute",
-						inset: 0,
-						padding: "11px 13px",
-						background: "var(--bg-surf)",
-						color: "var(--text-sub)",
-						fontFamily: "var(--font-mono)",
-						fontSize: "12px",
-						lineHeight: 1.6,
-						overflowY: "auto",
-					}}
-				/>
-
-				{termStatus === "connecting" ? (
-					<div
-						style={{ ...overlayBase, background: "rgba(26,28,26,.45)" }}
-						role="status"
-						aria-live="polite"
-					>
-						<Spinner />
-						<span>Connecting…</span>
-					</div>
-				) : null}
-
-				{termStatus === "reconnecting" ? (
-					<div
-						style={{ ...overlayBase, background: "rgba(26,28,26,.78)" }}
-						role="status"
-						aria-live="polite"
-					>
-						<Spinner gold />
-						<span>{`reconnecting… attempt ${reconnectAttempts} / 5`}</span>
-						<button type="button" style={overlayButton} onClick={reattach}>
-							Reattach
-						</button>
-					</div>
-				) : null}
-
-				{termStatus === "error" ? (
-					<div
-						style={{ ...overlayBase, background: "rgba(26,28,26,.78)" }}
-						role="alert"
-						aria-live="assertive"
-					>
-						<span
-							aria-hidden="true"
-							style={{
-								width: "22px",
-								height: "22px",
-								display: "grid",
-								placeItems: "center",
-								color: "var(--err)",
-								fontSize: "18px",
-							}}
-						>
-							!
-						</span>
-						<span>{`Session unavailable. ${ERROR_REASON}.`}</span>
-						<button type="button" style={overlayButton} onClick={reattach}>
-							Retry
-						</button>
-					</div>
-				) : null}
-
-				{isConfirmingTerminate ? (
+				{/* A stopped workspace is a calm resting state — branch the body on
+					`status === "stopped"` BEFORE the termStatus overlays so a transient
+					termStatus during the running→stopped tear-down can't flash an error
+					scrim. The placeholder (role=status, NOT alert) covers the body over a
+					calm --bg-surf wash; the Start CTA fires the same start mutation as the
+					header button and shares startPending so both disable together. */}
+				{status === "stopped" ? (
 					<div
 						style={{
 							...overlayBase,
-							background: "rgba(26,28,26,.92)",
-							opacity: 1,
+							inset: 0,
+							gap: "var(--space-sm)",
+							padding: "var(--space-xl) var(--space-lg)",
+							background: "var(--bg-surf)",
 						}}
-						role="alertdialog"
-						aria-label={`Terminate ${name}`}
-						aria-live="assertive"
+						role="status"
+						aria-live="polite"
 					>
-						<span style={{ maxWidth: "260px", textAlign: "center" }}>
-							{terminateConfirmCopy(name)}
+						<span
+							style={{
+								fontFamily: "var(--font-display)",
+								fontSize: "16px",
+								fontWeight: 500,
+								color: "var(--text-sub)",
+							}}
+						>
+							{STOPPED_HEADING}
 						</span>
-						<div style={{ display: "flex", gap: "8px" }}>
-							<button
-								type="button"
-								style={overlayButton}
-								onClick={() => setConfirmingTerminate(false)}
-							>
-								Cancel
-							</button>
-							<button
-								type="button"
-								style={{ ...overlayButton, color: "var(--err)" }}
-								onClick={() => {
-									setConfirmingTerminate(false);
-									onTerminate?.(id);
-								}}
-							>
-								Destroy
-							</button>
-						</div>
+						<span
+							style={{
+								color: "var(--text-muted)",
+								maxWidth: "260px",
+								textAlign: "center",
+								lineHeight: 1.5,
+							}}
+						>
+							{STOPPED_BODY}
+						</span>
+						<button
+							type="button"
+							aria-label="Start workspace"
+							style={{
+								...overlayButton,
+								display: "inline-flex",
+								alignItems: "center",
+								gap: "6px",
+							}}
+							disabled={startPending}
+							aria-busy={startPending || undefined}
+							onClick={() => onStart?.(id)}
+						>
+							{startPending ? <Spinner /> : <StartIcon />}
+							Start workspace
+						</button>
 					</div>
-				) : null}
+				) : (
+					<>
+						<div
+							ref={containerRef}
+							className="term"
+							data-testid={`term-${id}`}
+							style={{
+								position: "absolute",
+								inset: 0,
+								padding: "11px 13px",
+								background: "var(--bg-surf)",
+								color: "var(--text-sub)",
+								fontFamily: "var(--font-mono)",
+								fontSize: "12px",
+								lineHeight: 1.6,
+								overflowY: "auto",
+							}}
+						/>
+
+						{termStatus === "connecting" ? (
+							<div
+								style={{ ...overlayBase, background: "rgba(26,28,26,.45)" }}
+								role="status"
+								aria-live="polite"
+							>
+								<Spinner />
+								<span>Connecting…</span>
+							</div>
+						) : null}
+
+						{termStatus === "reconnecting" ? (
+							<div
+								style={{ ...overlayBase, background: "rgba(26,28,26,.78)" }}
+								role="status"
+								aria-live="polite"
+							>
+								<Spinner gold />
+								<span>{`reconnecting… attempt ${reconnectAttempts} / 5`}</span>
+								<button type="button" style={overlayButton} onClick={reattach}>
+									Reattach
+								</button>
+							</div>
+						) : null}
+
+						{termStatus === "error" ? (
+							<div
+								style={{ ...overlayBase, background: "rgba(26,28,26,.78)" }}
+								role="alert"
+								aria-live="assertive"
+							>
+								<span
+									aria-hidden="true"
+									style={{
+										width: "22px",
+										height: "22px",
+										display: "grid",
+										placeItems: "center",
+										color: "var(--err)",
+										fontSize: "18px",
+									}}
+								>
+									!
+								</span>
+								<span>{`Session unavailable. ${ERROR_REASON}.`}</span>
+								<button type="button" style={overlayButton} onClick={reattach}>
+									Retry
+								</button>
+							</div>
+						) : null}
+
+						{isConfirmingTerminate ? (
+							<div
+								style={{
+									...overlayBase,
+									background: "rgba(26,28,26,.92)",
+									opacity: 1,
+								}}
+								role="alertdialog"
+								aria-label={`Terminate ${name}`}
+								aria-live="assertive"
+							>
+								<span style={{ maxWidth: "260px", textAlign: "center" }}>
+									{terminateConfirmCopy(name)}
+								</span>
+								<div style={{ display: "flex", gap: "8px" }}>
+									<button
+										type="button"
+										style={overlayButton}
+										onClick={() => setConfirmingTerminate(false)}
+									>
+										Cancel
+									</button>
+									<button
+										type="button"
+										style={{ ...overlayButton, color: "var(--err)" }}
+										onClick={() => {
+											setConfirmingTerminate(false);
+											onTerminate?.(id);
+										}}
+									>
+										Destroy
+									</button>
+								</div>
+							</div>
+						) : null}
+					</>
+				)}
 			</div>
 
 			{/* Per-workspace activity drawer (UI-06); closed when the id is null. */}

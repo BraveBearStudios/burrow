@@ -13,7 +13,7 @@ import {
 	render,
 	screen,
 } from "@testing-library/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
 	installMockWebSocket,
@@ -29,14 +29,19 @@ vi.mock("@xterm/addon-fit", () => import("../../tests/helpers/mockXterm"));
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
 
 // The panel renders the (closed) ActivityDrawer, whose useWorkspaceEvents hook
-// needs a QueryClient in context even when the poll is disabled. Wrap every render.
+// needs a QueryClient in context even when the poll is disabled. Wrap every render
+// via the `wrapper` option (NOT inline children) so a later `rerender(...)` keeps
+// the provider — an inline-children wrap is dropped on rerender, surfacing a
+// "No QueryClient set" error in the gating test that flips status via rerender.
 function renderPanel(ui: ReactElement): RenderResult {
 	const client = new QueryClient({
 		defaultOptions: { queries: { retry: false } },
 	});
-	return render(
-		<QueryClientProvider client={client}>{ui}</QueryClientProvider>,
-	);
+	return render(ui, {
+		wrapper: ({ children }: { children: ReactNode }) => (
+			<QueryClientProvider client={client}>{children}</QueryClientProvider>
+		),
+	});
 }
 
 describe("TerminalPanel — happy path (the MVP slice)", () => {
@@ -243,9 +248,12 @@ describe("TerminalPanel — Stop/Start controls + stopped placeholder (UI-07/UI-
 		).toBeNull();
 
 		rerender(<TerminalPanel id="w1" name="project-eta" status="stopped" />);
+		// stopped renders TWO Start affordances (the header button + the placeholder
+		// CTA, both aria-label "Start workspace" per UI-SPEC §1+§2), so assert the
+		// affordance is present via getAllByRole — getByRole throws on the 2 matches.
 		expect(
-			screen.getByRole("button", { name: "Start workspace" }),
-		).toBeInTheDocument();
+			screen.getAllByRole("button", { name: "Start workspace" }).length,
+		).toBeGreaterThanOrEqual(1);
 		expect(screen.queryByRole("button", { name: "Stop workspace" })).toBeNull();
 
 		for (const status of ["creating", "error", "destroyed"] as const) {
@@ -311,9 +319,11 @@ describe("TerminalPanel — Stop/Start controls + stopped placeholder (UI-07/UI-
 				"This workspace is stopped. Start it to reconnect the terminal and pick up where you left off.",
 			),
 		).toBeInTheDocument();
+		// The placeholder Start CTA (plus the header Start button) — both labeled
+		// "Start workspace"; assert at least the placeholder CTA exists via plural.
 		expect(
-			screen.getByRole("button", { name: "Start workspace" }),
-		).toBeInTheDocument();
+			screen.getAllByRole("button", { name: "Start workspace" }).length,
+		).toBeGreaterThanOrEqual(1);
 
 		// It is a calm role=status region (announced politely), NOT role=alert, and
 		// NONE of the connecting/reconnecting/error overlays render under it.
