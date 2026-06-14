@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: UI Polish + Stop/Start Controls
 status: executing
 stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-06-14T05:42:50.409Z"
+last_updated: "2026-06-14T06:00:21.274Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 5 (Stop/Start Controls + Drawer Polish) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-14
 
@@ -94,6 +94,7 @@ scope is CI-provable over the Fake provider — no real-Proxmox path this milest
 | Phase 04 P01 | 12min | 3 tasks | 5 files |
 | Phase 04 P05 | 18min | 1 task | 1 file |
 | Phase 5 P01 | 16min | 3 tasks | 7 files |
+| Phase 5 P02 | 14min | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -177,6 +178,8 @@ Recent decisions affecting current work:
 - [Phase 5]: [Plan 05-01]: Wave-0 failing-first locked — the 2 MSW stop/start handlers + the RED tests for UI-07..UI-11 (Stop/Start gating, pending, the stopped placeholder, the V2/V3/V4 CSS-source rules, the drawer width token) + the e2e stop->start scaffold land BEFORE the feature (05-02/05-03/05-04 turn them green). 13 RED-by-design, 100 green, lint+tsc clean.
 - [Phase 5]: [Plan 05-01]: The Stop/Start mutation seam is LOCKED to LeafPanel-owns-the-mutations — onStop/onStart/stopPending/startPending declared (type-only) on TerminalPanelProps so the failing-first tests compile against the contract 05-02 renders against (RESEARCH A2 / UI-SPEC §1). No behavior shipped; props inert until 05-02.
 - [Phase 5]: [Plan 05-01]: useTerminal needs NO production change for the stopped gate — the existing status!=='running' early-return (line 178) + the [workspaceId,status] teardown already satisfy UI-07/UI-08; the 3 hook tests are GREEN confirmations (RESEARCH A1). V2/V3/V4 are CSS-source asserts in vitest (jsdom can't evaluate :focus-visible/scrollbar/@media-width); live-paint proofs are the Plan-04 Playwright leg.
+- [Phase ?]: [Plan 05-02]: Stop/Start surfaced as status-gated header icon buttons (UI-07/UI-08) — show-only-applicable (Stop iff running, Start iff stopped, neither otherwise) so the UI never offers an illegal lifecycle action; Stop fires immediately (reversible, no confirm); both disable + aria-busy + 14px --accent-line spinner while pending (the disabled attr is the double-fire guard). Server is the authority: no Zustand status mirror — onSettled invalidation + the ~3s poll drive the Stop<->Start + placeholder<->terminal swap.
+- [Phase ?]: [Plan 05-02]: useTerminal.ts UNCHANGED — the existing line-178 status!=='running' early-return + the [workspaceId,status] teardown already satisfy the stopped contract (3 hook tests GREEN pre-plan, RESEARCH A1). The stopped body branches on status==='stopped' BEFORE the termStatus overlays (calm role=status --bg-surf placeholder, never an error scrim). 2 Rule-1 deviations fixed self-contradictory 05-01 RED tests (singular getByRole vs the spec-mandated two Start affordances; renderPanel dropped the QueryClient on rerender). Remaining 6 RED = 05-03's V2/V3/V4 css-rules + drawer width.
 
 ### Pending Todos
 
@@ -209,7 +212,7 @@ and each phase's *-HUMAN-UAT.md). The last three rows are now CLAIMED by v1.1:
 
 ## Session Continuity
 
-Last session: 2026-06-14T05:36:09.864Z
+Last session: 2026-06-14T05:59:53.294Z
 Stopped at: Phase 5 UI-SPEC approved
 Resume file: None
 Next plan: Plan Phase 5 with `/gsd:plan-phase 5` (Stop/Start Controls + Drawer Polish). Phase 6 (CI/tooling) has no dependency on Phase 5 and may be planned in parallel.
