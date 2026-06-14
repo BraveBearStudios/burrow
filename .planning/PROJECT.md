@@ -66,14 +66,14 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 - ✓ CI/CD: static gates → tiered tests → build → image scan → SBOM → sign → SLSA provenance → GHCR — v1.0 ★ real GHCR publish + cosign/attestation verify = CD
 - ✓ Auto-stop idle workspaces (in-process reconciler) + restore/reconnect terminal after refresh — v1.0 ★ real idle window = homelab smoke
 - ✓ Orphan reaper reconciles desired vs actual (destroys row-less pool CTs on their actual node, frees leaked VMIDs, fails timed-out `creating` rows) — v1.0 ★ real orphan = homelab smoke
+- ✓ Explicit stop/start controls in the workspace UI (WS-06/WS-07), state-machine-gated, with a `stopped` placeholder + Start CTA — v1.1 (Phase 5; UI-07/UI-08, vitest + Playwright green over Fake)
+- ✓ Activity-drawer polish: phone full-width responsive sheet ≤375px, global `--accent-line` focus ring, custom Burrow scrollbar — v1.1 (Phase 5; UI-09/UI-10/UI-11; UI audit 23/24)
 
 ### Active
 
 <!-- v1.1 candidates — the tech-debt carried out of the v1.0 close-out audit. -->
 
-- [ ] Surface explicit stop/start in the UI (WS-06/WS-07 endpoints + hooks exist; no button) — **decided v1.1: add explicit stop + start buttons**, state-machine-gated (not reaper-only)
-- [ ] Activity-drawer polish: phone full-width responsive sheet + restore the `--accent-line` focus ring / custom scrollbar (04-UI-REVIEW 22/24)
-- [ ] CI robustness: pin the reuse-lint encoding dep (`uvx --with charset-normalizer`); reconcile the SPDX-comment-before-frontmatter convention with the gsd-sdk `phase-plan-index` parser
+- [ ] CI robustness (Phase 6, next): pin the reuse-lint encoding dep (`uvx --with charset-normalizer`); reconcile the SPDX-comment-before-frontmatter convention with the gsd-sdk `phase-plan-index` parser
 - [ ] Run and record the dev-homelab smoke + first CI release (flip the ★ items above + the per-phase `*-HUMAN-UAT.md` checklists to passed)
 
 ### Out of Scope
@@ -166,4 +166,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-13 — opened milestone v1.1 (UI polish + stop/start controls; phases continue from v1.0 at Phase 5).*
+*Last updated: 2026-06-14 — Phase 5 complete (stop/start UI + drawer polish shipped, verified 5/5, UI audit 23/24). Next: Phase 6 (CI/tooling robustness).*
