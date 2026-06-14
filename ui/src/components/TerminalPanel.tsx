@@ -23,6 +23,19 @@ export interface TerminalPanelProps {
 	onSplit?: (id: string) => void;
 	onDetach?: (id: string) => void;
 	onTerminate?: (id: string) => void;
+	/**
+	 * Fire the WS-06 lifecycle stop for this workspace (UI-07). Owned by
+	 * `LeafPanel` (`useStopWorkspace`), passed in like `onTerminate`. Plan 02 wires
+	 * the gated header button + the body branch that call this; the prop is declared
+	 * here so the Wave-0 failing-first tests compile against the locked seam.
+	 */
+	onStop?: (id: string) => void;
+	/** Fire the WS-07 lifecycle start for this workspace (UI-08). See `onStop`. */
+	onStart?: (id: string) => void;
+	/** True while the stop mutation is in flight (disables the button, aria-busy). */
+	stopPending?: boolean;
+	/** True while the start mutation is in flight (disables Start affordances). */
+	startPending?: boolean;
 	/** Fired when the terminal hits a terminal state (Pitfall 4: invalidate list). */
 	onTerminalEvent?: (event: "error" | "closed") => void;
 }

@@ -215,3 +215,135 @@ describe("TerminalPanel — terminate confirm + detach (UI-SPEC criterion 12)", 
 		expect(screen.getByText("reconnecting… attempt 1 / 5")).toBeInTheDocument();
 	});
 });
+
+describe("TerminalPanel — Stop/Start controls + stopped placeholder (UI-07/UI-08)", () => {
+	// FAILING-FIRST (Wave 0): these reference the gated Stop/Start header buttons,
+	// the pending feedback, and the `Workspace stopped` placeholder body that
+	// Plan 02 adds. They are RED until then — the expected Wave 0 state. No test
+	// asserts an immediate status swap on click (optimistic-flip trap, Pitfall 1)
+	// and none uses getComputedStyle for a pseudo-class (jsdom boundary).
+	beforeEach(() => {
+		installMockWebSocket();
+		installMockResizeObserver();
+		resetXtermMocks();
+	});
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("gates: Stop only when running, Start only when stopped, neither otherwise", () => {
+		const { rerender } = renderPanel(
+			<TerminalPanel id="w1" name="project-eta" status="running" />,
+		);
+		expect(
+			screen.getByRole("button", { name: "Stop workspace" }),
+		).toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { name: "Start workspace" }),
+		).toBeNull();
+
+		rerender(<TerminalPanel id="w1" name="project-eta" status="stopped" />);
+		expect(
+			screen.getByRole("button", { name: "Start workspace" }),
+		).toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Stop workspace" })).toBeNull();
+
+		for (const status of ["creating", "error", "destroyed"] as const) {
+			rerender(<TerminalPanel id="w1" name="project-eta" status={status} />);
+			expect(
+				screen.queryByRole("button", { name: "Stop workspace" }),
+			).toBeNull();
+			expect(
+				screen.queryByRole("button", { name: "Start workspace" }),
+			).toBeNull();
+		}
+	});
+
+	it("Stop fires onStop once immediately, with NO confirm overlay (contrast terminate)", () => {
+		const onStop = vi.fn();
+		renderPanel(
+			<TerminalPanel
+				id="w1"
+				name="project-eta"
+				status="running"
+				onStop={onStop}
+			/>,
+		);
+
+		fireEvent.click(screen.getByRole("button", { name: "Stop workspace" }));
+
+		// Stop is reversible → fires immediately, no `Destroy …?` confirm copy.
+		expect(onStop).toHaveBeenCalledTimes(1);
+		expect(onStop).toHaveBeenCalledWith("w1");
+		expect(
+			screen.queryByText(/The container and its session are gone for good/),
+		).toBeNull();
+	});
+
+	it("disables + aria-busy while stop is pending and does not double-fire", () => {
+		const onStop = vi.fn();
+		renderPanel(
+			<TerminalPanel
+				id="w1"
+				name="project-eta"
+				status="running"
+				onStop={onStop}
+				stopPending
+			/>,
+		);
+
+		const btn = screen.getByRole("button", { name: "Stop workspace" });
+		expect(btn).toBeDisabled();
+		expect(btn).toHaveAttribute("aria-busy", "true");
+
+		// A click while pending must not fire a second mutation (disabled guard).
+		fireEvent.click(btn);
+		expect(onStop).not.toHaveBeenCalled();
+	});
+
+	it("renders the `Workspace stopped` placeholder (heading + copy + CTA, role=status) instead of overlays", () => {
+		renderPanel(<TerminalPanel id="w1" name="project-iota" status="stopped" />);
+
+		// The resting-state placeholder: heading + the locked body copy + a Start CTA.
+		expect(screen.getByText("Workspace stopped")).toBeInTheDocument();
+		expect(
+			screen.getByText(
+				"This workspace is stopped. Start it to reconnect the terminal and pick up where you left off.",
+			),
+		).toBeInTheDocument();
+		expect(
+			screen.getByRole("button", { name: "Start workspace" }),
+		).toBeInTheDocument();
+
+		// It is a calm role=status region (announced politely), NOT role=alert, and
+		// NONE of the connecting/reconnecting/error overlays render under it.
+		expect(screen.getByRole("status")).toBeInTheDocument();
+		expect(screen.queryByRole("alert")).toBeNull();
+		expect(screen.queryByText("Connecting…")).toBeNull();
+		expect(screen.queryByText(/reconnecting…/)).toBeNull();
+		expect(screen.queryByText(/Session unavailable/)).toBeNull();
+	});
+
+	it("disables both Start affordances (header + placeholder CTA) while start is pending", () => {
+		const onStart = vi.fn();
+		renderPanel(
+			<TerminalPanel
+				id="w1"
+				name="project-iota"
+				status="stopped"
+				onStart={onStart}
+				startPending
+			/>,
+		);
+
+		// Both the header Start button and the placeholder Start CTA carry the same
+		// pending state so a stopped panel cannot double-fire start (Pitfall 7).
+		const starts = screen.getAllByRole("button", { name: "Start workspace" });
+		expect(starts.length).toBeGreaterThanOrEqual(2);
+		for (const btn of starts) {
+			expect(btn).toBeDisabled();
+		}
+		fireEvent.click(starts[0]);
+		expect(onStart).not.toHaveBeenCalled();
+	});
+});

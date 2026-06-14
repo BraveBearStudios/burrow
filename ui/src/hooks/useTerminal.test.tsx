@@ -23,6 +23,7 @@ import {
 	liveObserverCount,
 	MockResizeObserver,
 } from "../../tests/helpers/resizeObserver";
+import type { WorkspaceStatus } from "../types/workspace";
 import { useTerminal } from "./useTerminal";
 
 vi.mock("@xterm/xterm", () => import("../../tests/helpers/mockXterm"));
@@ -273,6 +274,73 @@ describe("useTerminal — clean dispose (TERM-07)", () => {
 		}
 		expect(liveTerminalCount()).toBe(0);
 		expect(liveObserverCount()).toBe(0);
+	});
+});
+
+// A status-parameterized harness for the stopped-gate block: it drives the hook
+// with a live `status` so a rerender flips the [workspaceId, status] effect dep.
+function StatusHarness({
+	id = "w1",
+	status,
+}: {
+	id?: string;
+	status: WorkspaceStatus;
+}) {
+	const t = useTerminal(id, status);
+	return <div data-testid="term" ref={t.containerRef} />;
+}
+
+describe("useTerminal — stopped gate (UI-07/UI-08)", () => {
+	let WS: typeof MockWebSocket;
+
+	beforeEach(() => {
+		WS = installMockWebSocket();
+		installMockResizeObserver();
+		resetXtermMocks();
+	});
+	afterEach(() => {
+		vi.restoreAllMocks();
+	});
+
+	it("opens NO socket while status is stopped (the line-178 gate holds)", () => {
+		render(<StatusHarness status="stopped" />);
+		// A stopped workspace has no live ttyd — the effect early-returns, so the
+		// hook constructs zero sockets and runs no reconnect/backoff loop.
+		expect(WS.instances).toHaveLength(0);
+	});
+
+	it("tears the socket down on running→stopped and opens none after", () => {
+		const { rerender } = render(<StatusHarness status="running" />);
+		// A running workspace opened a socket; drive it open.
+		expect(WS.instances).toHaveLength(1);
+		const opened = WS.instances.at(-1);
+		if (!opened) {
+			throw new Error("expected a socket while running");
+		}
+		act(() => {
+			opened.emitOpen();
+		});
+
+		// Flip to stopped: the [workspaceId, status] dep change runs the cleanup
+		// (closes the socket, clears the timer), then the re-run early-returns.
+		rerender(<StatusHarness status="stopped" />);
+		expect(opened.closed).toBe(true);
+		// No new OPEN socket exists after the flip (no phantom reconnect).
+		expect(WS.instances.filter((s) => !s.closed)).toHaveLength(0);
+	});
+
+	it("reconnects with a fresh socket on stopped→running", () => {
+		const { rerender } = render(<StatusHarness status="stopped" />);
+		expect(WS.instances).toHaveLength(0);
+
+		// Start: the effect re-runs and constructs a fresh socket (reconnect).
+		rerender(<StatusHarness status="running" />);
+		expect(WS.instances).toHaveLength(1);
+		const reconnected = WS.instances.at(-1);
+		if (!reconnected) {
+			throw new Error("expected a fresh socket after stopped→running");
+		}
+		expect(reconnected.closed).toBe(false);
 	});
 });
 
