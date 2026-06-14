@@ -89,19 +89,19 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-07 | — | Pending |
-| UI-08 | — | Pending |
-| UI-09 | — | Pending |
-| UI-10 | — | Pending |
-| UI-11 | — | Pending |
-| CICD-07 | — | Pending |
-| CICD-08 | — | Pending |
+| UI-07 | Phase 5 | Pending |
+| UI-08 | Phase 5 | Pending |
+| UI-09 | Phase 5 | Pending |
+| UI-10 | Phase 5 | Pending |
+| UI-11 | Phase 5 | Pending |
+| CICD-07 | Phase 6 | Pending |
+| CICD-08 | Phase 6 | Pending |
 
 **Coverage:**
 
 - v1.1 requirements: 7 total
-- Mapped to phases: 0 (pre-roadmap)
-- Unmapped: 7
+- Mapped to phases: 7 (Phase 5: UI-07..UI-11; Phase 6: CICD-07, CICD-08)
+- Unmapped: 0 ✓
 
 ---
-*Requirements defined: 2026-06-13 for milestone v1.1*
+*Requirements defined: 2026-06-13 for milestone v1.1; mapped to phases 2026-06-13.*
