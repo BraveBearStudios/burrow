@@ -4,13 +4,13 @@ milestone: v1.1
 milestone_name: UI Polish + Stop/Start Controls
 status: executing
 stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-06-14T06:00:21.274Z"
+last_updated: "2026-06-14T06:09:01.309Z"
 last_activity: 2026-06-14
 progress:
   total_phases: 2
   completed_phases: 0
   total_plans: 4
-  completed_plans: 2
+  completed_plans: 3
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 5 (Stop/Start Controls + Drawer Polish) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-14
 
@@ -95,6 +95,7 @@ scope is CI-provable over the Fake provider — no real-Proxmox path this milest
 | Phase 04 P05 | 18min | 1 task | 1 file |
 | Phase 5 P01 | 16min | 3 tasks | 7 files |
 | Phase 5 P02 | 14min | 3 tasks | 4 files |
+| Phase 5 P03 | 9 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -180,6 +181,7 @@ Recent decisions affecting current work:
 - [Phase 5]: [Plan 05-01]: useTerminal needs NO production change for the stopped gate — the existing status!=='running' early-return (line 178) + the [workspaceId,status] teardown already satisfy UI-07/UI-08; the 3 hook tests are GREEN confirmations (RESEARCH A1). V2/V3/V4 are CSS-source asserts in vitest (jsdom can't evaluate :focus-visible/scrollbar/@media-width); live-paint proofs are the Plan-04 Playwright leg.
 - [Phase ?]: [Plan 05-02]: Stop/Start surfaced as status-gated header icon buttons (UI-07/UI-08) — show-only-applicable (Stop iff running, Start iff stopped, neither otherwise) so the UI never offers an illegal lifecycle action; Stop fires immediately (reversible, no confirm); both disable + aria-busy + 14px --accent-line spinner while pending (the disabled attr is the double-fire guard). Server is the authority: no Zustand status mirror — onSettled invalidation + the ~3s poll drive the Stop<->Start + placeholder<->terminal swap.
 - [Phase ?]: [Plan 05-02]: useTerminal.ts UNCHANGED — the existing line-178 status!=='running' early-return + the [workspaceId,status] teardown already satisfy the stopped contract (3 hook tests GREEN pre-plan, RESEARCH A1). The stopped body branches on status==='stopped' BEFORE the termStatus overlays (calm role=status --bg-surf placeholder, never an error scrim). 2 Rule-1 deviations fixed self-contradictory 05-01 RED tests (singular getByRole vs the spec-mandated two Start affordances; renderPanel dropped the QueryClient on rerender). Remaining 6 RED = 05-03's V2/V3/V4 css-rules + drawer width.
+- [Phase ?]: [Plan 05-03]: The 3 drawer-polish details (04-UI-REVIEW 22/24) ship as pure global-CSS additions + one inline-style swap. --w-drawer:min(360px,100vw) lives in @theme and is overridden to 100vw under @media(max-width:375px) on :root in PLAIN CSS (NOT a nested @theme — Tailwind v4 Pitfall 6); ActivityDrawer swaps the DRAWER_WIDTH literal for width:var(--w-drawer) (UI-09). ONE unscoped global :focus-visible{outline:2px solid var(--accent-line);outline-offset:2px} covers every control across all four themes (UI-10); the <aside> outline:none stays (it suppresses only its own ring, not child rings — Pitfall 5, no *{outline:none}). The global custom scrollbar thumb is --border-mid→--text-muted on hover (a neutral, never accent/gold) on a transparent track + Firefox scrollbar-width:thin/scrollbar-color (UI-11). Tokens only, zero hex/CDN/gold; full vitest 113/113 GREEN.
 
 ### Pending Todos
 
@@ -212,7 +214,7 @@ and each phase's *-HUMAN-UAT.md). The last three rows are now CLAIMED by v1.1:
 
 ## Session Continuity
 
-Last session: 2026-06-14T05:59:53.294Z
+Last session: 2026-06-14T06:08:40.067Z
 Stopped at: Phase 5 UI-SPEC approved
 Resume file: None
 Next plan: Plan Phase 5 with `/gsd:plan-phase 5` (Stop/Start Controls + Drawer Polish). Phase 6 (CI/tooling) has no dependency on Phase 5 and may be planned in parallel.

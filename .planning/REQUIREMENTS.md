@@ -33,9 +33,9 @@ The WS-06 (stop) and WS-07 (start) API endpoints + TanStack hooks shipped in v1.
 
 - [x] **UI-07**: Operator can stop a running workspace from the UI — a Stop control, enabled only when status is `running`, that calls the WS-06 stop path and reflects the resulting `stopped` state (terminal disconnects, status indicator updates)
 - [x] **UI-08**: Operator can start a stopped workspace from the UI — a Start control, enabled only when status is `stopped`, that calls the WS-07 start path (awaits ttyd health) and reflects the resulting `running` state, re-enabling the terminal
-- [ ] **UI-09**: The activity drawer renders as a full-width sheet on phone-width viewports (≤375px) instead of the fixed 360px panel, per the V2 responsive-gap finding
-- [ ] **UI-10**: Focusable interactive controls show the `--accent-line` focus ring on keyboard focus (V3), restoring the design-system focus affordance
-- [ ] **UI-11**: Scrollable drawer (and terminal-adjacent) surfaces use the custom Burrow scrollbar styling (V4) rather than the native scrollbar
+- [x] **UI-09**: The activity drawer renders as a full-width sheet on phone-width viewports (≤375px) instead of the fixed 360px panel, per the V2 responsive-gap finding
+- [x] **UI-10**: Focusable interactive controls show the `--accent-line` focus ring on keyboard focus (V3), restoring the design-system focus affordance
+- [x] **UI-11**: Scrollable drawer (and terminal-adjacent) surfaces use the custom Burrow scrollbar styling (V4) rather than the native scrollbar
 
 ### CI / Tooling Robustness (CICD)
 
@@ -91,9 +91,9 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 |-------------|-------|--------|
 | UI-07 | Phase 5 | Complete |
 | UI-08 | Phase 5 | Complete |
-| UI-09 | Phase 5 | Pending |
-| UI-10 | Phase 5 | Pending |
-| UI-11 | Phase 5 | Pending |
+| UI-09 | Phase 5 | Complete |
+| UI-10 | Phase 5 | Complete |
+| UI-11 | Phase 5 | Complete |
 | CICD-07 | Phase 6 | Pending |
 | CICD-08 | Phase 6 | Pending |
 

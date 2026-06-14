@@ -88,7 +88,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 05-02-PLAN.md — Stop/Start controls + stopped placeholder + LeafPanel wiring (UI-07, UI-08)
-- [ ] 05-03-PLAN.md — Drawer polish CSS: --w-drawer responsive token, :focus-visible ring, custom scrollbar (UI-09, UI-10, UI-11)
+- [x] 05-03-PLAN.md — Drawer polish CSS: --w-drawer responsive token, :focus-visible ring, custom scrollbar (UI-09, UI-10, UI-11)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -123,5 +123,5 @@ Phases execute in numeric order: 5 → 6 (Phase 6 has no dependency on Phase 5 a
 | 2. Terminal Proxy + React UI | v1.0 | 6/6 | Complete | 2026-06-10 |
 | 3. Reproducible Workers | v1.0 | 3/3 | Complete | 2026-06-11 |
 | 4. Hardening & Release | v1.0 | 5/5 | Complete | 2026-06-11 |
-| 5. Stop/Start Controls + Drawer Polish | v1.1 | 2/4 | In Progress|  |
+| 5. Stop/Start Controls + Drawer Polish | v1.1 | 3/4 | In Progress|  |
 | 6. CI / Tooling Robustness | v1.1 | 0/? | Not started | - |
