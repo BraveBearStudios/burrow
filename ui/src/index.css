@@ -284,3 +284,45 @@
 		--w-drawer: 100vw;
 	}
 }
+
+/*
+ * Global focus-visible ring (UI-10 / V3). ONE app-wide rule gives every
+ * interactive control the --accent-line ring the inline icon buttons lacked.
+ * --accent-line is defined in every theme block, so it renders across all four.
+ * Uses :focus-visible (keyboard/programmatic focus) — NOT :focus — so a mouse
+ * click does not paint the ring.
+ */
+:focus-visible {
+	outline: 2px solid var(--accent-line);
+	outline-offset: 2px;
+}
+
+/*
+ * Global custom scrollbar (UI-11 / V4). Tokens only — the thumb is --border-mid
+ * (a neutral; never accent, never gold) on a transparent track, deepening to
+ * --text-muted on hover. --border-mid / --text-muted are defined per theme, so
+ * the scrollbar renders correctly across all four. Applies to every scroll
+ * surface (drawer list, terminal body, sidebar list).
+ */
+::-webkit-scrollbar {
+	width: 8px;
+	height: 8px;
+}
+::-webkit-scrollbar-track {
+	background: transparent;
+}
+::-webkit-scrollbar-thumb {
+	background: var(--border-mid);
+	border-radius: var(--radius-full);
+	border: 2px solid transparent;
+	background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover {
+	background: var(--text-muted);
+}
+
+/* Firefox */
+* {
+	scrollbar-width: thin;
+	scrollbar-color: var(--border-mid) transparent;
+}
