@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.0
-milestone_name: milestone
-status: Awaiting next milestone
-stopped_at: "Completed 04-05-PLAN.md — release supply-chain workflow (CICD-05), the LAST Phase-4 / milestone plan. New .github/workflows/release.yml on v* tag / release published: a publish job (EXACTLY contents:read + packages:write + id-token:write + attestations:write) over a two-image matrix; build-push push:true → immutable digest; syft SBOM ×2 (SPDX + CycloneDX), cosign keyless sign, attest-build-provenance — all @<digest>. GHCR via github.repository_owner + GITHUB_TOKEN. All 5 new actions pinned to REAL commit SHAs (NO PIN_AT_WRITE). Verify runbook in the trailer. Commit fd58d5e. ci.yml untouched; YAML parses; reuse 272/272; api suite 166 passed; ruff format clean."
-last_updated: "2026-06-12T01:57:25.720Z"
-last_activity: 2026-06-12 — Milestone v1.0 completed and archived
+milestone: v1.1
+milestone_name: UI Polish + Stop/Start Controls
+status: planning
+last_updated: "2026-06-14T00:29:41.243Z"
+last_activity: 2026-06-14
 progress:
-  total_phases: 5
-  completed_phases: 5
-  total_plans: 26
-  completed_plans: 26
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 <!--
@@ -30,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-06-09)
 
 ## Current Position
 
-Phase: Milestone v1.0 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-12 — Milestone v1.0 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-14 — Milestone v1.1 started
 
 ## Performance Metrics
 

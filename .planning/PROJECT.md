@@ -25,6 +25,25 @@ from a browser, with each session running in an ephemeral, reproducible containe
 that is gone when destroyed. If everything else fails, *creating a workspace and
 getting a live, interactive Claude Code terminal in the browser* must work.
 
+## Current Milestone: v1.1 UI Polish + Stop/Start Controls
+
+**Goal:** Surface the backend-ready stop/start controls in the UI and close the
+carried v1.0 drawer + CI tech-debt — all dev-box-buildable and CI-provable over
+the Fake provider.
+
+**Target features:**
+- Explicit stop/start controls in the workspace UI (WS-06/WS-07), enable/disable
+  driven by the state machine (running→stop, stopped→start).
+- Activity-drawer polish: phone full-width responsive sheet (V2), `--accent-line`
+  focus ring (V3), custom scrollbar (V4) — 04-UI-REVIEW scored 22/24.
+- CI robustness: pin the reuse-lint encoding dep (`uvx --with charset-normalizer`);
+  reconcile the SPDX-comment-before-frontmatter convention with the gsd-sdk
+  `phase-plan-index` parser.
+
+**Out of this milestone (tracked, not v1.1 build):** the dev-homelab smoke + first
+CI run + real GHCR release (the v1.0 ★ acceptance items) — they need real
+Proxmox / Docker / GHCR, off the dev box, and remain v1.0 acceptance debt.
+
 ## Requirements
 
 ### Validated
@@ -52,7 +71,7 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 
 <!-- v1.1 candidates — the tech-debt carried out of the v1.0 close-out audit. -->
 
-- [ ] Surface explicit stop/start in the UI (WS-06/WS-07 endpoints + hooks exist; no button) — confirm whether operator stop/start is intentionally reaper-only in v1
+- [ ] Surface explicit stop/start in the UI (WS-06/WS-07 endpoints + hooks exist; no button) — **decided v1.1: add explicit stop + start buttons**, state-machine-gated (not reaper-only)
 - [ ] Activity-drawer polish: phone full-width responsive sheet + restore the `--accent-line` focus ring / custom scrollbar (04-UI-REVIEW 22/24)
 - [ ] CI robustness: pin the reuse-lint encoding dep (`uvx --with charset-normalizer`); reconcile the SPDX-comment-before-frontmatter convention with the gsd-sdk `phase-plan-index` parser
 - [ ] Run and record the dev-homelab smoke + first CI release (flip the ★ items above + the per-phase `*-HUMAN-UAT.md` checklists to passed)
@@ -147,4 +166,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-11 after the v1.0 MVP milestone (Phases 0-4 shipped; CI-provable contracts green, real-infra acceptance deferred to the dev-homelab smoke).*
+*Last updated: 2026-06-13 — opened milestone v1.1 (UI polish + stop/start controls; phases continue from v1.0 at Phase 5).*
