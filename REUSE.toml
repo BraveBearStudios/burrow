@@ -26,6 +26,8 @@ path = [
   "ui/biome.json",
   "cc-worker-config/plugins/manifest.json",
   "cc-worker-config/plugins/manifest.schema.json",
+  "release-please-config.json",
+  ".release-please-manifest.json",
 ]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Brave Bear Studios"
