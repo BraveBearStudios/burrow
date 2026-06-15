@@ -72,6 +72,8 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 - ✓ Explicit stop/start controls in the workspace UI (WS-06/WS-07), state-machine-gated, with a `stopped` placeholder + Start CTA — v1.1 (Phase 5; UI-07/UI-08, vitest + Playwright green over Fake)
 - ✓ Activity-drawer polish: phone full-width responsive sheet ≤375px, global `--accent-line` focus ring, custom Burrow scrollbar — v1.1 (Phase 5; UI-09/UI-10/UI-11; UI audit 23/24)
 - ✓ CI/tooling robustness: `reuse lint` pinned to `--with charset-normalizer` (no `NoEncodingModuleError`); planning artifacts licensed via REUSE.toml so PLAN frontmatter stays line-1 for the gsd-sdk parser — v1.1 (Phase 6; CICD-07/CICD-08; reuse 309/309 compliant)
+- ✓ Workspace list fast-reconciles on terminal error/close (LeafPanel wires `onTerminalEvent` → invalidate, not just the ~3s poll) — v1.2 (Phase 7; UI-12; vitest 114/114)
+- ✓ Stop/start e2e hardened: panel-scoped locators + per-test id-scoped backend isolation — v1.2 (Phase 7; CICD-09; e2e 7/7)
 
 ### Active
 
@@ -169,4 +171,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-15 — v1.1 shipped + tagged; opened milestone v1.2 (backlog fixes + release automation + auto node-select; phases continue from v1.1 at Phase 7).*
+*Last updated: 2026-06-15 — v1.2 Phase 7 complete (fast-reconcile UI-12 + e2e hardening CICD-09, verified 5/5). Next: Phase 8 (release-please + harden-runner), needs operator release decisions.*
