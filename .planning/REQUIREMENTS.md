@@ -39,8 +39,8 @@ The WS-06 (stop) and WS-07 (start) API endpoints + TanStack hooks shipped in v1.
 
 ### CI / Tooling Robustness (CICD)
 
-- [ ] **CICD-07**: `reuse lint` runs with a pinned encoding dependency (`uvx --with charset-normalizer reuse lint`) in CI and in the documented local command, so it never fails with `NoEncodingModuleError` on Windows / CI runners
-- [ ] **CICD-08**: The SPDX-header-before-frontmatter convention is reconciled with the gsd-sdk `phase-plan-index` parser so PLAN `wave` / `depends_on` metadata is read from the YAML (not silently defaulted to wave 1 / no-deps); the chosen convention is documented for future plans
+- [x] **CICD-07**: `reuse lint` runs with a pinned encoding dependency (`uvx --with charset-normalizer reuse lint`) in CI and in the documented local command, so it never fails with `NoEncodingModuleError` on Windows / CI runners
+- [x] **CICD-08**: The SPDX-header-before-frontmatter convention is reconciled with the gsd-sdk `phase-plan-index` parser so PLAN `wave` / `depends_on` metadata is read from the YAML (not silently defaulted to wave 1 / no-deps); the chosen convention is documented for future plans
 
 ## Future Requirements
 
@@ -94,8 +94,8 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | UI-09 | Phase 5 | Complete |
 | UI-10 | Phase 5 | Complete |
 | UI-11 | Phase 5 | Complete |
-| CICD-07 | Phase 6 | Pending |
-| CICD-08 | Phase 6 | Pending |
+| CICD-07 | Phase 6 | Complete |
+| CICD-08 | Phase 6 | Complete |
 
 **Coverage:**
 

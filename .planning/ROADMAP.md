@@ -62,7 +62,7 @@ cosign/attestation verify. Tracked per-phase in `*-HUMAN-UAT.md` and in the clos
 ### v1.1 UI Polish + Stop/Start Controls (Phases 5-6)
 
 - [x] **Phase 5: Stop/Start Controls + Drawer Polish** - Surface the backend-ready stop/start lifecycle as explicit, state-machine-gated UI controls and restore the three drawer-polish details (responsive sheet, focus ring, custom scrollbar) (completed 2026-06-14)
-- [ ] **Phase 6: CI / Tooling Robustness** - Pin the `reuse` encoding dependency and reconcile the SPDX-header-before-frontmatter convention with the gsd-sdk `phase-plan-index` parser
+- [x] **Phase 6: CI / Tooling Robustness** - Pin the `reuse` encoding dependency and reconcile the SPDX-header-before-frontmatter convention with the gsd-sdk `phase-plan-index` parser (completed 2026-06-15)
 
 ## Phase Details
 
@@ -124,4 +124,4 @@ Phases execute in numeric order: 5 → 6 (Phase 6 has no dependency on Phase 5 a
 | 3. Reproducible Workers | v1.0 | 3/3 | Complete | 2026-06-11 |
 | 4. Hardening & Release | v1.0 | 5/5 | Complete | 2026-06-11 |
 | 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete    | 2026-06-14 |
-| 6. CI / Tooling Robustness | v1.1 | 0/? | Not started | - |
+| 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete    | 2026-06-15 |
