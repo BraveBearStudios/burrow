@@ -165,5 +165,5 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete | 2026-06-14 |
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete    | 2026-06-15 |
-| 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete   | 2026-06-15 |
+| 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete    | 2026-06-15 |
 | 9. Auto Node Selection | v1.2 | 0/? | Not started | - |

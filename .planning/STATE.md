@@ -4,7 +4,7 @@ milestone: v1.2
 milestone_name: Backlog Fixes + Release Automation
 status: verifying
 stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-06-15T21:42:45.106Z"
+last_updated: "2026-06-15T22:02:59.798Z"
 last_activity: 2026-06-15
 progress:
   total_phases: 3
@@ -30,8 +30,8 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: 8 (Release Hardening (release-please + harden-runner)) — EXECUTING
-Plan: 2 of 2
+Phase: 9
+Plan: Not started
 Status: Phase complete — ready for verification
 Last activity: 2026-06-15
 
@@ -39,7 +39,7 @@ Last activity: 2026-06-15
 
 **Velocity:**
 
-- Total plans completed: 28
+- Total plans completed: 30
 - Average duration: 16 min
 - Total execution time: 3.50 hours
 
@@ -52,6 +52,7 @@ Last activity: 2026-06-15
 | 5 | 4 | - | - |
 | 6 | 1 | - | - |
 | 7 | 1 | - | - |
+| 8 | 2 | - | - |
 
 **Per-plan:**
 
