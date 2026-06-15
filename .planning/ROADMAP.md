@@ -85,7 +85,7 @@ v1.0 real-infra acceptance (ACC-01/02/03). See `milestones/v1.1-MILESTONE-AUDIT.
 ### v1.2 Backlog Fixes + Release Automation (Phases 7-9)
 
 - [x] **Phase 7: Backlog Fixes (Fast-Reconcile + E2E Hardening)** - Wire the `LeafPanel onTerminalEvent` fast-reconcile so the workspace list refreshes on a terminal error/close (UI-12), and harden the stop/start Playwright e2e with panel-scoped locators + per-test backend isolation (CICD-09) (completed 2026-06-15)
-- [ ] **Phase 8: Release Hardening (release-please + harden-runner)** - Add release-please Conventional-Commit-driven release PRs (RELX-01) and a `step-security/harden-runner` egress allowlist with all third-party actions SHA-pinned (RELX-02)
+- [x] **Phase 8: Release Hardening (release-please + harden-runner)** - Add release-please Conventional-Commit-driven release PRs (RELX-01) and a `step-security/harden-runner` egress allowlist with all third-party actions SHA-pinned (RELX-02) (completed 2026-06-15)
 - [ ] **Phase 9: Auto Node Selection** - Capacity-aware auto node selection at create time — least-loaded node that passes the RAM threshold, proven over the FakeComputeProvider's multi-node capacity, with manual pick retained (WSX-01)
 
 ## Phase Details
@@ -129,7 +129,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 08-02-PLAN.md — harden ci.yml + release.yml (harden-runner audit step 0 on every job), repin the PR-title gate off the moving v5 tag, document the release + hardening policy in CONTRIBUTING.md (RELX-02, RELX-01)
+- [x] 08-02-PLAN.md — harden ci.yml + release.yml (harden-runner audit step 0 on every job), repin the PR-title gate off the moving v5 tag, document the release + hardening policy in CONTRIBUTING.md (RELX-02, RELX-01)
 
 **Scope note**: CI-config + docs only, dev-box-buildable and statically validatable (YAML/JSON parse + `reuse lint`); the live release-please PR and live harden-runner enforcement are the deferred ACC-02 on-runner acceptance, not a PR-CI command. RELX-01 = release-please (locked, do not propose semantic-release). All actions SHA-pinned; SPDX headers on every new/changed file (planning artifacts via REUSE.toml per CICD-08). Any baseline-architecture deviation lands an ADR.
 
@@ -165,5 +165,5 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete | 2026-06-14 |
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete    | 2026-06-15 |
-| 8. Release Hardening (release-please + harden-runner) | v1.2 | 1/2 | In Progress|  |
+| 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete   | 2026-06-15 |
 | 9. Auto Node Selection | v1.2 | 0/? | Not started | - |
