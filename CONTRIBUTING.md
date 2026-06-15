@@ -97,6 +97,42 @@ underlying copyright is unaffected by the CLA.
    one maintainer review. PRs are squash-merged; the PR title becomes the squash
    commit and must itself be a valid Conventional Commit.
 
+## Release process
+
+Releases are automated by **release-please** and chained to the GHCR publish by a
+tag.
+
+**The release chain.** A merge to `main` opens (or updates) an automated release
+pull request via release-please. That PR bumps the version in
+`.release-please-manifest.json` and regenerates `CHANGELOG.md` from the
+Conventional-Commit history on `main`. Merging the release PR tags a `v*`
+release, and the `v*` tag fires the GHCR publish job in `release.yml`. The two
+workflows never share a file or edit each other's trigger: the chain is purely
+tag-based.
+
+**Why the PR-title gate matters here.** Because PRs are squash-merged, the squash
+commit message is the PR title (see `## Submitting changes`). release-please reads
+those Conventional-Commit messages on `main` to compute the next version bump, so
+the PR-title gate is what makes the automated versioning work. A non-conforming
+title would either block the merge or be invisible to the bump calculation.
+
+**Runner hardening (audit today, block later).** Every CI job runs under
+`step-security/harden-runner` in `egress-policy: audit` mode (all four runners
+across `ci.yml`, `release.yml`, and `release-please.yml`). Audit mode only
+observes egress, so it breaks nothing today. Turning the discovered egress into an
+`allowed-endpoints` allowlist and flipping `egress-policy: block` is the first
+on-runner acceptance step (deferred ACC-02), and it must wait for real audit
+telemetry from a live runner. The `build-scan` and `publish` jobs will need the
+widest allowlist because of their Docker, Trivy, and GHCR egress.
+
+**First-release caveat (`GITHUB_TOKEN` retrigger).** release-please tags the
+release with the run's built-in `GITHUB_TOKEN`. GitHub suppresses workflow events
+raised by `GITHUB_TOKEN` to avoid recursive runs, so the new `v*` tag may not
+auto-trigger `release.yml`. The first releaser must confirm that `release.yml`
+actually fires on the release-please tag. If it does not, the remediation is an
+ACC-02 follow-up: either run the release-please action with a scoped GitHub App
+token, or manually re-run `release.yml` on the tag.
+
 ## Architecture decisions
 
 Anything that deviates from the baseline architecture needs an ADR in
