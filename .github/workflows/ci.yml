@@ -141,6 +141,7 @@ jobs:
     permissions:
       contents: read
       security-events: write # github/codeql-action/upload-sarif
+      actions: read          # upload-sarif run/workflow metadata (private repos)
     strategy:
       fail-fast: false
       matrix:
