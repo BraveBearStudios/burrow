@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.1
-milestone_name: UI Polish + Stop/Start Controls
-status: Awaiting next milestone
-stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-06-15T04:31:16.648Z"
-last_activity: 2026-06-15 — Milestone v1.1 completed and archived
+milestone: v1.2
+milestone_name: Backlog Fixes + Release Automation
+status: planning
+last_updated: "2026-06-15T05:01:34.945Z"
+last_activity: 2026-06-15
 progress:
-  total_phases: 2
-  completed_phases: 2
-  total_plans: 5
-  completed_plans: 5
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 <!--
@@ -30,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: Milestone v1.1 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-15 — Milestone v1.1 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-15 — Milestone v1.2 started
 
 ## Performance Metrics
 

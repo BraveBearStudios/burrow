@@ -25,24 +25,27 @@ from a browser, with each session running in an ephemeral, reproducible containe
 that is gone when destroyed. If everything else fails, *creating a workspace and
 getting a live, interactive Claude Code terminal in the browser* must work.
 
-## Current Milestone: v1.1 UI Polish + Stop/Start Controls
+## Current Milestone: v1.2 Backlog Fixes + Release Automation
 
-**Goal:** Surface the backend-ready stop/start controls in the UI and close the
-carried v1.0 drawer + CI tech-debt — all dev-box-buildable and CI-provable over
+**Goal:** Clear the v1.1 backlog debt, harden the release/CI surface, and add
+capacity-aware auto node selection — all dev-box-buildable and CI-provable over
 the Fake provider.
 
 **Target features:**
-- Explicit stop/start controls in the workspace UI (WS-06/WS-07), enable/disable
-  driven by the state machine (running→stop, stopped→start).
-- Activity-drawer polish: phone full-width responsive sheet (V2), `--accent-line`
-  focus ring (V3), custom scrollbar (V4) — 04-UI-REVIEW scored 22/24.
-- CI robustness: pin the reuse-lint encoding dep (`uvx --with charset-normalizer`);
-  reconcile the SPDX-comment-before-frontmatter convention with the gsd-sdk
-  `phase-plan-index` parser.
+- Wire the `LeafPanel onTerminalEvent` fast-reconcile so the workspace list
+  refreshes on a terminal error/close, not just the ~3s poll (WR-01).
+- Harden the stop/start e2e suite: scoped selectors + per-test backend isolation (WR-02).
+- Release automation via **release-please** — Conventional-Commit-driven release
+  PRs that bump version + changelog + tag on merge (RELX-01).
+- `step-security/harden-runner` egress allowlist on the CI workflows, actions
+  SHA-pinned (RELX-02).
+- Capacity-aware auto node selection at create time, proven over the
+  FakeComputeProvider's multi-node capacity (WSX-01).
 
-**Out of this milestone (tracked, not v1.1 build):** the dev-homelab smoke + first
-CI run + real GHCR release (the v1.0 ★ acceptance items) — they need real
-Proxmox / Docker / GHCR, off the dev box, and remain v1.0 acceptance debt.
+**Out of this milestone (tracked, deferred):** the dev-homelab smoke + first real
+CI/GHCR release (ACC-01/02/03) and the real-boot v2 items (WSX-02 persistent
+workspaces, WSX-03 scrollback restore) — they need real Proxmox / a live runner,
+off the dev box.
 
 ## Requirements
 
@@ -72,7 +75,7 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 
 ### Active
 
-<!-- v1.1 candidates — the tech-debt carried out of the v1.0 close-out audit. -->
+<!-- v1.2 active scope lives in REQUIREMENTS.md (WR-01/WR-02, RELX-01/02, WSX-01); below is the carried real-infra acceptance debt. -->
 
 - [ ] Run and record the dev-homelab smoke + first CI release (flip the ★ items above + the per-phase `*-HUMAN-UAT.md` checklists to passed)
 
@@ -166,4 +169,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-14 — v1.1 build complete: Phase 5 (stop/start UI + drawer polish, 5/5, UI 23/24) + Phase 6 (CI/tooling robustness, reuse 309/309). All v1.1 phases shipped; entering milestone lifecycle (audit → complete → cleanup).*
+*Last updated: 2026-06-15 — v1.1 shipped + tagged; opened milestone v1.2 (backlog fixes + release automation + auto node-select; phases continue from v1.1 at Phase 7).*
