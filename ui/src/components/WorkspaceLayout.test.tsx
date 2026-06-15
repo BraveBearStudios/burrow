@@ -13,10 +13,14 @@ import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { installMockWebSocket } from "../../tests/helpers/mockWebSocket";
+import {
+	lastSocket,
+	installMockWebSocket,
+} from "../../tests/helpers/mockWebSocket";
 import { resetXtermMocks } from "../../tests/helpers/mockXterm";
 import { installMockResizeObserver } from "../../tests/helpers/resizeObserver";
 import { server } from "../../tests/msw/server";
+import { WORKSPACES_KEY } from "../hooks/useWorkspaces";
 import { useLayoutStore } from "../store/layoutStore";
 import { WorkspaceLayout } from "./WorkspaceLayout";
 
@@ -25,12 +29,12 @@ vi.mock("@xterm/xterm", () => import("../../tests/helpers/mockXterm"));
 vi.mock("@xterm/addon-fit", () => import("../../tests/helpers/mockXterm"));
 vi.mock("@xterm/xterm/css/xterm.css", () => ({}));
 
-function renderLayout() {
-	const client = new QueryClient();
+/** Render the layout, returning the QueryClient so a test can spy on it. */
+function renderLayout(client = new QueryClient()) {
 	const wrapper = ({ children }: { children: ReactNode }) => (
 		<QueryClientProvider client={client}>{children}</QueryClientProvider>
 	);
-	return render(<WorkspaceLayout />, { wrapper });
+	return { client, ...render(<WorkspaceLayout />, { wrapper }) };
 }
 
 /** Reset the persisted layout + terminal/WS mocks before each case. */
@@ -256,6 +260,52 @@ describe("WorkspaceLayout — stop/start mutation wiring (UI-07 / UI-08)", () =>
 
 		expect(screen.getByText("project-iota")).toBeInTheDocument();
 		expect(useLayoutStore.getState().mosaicNode).toBe("ws-stopped");
+	});
+});
+
+describe("WorkspaceLayout — fast-reconcile on a terminal error/close (UI-12)", () => {
+	// Pitfall 4: a terminal error/close is fresher than the ~3s poll, so LeafPanel
+	// must wire `onTerminalEvent` → `useInvalidateWorkspaces` to refetch the list
+	// immediately. This proves the INVALIDATION path specifically (not the poll's own
+	// refetch): drive a terminal close and assert a WORKSPACES_KEY invalidation fired,
+	// AND that no workspace status was mirrored into the Zustand layoutStore (server
+	// stays the single source of truth — Pitfall 11).
+	it("invalidates WORKSPACES_KEY when the terminal hits a terminal state", async () => {
+		// A single open panel for a live, running workspace from the MSW seed — a
+		// running workspace mounts useTerminal and opens the (mock) WebSocket.
+		useLayoutStore.setState({
+			mosaicNode: "ws-running",
+			activeWorkspaceId: "ws-running",
+		});
+
+		const { client } = renderLayout();
+		// Spy AFTER the initial list fetch so we only capture the terminal-driven
+		// invalidation, never the mount/poll refetch.
+		await waitFor(() => {
+			expect(screen.getByText("project-eta")).toBeInTheDocument();
+		});
+		const invalidateSpy = vi.spyOn(client, "invalidateQueries");
+
+		// Snapshot the persisted view state so we can prove status is NOT mirrored in.
+		const layoutBefore = useLayoutStore.getState();
+
+		// Drive the terminal to a terminal state: a dropped socket (non-policy close)
+		// routes through useTerminal.onclose → scheduleReconnect → onTerminalEvent("closed").
+		lastSocket().emitClose();
+
+		// The wired callback invalidates the shared workspace-list query immediately.
+		await waitFor(() => {
+			expect(invalidateSpy).toHaveBeenCalledWith({
+				queryKey: WORKSPACES_KEY,
+			});
+		});
+
+		// The fast-reconcile is invalidation-only: NO workspace status leaked into the
+		// layoutStore (it never grew a status field; mosaicNode/activeWorkspaceId hold).
+		const layoutAfter = useLayoutStore.getState();
+		expect(layoutAfter.mosaicNode).toBe(layoutBefore.mosaicNode);
+		expect(layoutAfter.activeWorkspaceId).toBe(layoutBefore.activeWorkspaceId);
+		expect(layoutAfter).not.toHaveProperty("status");
 	});
 });
 
