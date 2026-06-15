@@ -1,0 +1,45 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Normalize all text files to LF in the repo; let Git handle working-tree EOLs.
+* text=auto eol=lf
+
+# Force LF on files that MUST be LF (shell scripts run in Linux containers;
+# CRLF silently breaks them). Source and config files are LF for consistency
+# across Windows/macOS/Linux contributors.
+*.sh        text eol=lf
+*.bash      text eol=lf
+*.py        text eol=lf
+*.ts        text eol=lf
+*.tsx       text eol=lf
+*.js        text eol=lf
+*.jsx       text eol=lf
+*.json      text eol=lf
+*.css       text eol=lf
+*.html      text eol=lf
+*.md        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.toml      text eol=lf
+*.sql       text eol=lf
+*.cfg       text eol=lf
+*.ini       text eol=lf
+Dockerfile* text eol=lf
+.env.example text eol=lf
+
+# Treat these as binary (never normalize / never diff as text).
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.ico   binary
+*.webp  binary
+*.pdf   binary
+*.zip   binary
+*.woff  binary
+*.woff2 binary
+
+# Keep generated lockfiles in the repo but collapse them in PR diffs for review.
+uv.lock          linguist-generated=true
+package-lock.json linguist-generated=true
+pnpm-lock.yaml   linguist-generated=true
