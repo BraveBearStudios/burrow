@@ -97,8 +97,11 @@ jobs:
         run: shellcheck cc-worker-config/lxc/worker-template/burrow-boot.sh cc-worker-config/lxc/worker-template/provision-template.sh
 
       # ── Repo-wide SPDX gate (CICD-06) ──────────────────────────────────
+      # CICD-07: pin the encoding module. Bare `uvx reuse lint` raises
+      # NoEncodingModuleError on hosts without libmagic (the Windows dev box +
+      # slim runners); `--with charset-normalizer` supplies a pure-Python encoder.
       - name: spdx · reuse lint
-        run: uvx reuse lint
+        run: uvx --with charset-normalizer reuse lint
 
   pr-title:
     name: Conventional-Commit PR title
