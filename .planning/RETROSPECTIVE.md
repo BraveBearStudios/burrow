@@ -67,8 +67,52 @@ per-workspace activity drawer + the scan/SBOM/sign/SLSA→GHCR release path (P4)
 - Notable: the heaviest spend was the Phase-3/4 executor + code-fixer agents (full TDD + multi-file
   supply-chain work); discuss/plan/review agents were comparatively cheap.
 
+## Milestone: v1.1 — UI Polish + Stop/Start Controls
+
+**Shipped:** 2026-06-15
+**Phases:** 2 | **Plans:** 5 | **Close state:** tech_debt (no blockers)
+
+### What Was Built
+Explicit state-machine-gated Stop/Start UI controls + a `Workspace stopped` placeholder (UI-07/08);
+the three 04-UI-REVIEW drawer-polish details restored as global CSS — `--w-drawer` responsive token,
+global `:focus-visible` `--accent-line` ring, custom scrollbar (UI-09/10/11); CI/tooling robustness —
+`reuse` pinned to `--with charset-normalizer` and `.planning` artifacts licensed via REUSE.toml so PLAN
+frontmatter stays line-1 for the parser (CICD-07/08).
+
+### What Worked
+- The discuss→ui-spec→research→pattern→plan→checker→execute→review→verify chain caught real things early:
+  the planner corrected a stale research claim (test files already existed → "extend" not "create"); the
+  reviewer + verifier independently confirmed the e2e and surfaced WR-01 as pre-existing, not a regression.
+- Grounding the CICD work by actually running `reuse lint` first turned a vague "document a convention"
+  phase into a concrete, oracle-verified fix (299/312 → 309/309).
+- Failing-first Wave-0 made the feature waves pure go-green; `useTerminal` needed zero production change
+  (confirmed by test), avoiding speculative rework.
+
+### What Was Inefficient
+- The executor honored the global per-commit approval gate and paused mid-plan (05-04) — the orchestrator
+  had to finalize the commit/SUMMARY inline. Worth aligning the subagent commit posture with the run's
+  "gate at phase boundaries" decision up front.
+- Bash cwd drifted into `ui/` after a `cd ui` gate, causing a confusing `cd api` failure — absolute paths
+  in orchestrator shell calls would avoid it.
+- Phase 6 was small enough that the full planner/checker/executor fleet was overkill; executed inline.
+
+### Patterns Established
+- **jsdom boundary discipline:** V2 width / V3 `:focus-visible` / V4 scrollbar are CSS-source asserts (vitest)
+  or Playwright live assertions — never computed-style/pseudo-class in jsdom. Encoded in VALIDATION.md.
+- **Planning-artifact licensing (CICD-08):** `.planning/**` md/json licensed via REUSE.toml, PLAN frontmatter
+  line-1; source files keep inline headers (CICD-06 preserved).
+
+### Key Lessons
+- Surface pre-existing debt found during in-scope review as backlog todos, don't silently expand phase scope.
+- An infra phase's "test" can be a tool oracle (`reuse lint` + parser), not a code test pyramid.
+
+### Cost Observations
+- Model mix: Opus across orchestrator + all GSD subagents. Heaviest spend: the four Phase-5 executors
+  (real React/CSS + tests + a live Playwright run). Phase 6 executed inline (cheap).
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Close state | Blockers found at audit |
 |-----------|--------|-------|-------------|--------------------------|
 | v1.0 MVP | 5 | 26 | tech_debt (real-infra deferred) | 1 (WS-08 terminate→destroy; fixed) |
+| v1.1 UI Polish + Stop/Start | 2 | 5 | tech_debt (no blockers; WR-01/02 → backlog) | 0 |
