@@ -110,6 +110,12 @@ release, and the `v*` tag fires the GHCR publish job in `release.yml`. The two
 workflows never share a file or edit each other's trigger: the chain is purely
 tag-based.
 
+**First-PR `version.txt`.** The config uses `release-type: simple`, so the first
+release-please PR will create a tracked `version.txt` at the repo root (the
+simple-release version file) alongside the `.release-please-manifest.json`
+version of record. This is additive and expected: let release-please own and
+update that file.
+
 **Why the PR-title gate matters here.** Because PRs are squash-merged, the squash
 commit message is the PR title (see `## Submitting changes`). release-please reads
 those Conventional-Commit messages on `main` to compute the next version bump, so
