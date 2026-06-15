@@ -17,7 +17,7 @@
 // in playwright.config.ts — no new harness. It does NOT run in the Wave-0 vitest gate;
 // it is the Plan 04 `npm run e2e` gate over the freshly-built UI.
 
-import { expect, type Page, test } from "@playwright/test";
+import { expect, type Locator, type Page, test } from "@playwright/test";
 
 // Unique names per run so reruns / shards never collide.
 const stamp = Date.now();
@@ -29,12 +29,37 @@ const wsBar = `e2e-stopstart-bar-${stamp}`;
 
 test.describe.configure({ mode: "serial" });
 
+// CICD-09 per-test backend isolation: track every workspace id a test creates so
+// `afterEach` can DELETE exactly those rows (id-scoped — never a broad wipe). The
+// Fake backend persists across tests in a `mode: serial` file, so without this the
+// list accumulates and a global locator could match a sibling test's panel. Scoping
+// the cleanup to the created ids keeps the suite order-independent / parallel-safe.
+const createdIds: string[] = [];
+
 /**
- * Create a workspace through the modal and wait for its panel to open. The v1
- * create POST is synchronous (boots to `running`, returns the row), so the modal
- * closes and a terminal panel mounts once the saga resolves against the Fake.
+ * Look up the id the control plane assigned a freshly-created workspace by its
+ * unique name (the create POST is synchronous, so the row is already listed). Used
+ * to scope the panel locator + the per-test cleanup to THIS workspace.
  */
-async function createWorkspace(page: Page, name: string): Promise<void> {
+async function workspaceIdByName(page: Page, name: string): Promise<string> {
+	const res = await page.request.get("/api/v1/workspaces");
+	expect(res.ok()).toBe(true);
+	const body = (await res.json()) as {
+		data: Array<{ id: string; name: string }>;
+	};
+	const found = body.data.find((w) => w.name === name);
+	expect(found, `workspace ${name} should exist in the live list`).toBeTruthy();
+	return (found as { id: string }).id;
+}
+
+/**
+ * Create a workspace through the modal, wait for its panel to open, and return the
+ * panel locator scoped to its workspace id (`data-testid="panel-${id}"`). The v1
+ * create POST is synchronous (boots to `running`, returns the row), so the modal
+ * closes and a terminal panel mounts once the saga resolves against the Fake. The
+ * created id is tracked for the per-test `afterEach` cleanup.
+ */
+async function createWorkspace(page: Page, name: string): Promise<Locator> {
 	await page.getByRole("button", { name: /New workspace/ }).click();
 	const dialog = page.getByRole("dialog");
 	await expect(dialog).toBeVisible();
@@ -46,15 +71,36 @@ async function createWorkspace(page: Page, name: string): Promise<void> {
 
 	await page.getByRole("button", { name: "Create" }).click();
 	await expect(dialog).toBeHidden({ timeout: 30_000 });
-	await expect(page.getByText(name).first()).toBeVisible({ timeout: 30_000 });
+
+	const id = await workspaceIdByName(page, name);
+	createdIds.push(id);
+	const panel = page.getByTestId(`panel-${id}`);
+	await expect(panel).toBeVisible({ timeout: 30_000 });
+	await expect(panel.getByText(name)).toBeVisible({ timeout: 30_000 });
+	return panel;
 }
+
+// Per-test isolation (CICD-09): destroy only the workspaces this test created, by
+// id, so the Fake backend never accumulates and the suite stays order-independent.
+// A 404 is fine (a test may have already terminated the row through the UI).
+test.afterEach(async ({ request }) => {
+	while (createdIds.length > 0) {
+		const id = createdIds.pop();
+		if (!id) {
+			continue;
+		}
+		await request.delete(`/api/v1/workspaces/${id}`);
+	}
+});
 
 test("stop → placeholder → start → reconnect round-trip", async ({ page }) => {
 	await page.goto("/");
 
 	// ── Create + terminal echoes ───────────────────────────────────────────────
-	await createWorkspace(page, wsName);
-	await expect(page.locator('[data-testid^="term-"]').first()).toBeVisible();
+	// Every interaction below is scoped to THIS panel (`panel-${id}`) — no unscoped
+	// `.first()` and no global `[data-testid^="term-"]` count assertion.
+	const panel = await createWorkspace(page, wsName);
+	await expect(panel.locator('[data-testid^="term-"]')).toBeVisible();
 
 	// ── Stop: fires POST /workspaces/{id}/stop immediately (no confirm) ─────────
 	// Assert the REAL POST fires over the Fake (not an optimistic client flip), the
@@ -67,21 +113,29 @@ test("stop → placeholder → start → reconnect round-trip", async ({ page })
 				) && res.request().method() === "POST",
 			{ timeout: 15_000 },
 		),
-		page.getByRole("button", { name: "Stop workspace" }).first().click(),
+		panel.getByRole("button", { name: "Stop workspace" }).click(),
 	]);
 	expect(stopResponse.ok()).toBe(true);
 
 	// After the ~3s server-truth poll re-lists status=stopped, the placeholder body
 	// replaces the terminal — NOT a connecting/reconnecting/error overlay.
-	await expect(page.getByText("Workspace stopped")).toBeVisible({
+	await expect(panel.getByText("Workspace stopped")).toBeVisible({
 		timeout: 15_000,
 	});
-	// The live terminal body is gone while stopped (the placeholder owns the body).
-	await expect(page.locator('[data-testid^="term-"]')).toHaveCount(0, {
+	// The live terminal body is gone for THIS panel while stopped (the placeholder
+	// owns the body) — a panel-scoped assertion, never a global count over the grid.
+	await expect(panel.locator('[data-testid^="term-"]')).toHaveCount(0, {
 		timeout: 15_000,
 	});
 
 	// ── Start: from the placeholder CTA → POST /start → terminal reconnects ─────
+	// A stopped panel renders TWO "Start workspace" affordances (the header icon
+	// button + the placeholder CTA). Scope the click to the placeholder region
+	// (`role="status"`, which also owns the "Workspace stopped" heading) so the
+	// locator is unambiguous — strict mode would reject the bare two-match query.
+	const placeholder = panel.getByRole("status").filter({
+		hasText: "Workspace stopped",
+	});
 	const [startResponse] = await Promise.all([
 		page.waitForResponse(
 			(res) =>
@@ -90,16 +144,16 @@ test("stop → placeholder → start → reconnect round-trip", async ({ page })
 				) && res.request().method() === "POST",
 			{ timeout: 15_000 },
 		),
-		page.getByRole("button", { name: "Start workspace" }).first().click(),
+		placeholder.getByRole("button", { name: "Start workspace" }).click(),
 	]);
 	expect(startResponse.ok()).toBe(true);
 
 	// The placeholder unmounts and the live terminal body re-mounts (stopped→running
 	// re-runs the useTerminal effect → fresh socket → reconnect).
-	await expect(page.getByText("Workspace stopped")).toBeHidden({
+	await expect(panel.getByText("Workspace stopped")).toBeHidden({
 		timeout: 30_000,
 	});
-	await expect(page.locator('[data-testid^="term-"]').first()).toBeVisible({
+	await expect(panel.locator('[data-testid^="term-"]')).toBeVisible({
 		timeout: 30_000,
 	});
 });
@@ -115,11 +169,11 @@ test.describe("drawer full-width at 375px (UI-09)", () => {
 		page,
 	}) => {
 		await page.goto("/");
-		await createWorkspace(page, wsDrawer);
-		await expect(page.locator('[data-testid^="term-"]').first()).toBeVisible();
+		const panel = await createWorkspace(page, wsDrawer);
+		await expect(panel.locator('[data-testid^="term-"]')).toBeVisible();
 
-		// Open the per-workspace Activity drawer from the panel header.
-		await page.getByRole("button", { name: "Activity log" }).first().click();
+		// Open the per-workspace Activity drawer from THIS panel's header.
+		await panel.getByRole("button", { name: "Activity log" }).click();
 		const drawer = page.getByRole("dialog", { name: /activity log/i });
 		await expect(drawer).toBeVisible();
 
@@ -137,10 +191,10 @@ test.describe("drawer is the 360px panel above 375px (UI-09)", () => {
 		page,
 	}) => {
 		await page.goto("/");
-		await createWorkspace(page, wsWide);
-		await expect(page.locator('[data-testid^="term-"]').first()).toBeVisible();
+		const panel = await createWorkspace(page, wsWide);
+		await expect(panel.locator('[data-testid^="term-"]')).toBeVisible();
 
-		await page.getByRole("button", { name: "Activity log" }).first().click();
+		await panel.getByRole("button", { name: "Activity log" }).click();
 		const drawer = page.getByRole("dialog", { name: /activity log/i });
 		await expect(drawer).toBeVisible();
 
@@ -161,15 +215,13 @@ test("keyboard focus paints the global --accent-line ring (UI-10)", async ({
 	page,
 }) => {
 	await page.goto("/");
-	await createWorkspace(page, wsA11y);
-	await expect(page.locator('[data-testid^="term-"]').first()).toBeVisible();
+	const panel = await createWorkspace(page, wsA11y);
+	await expect(panel.locator('[data-testid^="term-"]')).toBeVisible();
 
 	// Tab into the page header, then Tab to the panel's Activity log button and open
 	// the drawer with Enter — all keyboard input, so Chromium's :focus-visible
 	// heuristic stays in keyboard mode for the focus the drawer moves on open.
-	const activityButton = page
-		.getByRole("button", { name: "Activity log" })
-		.first();
+	const activityButton = panel.getByRole("button", { name: "Activity log" });
 	await activityButton.focus();
 	await page.keyboard.press("Tab");
 	await page.keyboard.press("Shift+Tab"); // back to Activity log, via keyboard
@@ -210,8 +262,8 @@ test("the custom 8px scrollbar renders on a scroll surface (UI-11)", async ({
 	page,
 }) => {
 	await page.goto("/");
-	await createWorkspace(page, wsBar);
-	const termBody = page.locator('[data-testid^="term-"]').first();
+	const panel = await createWorkspace(page, wsBar);
+	const termBody = panel.locator('[data-testid^="term-"]');
 	await expect(termBody).toBeVisible();
 
 	// Read the live computed style of the styled ::-webkit-scrollbar pseudo-element on

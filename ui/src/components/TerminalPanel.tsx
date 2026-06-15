@@ -289,6 +289,10 @@ export function TerminalPanel({
 
 	return (
 		<section
+			// Stable per-panel hook (CICD-09): scopes every e2e locator to THIS
+			// workspace's panel so a multi-panel layout never leaks a `.first()` /
+			// global `[data-testid^="term-"]` assertion across sibling panels.
+			data-testid={`panel-${id}`}
 			style={{
 				display: "flex",
 				flexDirection: "column",
