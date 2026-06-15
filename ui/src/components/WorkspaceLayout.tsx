@@ -20,6 +20,7 @@ import { Mosaic } from "react-mosaic-component";
 import "react-mosaic-component/react-mosaic-component.css";
 import {
 	useDestroyWorkspace,
+	useInvalidateWorkspaces,
 	useStartWorkspace,
 	useStopWorkspace,
 	useWorkspaces,
@@ -62,6 +63,11 @@ function LeafPanel({ id, workspace }: { id: string; workspace?: Workspace }) {
 	const destroyWorkspace = useDestroyWorkspace();
 	const stopWorkspace = useStopWorkspace();
 	const startWorkspace = useStartWorkspace();
+	// Fast-reconcile (UI-12 / Pitfall 4): a terminal error/close is fresher than the
+	// ~3s poll, so invalidate the shared list immediately. The server stays the single
+	// source of truth — this only triggers a refetch, it never mirrors status into
+	// Zustand. Wired below as `onTerminalEvent`, mirroring the `onTerminate` shape.
+	const invalidateWorkspaces = useInvalidateWorkspaces();
 	const isActive = activeWorkspaceId === id;
 
 	// Terminate = DESTROY the workspace (WS-08 / UI-05), not a client-only panel
@@ -127,6 +133,7 @@ function LeafPanel({ id, workspace }: { id: string; workspace?: Workspace }) {
 				branch={workspace?.projectBranch}
 				onSplit={(panelId) => splitPanel(panelId, "row")}
 				onTerminate={onTerminate}
+				onTerminalEvent={invalidateWorkspaces}
 				onStop={onStop}
 				onStart={onStart}
 				stopPending={stopWorkspace.isPending}

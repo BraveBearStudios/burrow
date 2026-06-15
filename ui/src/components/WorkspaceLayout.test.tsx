@@ -14,8 +14,8 @@ import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
-	lastSocket,
 	installMockWebSocket,
+	lastSocket,
 } from "../../tests/helpers/mockWebSocket";
 import { resetXtermMocks } from "../../tests/helpers/mockXterm";
 import { installMockResizeObserver } from "../../tests/helpers/resizeObserver";
