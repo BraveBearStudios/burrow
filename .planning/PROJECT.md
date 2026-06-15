@@ -68,12 +68,12 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 - ✓ Orphan reaper reconciles desired vs actual (destroys row-less pool CTs on their actual node, frees leaked VMIDs, fails timed-out `creating` rows) — v1.0 ★ real orphan = homelab smoke
 - ✓ Explicit stop/start controls in the workspace UI (WS-06/WS-07), state-machine-gated, with a `stopped` placeholder + Start CTA — v1.1 (Phase 5; UI-07/UI-08, vitest + Playwright green over Fake)
 - ✓ Activity-drawer polish: phone full-width responsive sheet ≤375px, global `--accent-line` focus ring, custom Burrow scrollbar — v1.1 (Phase 5; UI-09/UI-10/UI-11; UI audit 23/24)
+- ✓ CI/tooling robustness: `reuse lint` pinned to `--with charset-normalizer` (no `NoEncodingModuleError`); planning artifacts licensed via REUSE.toml so PLAN frontmatter stays line-1 for the gsd-sdk parser — v1.1 (Phase 6; CICD-07/CICD-08; reuse 309/309 compliant)
 
 ### Active
 
 <!-- v1.1 candidates — the tech-debt carried out of the v1.0 close-out audit. -->
 
-- [ ] CI robustness (Phase 6, next): pin the reuse-lint encoding dep (`uvx --with charset-normalizer`); reconcile the SPDX-comment-before-frontmatter convention with the gsd-sdk `phase-plan-index` parser
 - [ ] Run and record the dev-homelab smoke + first CI release (flip the ★ items above + the per-phase `*-HUMAN-UAT.md` checklists to passed)
 
 ### Out of Scope
@@ -166,4 +166,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-14 — Phase 5 complete (stop/start UI + drawer polish shipped, verified 5/5, UI audit 23/24). Next: Phase 6 (CI/tooling robustness).*
+*Last updated: 2026-06-14 — v1.1 build complete: Phase 5 (stop/start UI + drawer polish, 5/5, UI 23/24) + Phase 6 (CI/tooling robustness, reuse 309/309). All v1.1 phases shipped; entering milestone lifecycle (audit → complete → cleanup).*
