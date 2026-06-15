@@ -2,15 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Backlog Fixes + Release Automation
-status: planning
-last_updated: "2026-06-15T05:01:34.945Z"
+status: verifying
+stopped_at: Completed 07-01-PLAN.md
+last_updated: "2026-06-15T05:53:58.388Z"
 last_activity: 2026-06-15
 progress:
   total_phases: 3
-  completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
-  percent: 0
+  completed_phases: 1
+  total_plans: 1
+  completed_plans: 1
+  percent: 33
 ---
 
 <!--
@@ -29,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: Not started (roadmap defined — v1.2 phases 7-9)
-Plan: —
-Status: Roadmap created; ready to plan Phase 7
-Last activity: 2026-06-15 — v1.2 roadmap created (Phases 7-9; 5/5 requirements mapped)
+Phase: 7 (Backlog Fixes (Fast-Reconcile + E2E Hardening)) — EXECUTING
+Plan: 1 of 1
+Status: Phase complete — ready for verification
+Last activity: 2026-06-15
 
 ## Performance Metrics
 
@@ -89,6 +90,7 @@ Last activity: 2026-06-15 — v1.2 roadmap created (Phases 7-9; 5/5 requirements
 | Phase 5 P01 | 16min | 3 tasks | 7 files |
 | Phase 5 P02 | 14min | 3 tasks | 4 files |
 | Phase 5 P03 | 9 | 2 tasks | 2 files |
+| Phase 7 P01 | 10 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -177,6 +179,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 05-02]: Stop/Start surfaced as status-gated header icon buttons (UI-07/UI-08) — show-only-applicable (Stop iff running, Start iff stopped, neither otherwise) so the UI never offers an illegal lifecycle action; Stop fires immediately (reversible, no confirm); both disable + aria-busy + 14px --accent-line spinner while pending. Server is the authority: no Zustand status mirror — onSettled invalidation + the ~3s poll drive the Stop<->Start + placeholder<->terminal swap. **(v1.2 Phase 7 UI-12 makes that poll faster on a terminal error/close via the fast-reconcile invalidation, but the server stays the single source of truth — no optimistic flip is added.)**
 - [Phase ?]: [Plan 05-02]: useTerminal.ts UNCHANGED — the existing line-178 status!=='running' early-return + the [workspaceId,status] teardown already satisfy the stopped contract. The stopped body branches on status==='stopped' BEFORE the termStatus overlays (calm role=status --bg-surf placeholder, never an error scrim). 2 Rule-1 deviations fixed self-contradictory 05-01 RED tests.
 - [Phase ?]: [Plan 05-03]: The 3 drawer-polish details (04-UI-REVIEW 22/24) ship as pure global-CSS additions + one inline-style swap. --w-drawer:min(360px,100vw) lives in @theme and is overridden to 100vw under @media(max-width:375px) on :root in PLAIN CSS (NOT a nested @theme — Tailwind v4 Pitfall 6); ActivityDrawer swaps the DRAWER_WIDTH literal for width:var(--w-drawer) (UI-09). ONE unscoped global :focus-visible{outline:2px solid var(--accent-line);outline-offset:2px} covers every control across all four themes (UI-10); the global custom scrollbar thumb is --border-mid→--text-muted on hover on a transparent track + Firefox scrollbar-width:thin/scrollbar-color (UI-11). Tokens only, zero hex/CDN/gold; full vitest 113/113 GREEN.
+- [Phase 7]: [Plan 07-01]: UI-12 fast-reconcile shipped as invalidation-only — LeafPanel calls useInvalidateWorkspaces() and passes it as onTerminalEvent to TerminalPanel (mirroring the onTerminate wiring), so a terminal error/close invalidates WORKSPACES_KEY immediately (Pitfall 4) ahead of the ~3s poll. The server stays the single source of truth: the failing-first vitest drives a MockWebSocket close (→ useTerminal.onclose → scheduleReconnect → onTerminalEvent('closed')), spies QueryClient.invalidateQueries for WORKSPACES_KEY, AND asserts no status leaked into the Zustand layoutStore. NO change to useTerminal/useWorkspaces beyond the one-line LeafPanel wiring. The WR-01 backlog finding is now CLOSED.
+- [Phase 7]: [Plan 07-01]: CICD-09 e2e hardening — TerminalPanel root <section> gained data-testid=panel-${id}; stop-start.spec.ts scopes EVERY locator to the panel under test (createWorkspace returns the panel locator + tracks the created id), removing all unscoped .first() and the global [data-testid^=term-] toHaveCount(0) (now a panel-scoped term-body-absent + placeholder-shown assertion). The stopped panel's TWO 'Start workspace' affordances (header icon button + placeholder CTA) are disambiguated by scoping the Start click to the role=status placeholder region (Rule-1 fix — strict mode rejected the bare two-match). An afterEach DELETEs only each test's created ids (id-scoped, never a broad wipe) so the mode:serial Fake-backed suite is order-independent. Gates: vitest 114/114, tsc + biome clean, build clean, e2e 7/7 over the Fake + stub ttyd. The WR-02 backlog finding is now CLOSED.
 
 ### Pending Todos
 
@@ -211,8 +215,8 @@ acceptances — CI never touches real Proxmox; see the milestone audits + each p
 
 ## Session Continuity
 
-Last session: 2026-06-15
-Stopped at: v1.2 roadmap created (Phases 7-9; 5/5 requirements mapped, 0 unmapped)
+Last session: 2026-06-15T05:53:58.378Z
+Stopped at: Completed 07-01-PLAN.md
 Resume file: None
 Next plan: Plan Phase 7 with `/gsd:plan-phase 7` (Backlog Fixes — UI-12 fast-reconcile + CICD-09 e2e hardening). Phases 8 (release hardening) and 9 (auto node selection) touch disjoint surfaces and may be planned in parallel.
 

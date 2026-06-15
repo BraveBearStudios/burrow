@@ -84,7 +84,7 @@ v1.0 real-infra acceptance (ACC-01/02/03). See `milestones/v1.1-MILESTONE-AUDIT.
 
 ### v1.2 Backlog Fixes + Release Automation (Phases 7-9)
 
-- [ ] **Phase 7: Backlog Fixes (Fast-Reconcile + E2E Hardening)** - Wire the `LeafPanel onTerminalEvent` fast-reconcile so the workspace list refreshes on a terminal error/close (UI-12), and harden the stop/start Playwright e2e with panel-scoped locators + per-test backend isolation (CICD-09)
+- [x] **Phase 7: Backlog Fixes (Fast-Reconcile + E2E Hardening)** - Wire the `LeafPanel onTerminalEvent` fast-reconcile so the workspace list refreshes on a terminal error/close (UI-12), and harden the stop/start Playwright e2e with panel-scoped locators + per-test backend isolation (CICD-09) (completed 2026-06-15)
 - [ ] **Phase 8: Release Hardening (release-please + harden-runner)** - Add release-please Conventional-Commit-driven release PRs (RELX-01) and a `step-security/harden-runner` egress allowlist with all third-party actions SHA-pinned (RELX-02)
 - [ ] **Phase 9: Auto Node Selection** - Capacity-aware auto node selection at create time — least-loaded node that passes the RAM threshold, proven over the FakeComputeProvider's multi-node capacity, with manual pick retained (WSX-01)
 
@@ -154,6 +154,6 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 4. Hardening & Release | v1.0 | 5/5 | Complete | 2026-06-11 |
 | 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete | 2026-06-14 |
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
-| 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 0/? | Not started | - |
+| 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete   | 2026-06-15 |
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 0/? | Not started | - |
 | 9. Auto Node Selection | v1.2 | 0/? | Not started | - |

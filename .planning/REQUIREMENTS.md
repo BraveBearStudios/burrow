@@ -25,7 +25,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 ### Workspace Lifecycle UI (UI)
 
-- [ ] **UI-12**: The workspace list reconciles immediately on a terminal error/close — `LeafPanel` wires `onTerminalEvent` → `useInvalidateWorkspaces` (the documented Pitfall-4 fast-reconcile), so the sidebar/status refresh without waiting for the ~3s poll (WR-01)
+- [x] **UI-12**: The workspace list reconciles immediately on a terminal error/close — `LeafPanel` wires `onTerminalEvent` → `useInvalidateWorkspaces` (the documented Pitfall-4 fast-reconcile), so the sidebar/status refresh without waiting for the ~3s poll (WR-01)
 
 ### Compute & Capacity (WSX)
 
@@ -38,7 +38,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 ### CI / Test Robustness (CICD)
 
-- [ ] **CICD-09**: The stop/start Playwright e2e is hardened — panel-scoped locators (no unscoped `.first()`/global count assertions) and per-test backend isolation (cleanup or DB reset) so the suite is robust to parallelization and multi-panel state (WR-02)
+- [x] **CICD-09**: The stop/start Playwright e2e is hardened — panel-scoped locators (no unscoped `.first()`/global count assertions) and per-test backend isolation (cleanup or DB reset) so the suite is robust to parallelization and multi-panel state (WR-02)
 
 ## Future Requirements
 
@@ -83,8 +83,8 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-12 | Phase 7 | Pending |
-| CICD-09 | Phase 7 | Pending |
+| UI-12 | Phase 7 | Complete |
+| CICD-09 | Phase 7 | Complete |
 | RELX-01 | Phase 8 | Pending |
 | RELX-02 | Phase 8 | Pending |
 | WSX-01 | Phase 9 | Pending |
