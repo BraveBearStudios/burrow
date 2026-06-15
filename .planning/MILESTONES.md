@@ -1,5 +1,18 @@
 # Milestones
 
+## v1.1 UI Polish + Stop/Start Controls (Shipped: 2026-06-15)
+
+**Phases completed:** 2 phases, 5 plans, 9 tasks
+
+**Key accomplishments:**
+
+- Two stop/start MSW lifecycle handlers + the failing-first RED tests for UI-07..UI-11 (Stop/Start gating, pending, the stopped placeholder, the V2/V3/V4 CSS-source rules, the drawer width token) + a Playwright stop->start + 375px-drawer e2e scaffold — the locked Wave 0 that the 05-02/05-03 feature plans turn green.
+- Status-gated Stop/Start header icon buttons (immediate-no-confirm Stop, disabled+aria-busy+spinner pending), the calm `Workspace stopped` placeholder body branched before the termStatus overlays, and the LeafPanel wiring of the existing useStop/useStartWorkspace hooks — turning the 05-01 UI-07/UI-08 RED tests GREEN with zero production change to useTerminal.
+- The three 04-UI-REVIEW polish details restored as pure global-CSS additions plus one inline-style swap: the `--w-drawer` token + `@media (max-width:375px)` override (UI-09 phone full-width sheet), one global `:focus-visible` `--accent-line` ring (UI-10), and the global custom Burrow scrollbar (UI-11) — turning the remaining 6 Plan-01 RED tests GREEN with the full vitest suite now 113/113 and zero hex/CDN/gold.
+- Completed `stop-start.spec.ts` — a 7/7-green Playwright gate over the built UI (Fake provider + stub ttyd) proving the stop→start server-truth round-trip, the 375px full-width drawer (and 360px above), the live `:focus-visible` --accent-line ring, and the custom 8px `::-webkit-scrollbar` — the four live halves jsdom cannot assert for UI-07..UI-11.
+
+---
+
 ## v1.0 MVP (Shipped: 2026-06-12)
 
 **Phases completed:** 5 phases, 26 plans, 73 tasks

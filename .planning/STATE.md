@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: UI Polish + Stop/Start Controls
-status: executing
+status: Awaiting next milestone
 stopped_at: Phase 5 UI-SPEC approved
-last_updated: "2026-06-15T02:42:17.997Z"
-last_activity: 2026-06-15
+last_updated: "2026-06-15T04:31:16.648Z"
+last_activity: 2026-06-15 — Milestone v1.1 completed and archived
 progress:
   total_phases: 2
   completed_phases: 2
@@ -30,18 +30,10 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: 6
-Plan: Not started
-Status: Ready to execute
-Last activity: 2026-06-15
-
-**v1.1 phase map:**
-
-- Phase 5 — Stop/Start Controls + Drawer Polish (UI-07, UI-08, UI-09, UI-10, UI-11) — frontend, depends on the v1.0 control plane + UI
-- Phase 6 — CI / Tooling Robustness (CICD-07, CICD-08) — CI/tooling + docs, independent of Phase 5
-
-Phases continue from v1.0 (which ended at Phase 4); v1.1 starts at Phase 5. All v1.1
-scope is CI-provable over the Fake provider — no real-Proxmox path this milestone.
+Phase: Milestone v1.1 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-15 — Milestone v1.1 completed and archived
 
 ## Performance Metrics
 
@@ -223,5 +215,4 @@ Next plan: Plan Phase 5 with `/gsd:plan-phase 5` (Stop/Start Controls + Drawer P
 
 ## Operator Next Steps
 
-- Review the v1.1 roadmap in `.planning/ROADMAP.md` (Phases 5-6).
-- Plan Phase 5 with `/gsd:plan-phase 5`, then Phase 6 with `/gsd:plan-phase 6` (Phase 6 may run in parallel — no dependency on Phase 5).
+- Start the next milestone with /gsd:new-milestone
