@@ -120,7 +120,17 @@ v1.0 real-infra acceptance (ACC-01/02/03). See `milestones/v1.1-MILESTONE-AUDIT.
   4. Every third-party action across the touched workflows is pinned to a full commit SHA (including `harden-runner` and the release-please action), with the SHA-pin convention preserved repo-wide.
   5. The harden-runner egress-allowlist policy and the release process are documented (CONTRIBUTING release section and/or a workflow comment) so the maintainer and future contributors can follow them; the first real enforcement is the deferred on-runner run.
 
-**Plans**: TBD
+**Plans**: 2 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 08-01-PLAN.md — release-please surface (config + manifest + workflow) with a blocking live SHA-verification gate, seeded 1.1.0 / bootstrap-sha = the v1.1 commit, REUSE.toml registration (RELX-01, RELX-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 08-02-PLAN.md — harden ci.yml + release.yml (harden-runner audit step 0 on every job), repin the PR-title gate off the moving v5 tag, document the release + hardening policy in CONTRIBUTING.md (RELX-02, RELX-01)
+
 **Scope note**: CI-config + docs only, dev-box-buildable and statically validatable (YAML/JSON parse + `reuse lint`); the live release-please PR and live harden-runner enforcement are the deferred ACC-02 on-runner acceptance, not a PR-CI command. RELX-01 = release-please (locked, do not propose semantic-release). All actions SHA-pinned; SPDX headers on every new/changed file (planning artifacts via REUSE.toml per CICD-08). Any baseline-architecture deviation lands an ADR.
 
 ### Phase 9: Auto Node Selection
@@ -155,5 +165,5 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete | 2026-06-14 |
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete    | 2026-06-15 |
-| 8. Release Hardening (release-please + harden-runner) | v1.2 | 0/? | Not started | - |
+| 8. Release Hardening (release-please + harden-runner) | v1.2 | 0/2 | Planned | - |
 | 9. Auto Node Selection | v1.2 | 0/? | Not started | - |
