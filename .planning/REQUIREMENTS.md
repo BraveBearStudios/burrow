@@ -83,17 +83,17 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| UI-12 | — | Pending |
-| CICD-09 | — | Pending |
-| RELX-01 | — | Pending |
-| RELX-02 | — | Pending |
-| WSX-01 | — | Pending |
+| UI-12 | Phase 7 | Pending |
+| CICD-09 | Phase 7 | Pending |
+| RELX-01 | Phase 8 | Pending |
+| RELX-02 | Phase 8 | Pending |
+| WSX-01 | Phase 9 | Pending |
 
 **Coverage:**
 
 - v1.2 requirements: 5 total
-- Mapped to phases: 0 (pre-roadmap)
-- Unmapped: 5
+- Mapped to phases: 5 (Phase 7: UI-12, CICD-09 · Phase 8: RELX-01, RELX-02 · Phase 9: WSX-01)
+- Unmapped: 0
 
 ---
-*Requirements defined: 2026-06-15 for milestone v1.2*
+*Requirements defined: 2026-06-15 for milestone v1.2; mapped to phases 7-9 during roadmap creation.*
