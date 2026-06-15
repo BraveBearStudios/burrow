@@ -38,3 +38,24 @@ path = ["design/Burrow-handoff.zip", "design/Burrow-handoff/**"]
 precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Brave Bear Studios"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
+
+# ── GSD planning artifacts (CICD-08) ───────────────────────────────────
+# Planning artifacts are licensed HERE, not via inline headers. This is the
+# reconciled convention: a `*-PLAN.md` must keep its YAML frontmatter on line 1
+# so the gsd-sdk `phase-plan-index` parser reads `wave`/`depends_on` (a leading
+# SPDX HTML comment makes the parser fall back to wave-1/no-deps). Covering the
+# whole `.planning` tree here keeps every PLAN/REVIEW/SUMMARY/etc. compliant
+# without an inline header. Real source files (api/, ui/, cc-worker-config/,
+# scripts) are deliberately NOT globbed — CICD-06 still requires their inline
+# two-line header to surface if missing.
+[[annotations]]
+path = [
+  ".planning/*.md",
+  ".planning/**/*.md",
+  ".planning/*.json",
+  ".planning/**/*.json",
+  ".planning/**/.gitignore",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Brave Bear Studios"
+SPDX-License-Identifier = "AGPL-3.0-or-later"

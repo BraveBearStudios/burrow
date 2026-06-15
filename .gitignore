@@ -41,6 +41,10 @@ blob-report/
 *.sqlite3
 /data/
 
+# ── Ephemeral test artifacts ──────────────────────────────────────────
+# Local UAT screenshots — regenerated per run, not source (CICD-08).
+ui/uat-shots/
+
 # ── Editor / OS ───────────────────────────────────────────────────────
 .DS_Store
 .idea/
