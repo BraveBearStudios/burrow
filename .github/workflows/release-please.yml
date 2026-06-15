@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Release automation (RELX-01). On every push to main, release-please reads the
+# Conventional-Commit history and maintains a release PR: it bumps the version
+# in .release-please-manifest.json and regenerates CHANGELOG.md. Merging that PR
+# tags v<X.Y.Z>, which fires release.yml's existing v* publish job. The two
+# workflows chain ONLY via the git tag, never via a shared file, so release.yml's
+# trigger is left untouched (no workflow_run, no trigger edit, no collision).
+#
+# Runner hardening (RELX-02): harden-runner runs first in egress-policy: audit so
+# it observes all egress from the start of the job. Discovering the real egress
+# allowlist from the audit insights and flipping to egress-policy: block is the
+# deferred ACC-02 on-runner step (it cannot be discovered on the dev box). Every
+# third-party action is pinned to a full 40-hex commit SHA; the trailing
+# # vX.Y.Z comment records the human-readable version only — the SHA is the
+# supply-chain control.
+#
+# The job uses the run's built-in GITHUB_TOKEN (no PAT, no new stored secret),
+# preserving the v1 LAN / no-stored-secret posture. NOTE for the first releaser:
+# a tag pushed by GITHUB_TOKEN may not re-trigger release.yml; verify on the first
+# live release and, if needed, re-run release.yml on the tag (Open Q1 / ACC-02).
+
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    name: Maintain release PR
+    runs-on: ubuntu-latest
+    # release-please needs to write the release branch/commit and open/update a
+    # PR. EXACTLY these two — no issues: write, nothing broader (least privilege).
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Harden the runner (audit egress)
+        uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
+
+      - name: Run release-please
+        uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
