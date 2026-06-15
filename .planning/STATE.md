@@ -4,13 +4,13 @@ milestone: v1.2
 milestone_name: Backlog Fixes + Release Automation
 status: executing
 stopped_at: Completed 07-01-PLAN.md
-last_updated: "2026-06-15T21:14:33.123Z"
-last_activity: 2026-06-15 -- Phase 8 planning complete
+last_updated: "2026-06-15T21:31:58.910Z"
+last_activity: 2026-06-15
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 33
 ---
 
@@ -26,14 +26,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-13)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 7 — Backlog Fixes (Fast-Reconcile + E2E Hardening)
+**Current focus:** Phase 8 — Release Hardening (release-please + harden-runner)
 
 ## Current Position
 
-Phase: 8
-Plan: Not started
+Phase: 8 (Release Hardening (release-please + harden-runner)) — EXECUTING
+Plan: 2 of 2
 Status: Ready to execute
-Last activity: 2026-06-15 -- Phase 8 planning complete
+Last activity: 2026-06-15
 
 ## Performance Metrics
 
@@ -92,6 +92,7 @@ Last activity: 2026-06-15 -- Phase 8 planning complete
 | Phase 5 P02 | 14min | 3 tasks | 4 files |
 | Phase 5 P03 | 9 | 2 tasks | 2 files |
 | Phase 7 P01 | 10 | 2 tasks | 4 files |
+| Phase 8 P08-01 | 12 | 3 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -182,6 +183,8 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 05-03]: The 3 drawer-polish details (04-UI-REVIEW 22/24) ship as pure global-CSS additions + one inline-style swap. --w-drawer:min(360px,100vw) lives in @theme and is overridden to 100vw under @media(max-width:375px) on :root in PLAIN CSS (NOT a nested @theme — Tailwind v4 Pitfall 6); ActivityDrawer swaps the DRAWER_WIDTH literal for width:var(--w-drawer) (UI-09). ONE unscoped global :focus-visible{outline:2px solid var(--accent-line);outline-offset:2px} covers every control across all four themes (UI-10); the global custom scrollbar thumb is --border-mid→--text-muted on hover on a transparent track + Firefox scrollbar-width:thin/scrollbar-color (UI-11). Tokens only, zero hex/CDN/gold; full vitest 113/113 GREEN.
 - [Phase 7]: [Plan 07-01]: UI-12 fast-reconcile shipped as invalidation-only — LeafPanel calls useInvalidateWorkspaces() and passes it as onTerminalEvent to TerminalPanel (mirroring the onTerminate wiring), so a terminal error/close invalidates WORKSPACES_KEY immediately (Pitfall 4) ahead of the ~3s poll. The server stays the single source of truth: the failing-first vitest drives a MockWebSocket close (→ useTerminal.onclose → scheduleReconnect → onTerminalEvent('closed')), spies QueryClient.invalidateQueries for WORKSPACES_KEY, AND asserts no status leaked into the Zustand layoutStore. NO change to useTerminal/useWorkspaces beyond the one-line LeafPanel wiring. The WR-01 backlog finding is now CLOSED.
 - [Phase 7]: [Plan 07-01]: CICD-09 e2e hardening — TerminalPanel root <section> gained data-testid=panel-${id}; stop-start.spec.ts scopes EVERY locator to the panel under test (createWorkspace returns the panel locator + tracks the created id), removing all unscoped .first() and the global [data-testid^=term-] toHaveCount(0) (now a panel-scoped term-body-absent + placeholder-shown assertion). The stopped panel's TWO 'Start workspace' affordances (header icon button + placeholder CTA) are disambiguated by scoping the Start click to the role=status placeholder region (Rule-1 fix — strict mode rejected the bare two-match). An afterEach DELETEs only each test's created ids (id-scoped, never a broad wipe) so the mode:serial Fake-backed suite is order-independent. Gates: vitest 114/114, tsc + biome clean, build clean, e2e 7/7 over the Fake + stub ttyd. The WR-02 backlog finding is now CLOSED.
+- [Phase 8]: [Plan 08-01]: release-please manifest-mode surface authored. release-please-config.json = release-type simple, single root '.', include-v-in-tag true, bootstrap-sha = the v1.1 COMMIT 9bccec85 (re-derived via 'git rev-parse v1.1^{commit}' = 'git rev-list -n1 v1.1'), NOT the f900a95 tag-object SHA that 'git rev-parse v1.1' returns (the RESEARCH/PATTERNS error corrected). .release-please-manifest.json seeded 1.1.0 (NOT the research-recommended 1.2.0) — only v1.0/v1.1 are tagged and v1.2 is in-progress, so 1.1.0 makes the first release PR capture the v1.2 work and propose v1.2.0. No changelog-sections override (locked 'defaults' by omission). Both comment-less JSON files licensed via REUSE.toml (CICD-08), not inline headers.
+- [Phase 8]: [Plan 08-01]: release-please.yml workflow authored (push:main). Workflow default permissions contents:read; the release-please job elevates to EXACTLY contents:write + pull-requests:write (no issues:write — least privilege, Pitfall 4). step-security/harden-runner@9af89fc (v2.19.4) is the literal step 0 in egress-policy:audit (observes all egress); googleapis/release-please-action@5c625bf (v4.4.1) follows with config-file + manifest-file + built-in GITHUB_TOKEN (no PAT, no new secret). Every uses: pinned to a live-'git ls-remote'-verified 40-hex commit SHA (all three matched the research hints exactly — no upstream drift; amannn v5.5.3 = 0723387 recorded for Plan 02's PR-title repin). The chain is tag-based: merging the release PR tags v* which fires release.yml's existing publish — release.yml's trigger is UNTOUCHED. harden-runner block flip + discovered allowlist is the deferred ACC-02 on-runner step.
 
 ### Pending Todos
 
@@ -216,7 +219,7 @@ acceptances — CI never touches real Proxmox; see the milestone audits + each p
 
 ## Session Continuity
 
-Last session: 2026-06-15T05:53:58.378Z
+Last session: 2026-06-15T21:26:09.501Z
 Stopped at: Completed 07-01-PLAN.md
 Resume file: None
 Next plan: Plan Phase 7 with `/gsd:plan-phase 7` (Backlog Fixes — UI-12 fast-reconcile + CICD-09 e2e hardening). Phases 8 (release hardening) and 9 (auto node selection) touch disjoint surfaces and may be planned in parallel.

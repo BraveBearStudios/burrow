@@ -33,8 +33,8 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 ### Release & Runner (RELX)
 
-- [ ] **RELX-01**: Release automation via **release-please** — a workflow that, from Conventional Commits on main, maintains a release PR (semantic version bump + generated changelog) and tags `v*` on merge. Config is buildable + lintable locally; the first real release PR is the on-runner acceptance.
-- [ ] **RELX-02**: CI workflows run under `step-security/harden-runner` with an egress allowlist (audit-then-block policy) and all third-party actions pinned to a commit SHA; the policy is documented. (First real enforcement is on the runner.)
+- [x] **RELX-01**: Release automation via **release-please** — a workflow that, from Conventional Commits on main, maintains a release PR (semantic version bump + generated changelog) and tags `v*` on merge. Config is buildable + lintable locally; the first real release PR is the on-runner acceptance.
+- [x] **RELX-02**: CI workflows run under `step-security/harden-runner` with an egress allowlist (audit-then-block policy) and all third-party actions pinned to a commit SHA; the policy is documented. (First real enforcement is on the runner.)
 
 ### CI / Test Robustness (CICD)
 
@@ -85,8 +85,8 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 |-------------|-------|--------|
 | UI-12 | Phase 7 | Complete |
 | CICD-09 | Phase 7 | Complete |
-| RELX-01 | Phase 8 | Pending |
-| RELX-02 | Phase 8 | Pending |
+| RELX-01 | Phase 8 | Complete |
+| RELX-02 | Phase 8 | Complete |
 | WSX-01 | Phase 9 | Pending |
 
 **Coverage:**
