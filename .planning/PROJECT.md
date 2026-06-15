@@ -74,6 +74,8 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 - ✓ CI/tooling robustness: `reuse lint` pinned to `--with charset-normalizer` (no `NoEncodingModuleError`); planning artifacts licensed via REUSE.toml so PLAN frontmatter stays line-1 for the gsd-sdk parser — v1.1 (Phase 6; CICD-07/CICD-08; reuse 309/309 compliant)
 - ✓ Workspace list fast-reconciles on terminal error/close (LeafPanel wires `onTerminalEvent` → invalidate, not just the ~3s poll) — v1.2 (Phase 7; UI-12; vitest 114/114)
 - ✓ Stop/start e2e hardened: panel-scoped locators + per-test id-scoped backend isolation — v1.2 (Phase 7; CICD-09; e2e 7/7)
+- ✓ Release automation via release-please (single-root `simple`, manifest seeded 1.1.0 so the first PR proposes v1.2.0, push:main → release PR → `v*` tag → existing `release.yml` publish) — v1.2 (Phase 8; RELX-01) ★ first live release PR = on-runner ACC-02
+- ✓ Runner hardening: `harden-runner` (egress audit) step 0 on all 5 CI jobs + every `uses:` SHA-pinned (25 refs, PR-title gate repinned off `@v5`) — v1.2 (Phase 8; RELX-02; reuse 331/331) ★ `egress-policy: block` flip + discovered allowlist = on-runner ACC-02
 
 ### Active
 
@@ -171,4 +173,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-15 — v1.2 Phase 7 complete (fast-reconcile UI-12 + e2e hardening CICD-09, verified 5/5). Next: Phase 8 (release-please + harden-runner), needs operator release decisions.*
+*Last updated: 2026-06-15 — v1.2 Phase 8 complete (release-please RELX-01 + harden-runner RELX-02, verified 5/5; manifest seeded 1.1.0, all 25 action uses SHA-pinned, harden-runner audit on 5 jobs). Live release PR + egress block-flip are deferred ACC-02 on-runner. Next: Phase 9 (auto node selection, WSX-01).*
