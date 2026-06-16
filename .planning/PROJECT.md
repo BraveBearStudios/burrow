@@ -76,6 +76,7 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 - ✓ Stop/start e2e hardened: panel-scoped locators + per-test id-scoped backend isolation — v1.2 (Phase 7; CICD-09; e2e 7/7)
 - ✓ Release automation via release-please (single-root `simple`, manifest seeded 1.1.0 so the first PR proposes v1.2.0, push:main → release PR → `v*` tag → existing `release.yml` publish) — v1.2 (Phase 8; RELX-01) ★ first live release PR = on-runner ACC-02
 - ✓ Runner hardening: `harden-runner` (egress audit) step 0 on all 5 CI jobs + every `uses:` SHA-pinned (25 refs, PR-title gate repinned off `@v5`) — v1.2 (Phase 8; RELX-02; reuse 331/331) ★ `egress-policy: block` flip + discovered allowlist = on-runner ACC-02
+- ✓ Auto node selection: creating a workspace without a node auto-picks the least-loaded node passing the RAM threshold (over `settings.worker_nodes` via the existing `getNodeMemory` seam, selection inside `_create_lock`); manual pick unchanged; no-fit refuses (409, no overcommit); modal defaults to "Auto (least-loaded)" — v1.2 (Phase 9; WSX-01; api 202 + ui 117 green, seam-leakage green) ★ real multi-node cluster = on-runner ACC-01
 
 ### Active
 
@@ -173,4 +174,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-15 — v1.2 Phase 8 complete (release-please RELX-01 + harden-runner RELX-02, verified 5/5; manifest seeded 1.1.0, all 25 action uses SHA-pinned, harden-runner audit on 5 jobs). Live release PR + egress block-flip are deferred ACC-02 on-runner. Next: Phase 9 (auto node selection, WSX-01).*
+*Last updated: 2026-06-16 — v1.2 milestone code-complete: Phase 7 (fast-reconcile + e2e hardening), Phase 8 (release-please + harden-runner), Phase 9 (auto node selection, WSX-01) all verified. Deferred on-runner/real-infra acceptances remain: ACC-01 (homelab smoke incl. real multi-node auto-select), ACC-02 (first live release PR + egress block-flip), ACC-03 (real GHCR publish + cosign/attestation verify). Next: milestone audit → complete → cleanup.*
