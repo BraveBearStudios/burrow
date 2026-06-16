@@ -153,8 +153,13 @@ class WorkspaceService:
             node = payload.node if payload.node is not None else await self.selectNode()
             # 0b — capacity guard (CAP-01) on the CHOSEN node (CAP-04). For the auto
             # path selectNode already guaranteed `_fits`, but the guard is the single
-            # authoritative threshold check both paths pass through.
-            if await self.compute.getNodeMemory(node) > self.settings.capacity_threshold:
+            # authoritative threshold check both paths pass through. IN-02: route it
+            # through the shared `_fits` comparator (strict `>` refuses, `==`
+            # eligible) so there is genuinely ONE comparison source — the guard can
+            # never drift from selectNode/`/nodes` if `_fits` semantics change.
+            if not _fits(
+                await self.compute.getNodeMemory(node), self.settings.capacity_threshold
+            ):
                 raise CapacityError(node)
             # 1 — reserve VMID via the DB partial-unique INSERT (the race arbiter);
             # persist the chosen node on the row (never None).
