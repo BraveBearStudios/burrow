@@ -104,6 +104,21 @@ export const seedNodes: NodeCapacity[] = [
 	},
 ];
 
+/**
+ * The node the Auto path resolves to — least-loaded among the at/under-threshold
+ * seed nodes, tie-broken by name ascending (mirrors the backend `selectNode`). Used
+ * by the create handler to fill the row when the request omits `node` (node1 @ 0.42).
+ */
+function autoSelectedNode(): string {
+	const eligible = seedNodes.filter((n) => !n.overThreshold);
+	const sorted = [...eligible].sort((a, b) => {
+		const fa = a.memoryUsedFraction ?? Number.POSITIVE_INFINITY;
+		const fb = b.memoryUsedFraction ?? Number.POSITIVE_INFINITY;
+		return fa !== fb ? fa - fb : a.node.localeCompare(b.node);
+	});
+	return sorted[0]?.node ?? "node1";
+}
+
 export const handlers = [
 	// GET /api/v1/workspaces — list, optionally filtered by ?status=
 	http.get("/api/v1/workspaces", ({ request }) => {
@@ -135,7 +150,10 @@ export const handlers = [
 		return HttpResponse.json(envelope(found));
 	}),
 
-	// POST /api/v1/workspaces — synchronous create returns a running workspace (v1 saga)
+	// POST /api/v1/workspaces — synchronous create returns a running workspace (v1 saga).
+	// When body.node is null/omitted (the Auto path) the backend auto-selects the
+	// least-loaded node; this fake mirrors that by deriving the least-loaded seed node
+	// (node1 @ 0.42) so the created row always carries a real node string.
 	http.post("/api/v1/workspaces", async ({ request }) => {
 		const body = (await request.json()) as WorkspaceCreate;
 		const created: Workspace = {
@@ -143,7 +161,7 @@ export const handlers = [
 			name: body.name,
 			status: "running",
 			vmid: 110,
-			node: body.node,
+			node: body.node ?? autoSelectedNode(),
 			lxcIp: "10.99.0.110",
 			projectRepo: body.projectRepo,
 			projectBranch: body.projectBranch ?? "main",

@@ -180,6 +180,9 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 	const [name, setName] = useState("");
 	const [projectRepo, setProjectRepo] = useState("");
 	const [projectBranch, setProjectBranch] = useState("main");
+	// "" is the Auto (least-loaded) sentinel: the default selection, sent to the
+	// backend as node: null so the service auto-selects. A non-empty value is an
+	// explicit manual node pick (the unchanged path).
 	const [node, setNode] = useState("");
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
 
@@ -207,13 +210,6 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 		};
 	}, []);
 
-	// Default the node select to the first node once capacity loads.
-	useEffect(() => {
-		if (!node && nodes && nodes.length > 0) {
-			setNode(nodes[0].node);
-		}
-	}, [nodes, node]);
-
 	// Focus the dialog on mount so Esc/Enter + the focus trap engage immediately.
 	useEffect(() => {
 		dialogRef.current?.focus();
@@ -226,8 +222,9 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 		return undefined;
 	};
 
-	const isValid =
-		name.trim() !== "" && projectRepo.trim() !== "" && node.trim() !== "";
+	// Node is no longer required: the default Auto (least-loaded) choice ("" sentinel)
+	// is a valid form state, so only Name + Git repo gate the Create button.
+	const isValid = name.trim() !== "" && projectRepo.trim() !== "";
 
 	const runSaga = async () => {
 		setServerError(null);
@@ -242,7 +239,9 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 				name,
 				projectRepo,
 				projectBranch: projectBranch.trim() || "main",
-				node,
+				// Auto sentinel ("") → node: null so the backend auto-selects the
+				// least-loaded node; a manual pick sends the chosen node string.
+				node: node || null,
 			});
 			if (intervalRef.current) {
 				clearInterval(intervalRef.current);
@@ -270,7 +269,7 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 	};
 
 	const onSubmit = () => {
-		setTouched({ Name: true, "Git repo": true, Node: true });
+		setTouched({ Name: true, "Git repo": true });
 		// Synchronous latch: block a double-submit (Enter + click, or two clicks in
 		// one tick) from starting a second saga / a second openPanel timer.
 		if (!isValid || phase !== "form" || submittingRef.current) {
@@ -421,6 +420,9 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 									onBlur={() => setTouched((t) => ({ ...t, Node: true }))}
 									style={{ ...inputStyle, padding: "0 6px" }}
 								>
+									{/* Auto (least-loaded) is the default: value "" → node null →
+									    the backend auto-selects. Manual picks follow below. */}
+									<option value="">Auto (least-loaded)</option>
 									{(nodes ?? []).map((n) => (
 										<option key={n.node} value={n.node}>
 											{n.node}

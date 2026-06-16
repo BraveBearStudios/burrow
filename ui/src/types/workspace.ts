@@ -36,7 +36,9 @@ export interface WorkspaceCreate {
 	projectRepo: string;
 	projectBranch?: string;
 	pluginSet?: string;
-	node: string;
+	// Optional, mirroring the backend `node: str | None = None`: null/omitted means
+	// "auto-select the least-loaded node"; a node string is an explicit manual pick.
+	node?: string | null;
 }
 
 /** Per-node capacity from GET /api/v1/nodes (Plan 02-01 backend). */
