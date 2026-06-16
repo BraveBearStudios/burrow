@@ -110,9 +110,44 @@ frontmatter stays line-1 for the parser (CICD-07/08).
 - Model mix: Opus across orchestrator + all GSD subagents. Heaviest spend: the four Phase-5 executors
   (real React/CSS + tests + a live Playwright run). Phase 6 executed inline (cheap).
 
+## Milestone: v1.2 — Backlog Fixes + Release Automation
+
+**Shipped:** 2026-06-16
+**Phases:** 3 | **Plans:** 6 | **Tasks:** 14
+
+### What Was Built
+- Phase 7: UI-12 `LeafPanel onTerminalEvent` fast-reconcile + CICD-09 panel-scoped stop/start e2e hardening (the two deferred v1.1 review findings).
+- Phase 8: release-please manifest-mode surface (seeded 1.1.0, bootstrap-sha = the v1.1 commit) + `harden-runner` audit step 0 on all 5 CI/release jobs + every `uses:` pinned to a live-verified upstream SHA.
+- Phase 9: capacity-aware auto node selection (WSX-01) over a `worker_nodes` Settings list and the shared `_fits` comparator, `selectNode` inside `_create_lock`, modal "Auto (least-loaded)" default. api 202 + ui 117 green.
+
+### What Worked
+- Parallel codebase scouts (4 structured Explore agents) grounded the Phase-9 discuss grey areas with file:line precision, so the planner and executors worked from a concrete integration map rather than assumptions.
+- Authoritative-override blocks in the planner/executor prompts caught and corrected two upstream-artifact errors before they shipped (see below).
+- The code-review → fix → verify chain earned its keep: it surfaced WR-01 (the curated `CapacityError(message=)` was dead at the wire and the static message misled the auto path), which every green test had missed because the unit test asserted on the exception object, not the response body.
+- TDD failing-first across all of Phase 9; mypy/ruff/biome/tsc gates green at every commit.
+
+### What Was Inefficient
+- The research agent AND the pattern-mapper both reported `git rev-parse v1.1` (the annotated tag-object SHA `f900a95…`) as the release-please `bootstrap-sha`, when the correct value is the commit SHA `9bccec85…` (`git rev-parse "v1.1^{commit}"`). Caught by verifying the git object live before planning; the lesson is now encoded.
+- A Phase-9 executor halted mid-plan on the global commit-approval gate (it asked "Proceed? yes/no" and stopped). With `SendMessage` unavailable to resume it, a fresh continuation executor had to finish Task 2 from the working-tree state. Autonomous executors must be told explicitly to auto-commit per step.
+
+### Patterns Established
+- Reuse parallel-scout findings as the phase RESEARCH.md/PATTERNS instead of re-spawning a researcher (the scouts already did the investigation).
+- Verify any SHA / git object / action pin live (`git ls-remote`, `git rev-parse ^{commit}`) rather than trusting agent memory; treat research-quoted SHAs as hints to confirm.
+- Surface a curated `safe_message` at the error-handler boundary without ever leaking raw `str(exc)`, so a single error `code` can carry path-accurate operator guidance.
+
+### Key Lessons
+- `git rev-parse <tag>` returns the annotated tag OBJECT, not the commit; release-please `bootstrap-sha` needs the commit (`^{commit}`).
+- Green tests on an exception object do not prove the wire message; assert the response body for user-facing error copy.
+- The global per-commit approval gate conflicts with autonomous executors; the orchestrator must pre-authorize per-step commits in the executor prompt.
+
+### Cost Observations
+- Model mix: Opus across the orchestrator + all GSD/Workflow subagents. Heaviest spend: the Phase-9 executors (backend selection logic + the criterion-5 unit/integration matrix) and the 4-agent parallel scout Workflow.
+- Notable: the review→fix→verify chain caught one real wire-level UX bug (WR-01) that 202 passing api tests had missed.
+
 ## Cross-Milestone Trends
 
 | Milestone | Phases | Plans | Close state | Blockers found at audit |
 |-----------|--------|-------|-------------|--------------------------|
 | v1.0 MVP | 5 | 26 | tech_debt (real-infra deferred) | 1 (WS-08 terminate→destroy; fixed) |
 | v1.1 UI Polish + Stop/Start | 2 | 5 | tech_debt (no blockers; WR-01/02 → backlog) | 0 |
+| v1.2 Backlog Fixes + Release Automation | 3 | 6 | passed (integration WIRED; 1 review warning fixed inline) | 0 |

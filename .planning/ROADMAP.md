@@ -9,30 +9,20 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 - ✅ **v1.0 MVP** — Phases 0-4 (shipped 2026-06-11)
 - ✅ **v1.1 UI Polish + Stop/Start Controls** — Phases 5-6 (shipped 2026-06-15)
-- 🚧 **v1.2 Backlog Fixes + Release Automation** — Phases 7-9 (in progress)
+- ✅ **v1.2 Backlog Fixes + Release Automation** — Phases 7-9 (shipped 2026-06-16)
 
-Full v1.0 detail is archived at [`milestones/v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md);
-v1.1 at [`milestones/v1.1-ROADMAP.md`](milestones/v1.1-ROADMAP.md). Requirements + close-out
-audits live alongside each in `milestones/`.
-
-## Overview (v1.2)
-
-v1.2 clears the two deferred v1.1 code-review findings (WR-01 the `LeafPanel`
-fast-reconcile, WR-02 the brittle stop/start e2e), hardens the release/CI surface
-(release-please automation + a `step-security/harden-runner` egress-locked runner with
-SHA-pinned actions), and adds capacity-aware auto node selection at create time. Every
-v1.2 requirement is dev-box-buildable and CI-provable over the `FakeComputeProvider` —
-there is no real-Proxmox path in this milestone. The carried real-infra acceptance debt
-(ACC-01/02/03 — the dev-homelab smoke, the first live CI run, a real GHCR release) and the
-real-boot v2 candidates (WSX-02 persistent workspaces, WSX-03 scrollback restore) stay
-tracked and deferred: they need real Proxmox / a live runner off the dev box.
+Full milestone detail is archived per version in `milestones/`:
+[`v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md),
+[`v1.1-ROADMAP.md`](milestones/v1.1-ROADMAP.md),
+[`v1.2-ROADMAP.md`](milestones/v1.2-ROADMAP.md). Requirements + close-out audits live
+alongside each. Start the next milestone with `/gsd:new-milestone`.
 
 ## Phases
 
 **Phase Numbering:**
 
-- Integer phases (7, 8, 9): Planned milestone work (v1.2 continues from v1.1's Phase 6)
-- Decimal phases (7.1, 7.2): Urgent insertions (marked with INSERTED)
+- Integer phases (7, 8, 9): planned milestone work (each milestone continues the numbering)
+- Decimal phases (7.1, 7.2): urgent insertions (marked with INSERTED)
 
 Decimal phases appear between their surrounding integers in numeric order.
 
@@ -82,91 +72,33 @@ v1.0 real-infra acceptance (ACC-01/02/03). See `milestones/v1.1-MILESTONE-AUDIT.
 
 </details>
 
-### v1.2 Backlog Fixes + Release Automation (Phases 7-9)
+<details>
+<summary>✅ v1.2 Backlog Fixes + Release Automation (Phases 7-9) — SHIPPED 2026-06-16</summary>
 
-- [x] **Phase 7: Backlog Fixes (Fast-Reconcile + E2E Hardening)** - Wire the `LeafPanel onTerminalEvent` fast-reconcile so the workspace list refreshes on a terminal error/close (UI-12), and harden the stop/start Playwright e2e with panel-scoped locators + per-test backend isolation (CICD-09) (completed 2026-06-15)
-- [x] **Phase 8: Release Hardening (release-please + harden-runner)** - Add release-please Conventional-Commit-driven release PRs (RELX-01) and a `step-security/harden-runner` egress allowlist with all third-party actions SHA-pinned (RELX-02) (completed 2026-06-15)
-- [x] **Phase 9: Auto Node Selection** - Capacity-aware auto node selection at create time — least-loaded node that passes the RAM threshold, proven over the FakeComputeProvider's multi-node capacity, with manual pick retained (WSX-01) (completed 2026-06-16)
+- [x] Phase 7: Backlog Fixes (Fast-Reconcile + E2E Hardening) (1/1 plan) — completed 2026-06-15
+- [x] Phase 8: Release Hardening (release-please + harden-runner) (2/2 plans) — completed 2026-06-15
+- [x] Phase 9: Auto Node Selection (3/3 plans) — completed 2026-06-16
 
-## Phase Details
+**Delivered:** the two deferred v1.1 code-review findings closed (UI-12 `LeafPanel
+onTerminalEvent` fast-reconcile + CICD-09 panel-scoped stop/start e2e hardening); a release-please
+manifest-mode surface (config + manifest seeded 1.1.0 so the first PR proposes v1.2.0, push:main →
+release PR → `v*` tag → existing publish) with `step-security/harden-runner` audit step 0 on all 5
+CI/release jobs and every `uses:` SHA-pinned to a live-verified upstream commit (RELX-01/RELX-02);
+and capacity-aware auto node selection (WSX-01) — `createWorkspace` auto-picks the least-loaded
+fitting node via `selectNode` inside `_create_lock` over a `worker_nodes` Settings list and the
+shared `_fits` comparator, manual pick unchanged, no-fit refuses with `capacity_exceeded`, modal
+defaults to "Auto (least-loaded)". 6 plans; api 202 + ui 117 green, seam-leakage green, every v1.2
+requirement CI-provable over the FakeComputeProvider.
 
-### Phase 7: Backlog Fixes (Fast-Reconcile + E2E Hardening)
+**Deferred (real-infra / backlog, tracked):** ACC-01 (dev-homelab smoke incl. real multi-node
+auto-select), ACC-02 (first live release-please PR + egress block-flip + full actionlint), ACC-03
+(real GHCR publish + cosign/attestation verify), WSX-02/WSX-03 (persistent workspaces + scrollback
+restore, real-boot v2), and the 07r e2e-cleanup-robustness nit. See
+`milestones/v1.2-MILESTONE-AUDIT.md`.
 
-**Goal**: The operator's workspace list reflects a terminal error/close immediately instead of waiting for the ~3s poll, and the stop/start Playwright e2e is robust to parallelization and multi-panel state so it stops being a flaky gate.
-**Depends on**: Phase 6 (builds on the shipped v1.1 surface — the `LeafPanel`/`onTerminalEvent` callback, `useInvalidateWorkspaces`, and the `stop-start.spec.ts` Playwright gate all ship from v1.1; also independent of Phases 8 and 9)
-**Requirements**: UI-12, CICD-09
-**Success Criteria** (what must be TRUE):
-
-  1. When a workspace's terminal emits an error or close event, the sidebar/status reconciles immediately (`LeafPanel` wires `onTerminalEvent` → `useInvalidateWorkspaces`, the documented Pitfall-4 fast-reconcile) — the operator does not wait for the next ~3s poll tick to see the new status.
-  2. A vitest test proves the fast-reconcile path: a simulated terminal error/close event triggers a workspace-list invalidation (not a status mirror), and absent an event the list still falls back to the existing poll.
-  3. The stop/start Playwright e2e uses panel-scoped locators only — no unscoped `.first()` and no global count assertions — so it asserts the correct panel's state under a multi-panel layout.
-  4. The stop/start e2e has per-test backend isolation (cleanup or DB reset between tests) so the suite is order-independent and survives parallelization without cross-test state bleed.
-  5. The full vitest + Playwright suite runs green over the Fake provider + stub ttyd, with the hardened stop/start spec passing repeatably.
-
-**Plans**: TBD
-**UI hint**: yes
-**Scope note**: Fully CI-provable over the Fake provider (vitest + Playwright + the stub ttyd already in the harness) — no real Proxmox. UI-12 is a frontend wiring + unit-test change; CICD-09 is a test-robustness change to `stop-start.spec.ts` and its harness. Every changed source file carries the SPDX header; the UI-12 regression test lands with the change.
-
-### Phase 8: Release Hardening (release-please + harden-runner)
-
-**Goal**: A merge to main maintains an automated release PR (semantic version bump + generated changelog) that tags `v*` on merge, and the CI workflows run under a locked-down, egress-restricted runner with every third-party action pinned to a commit SHA — so cutting a release is one click and the runner surface is hardened.
-**Depends on**: Nothing within v1.2 (independent of Phases 7 and 9; touches `.github/workflows/` + `docs/` only, not the React app or the API). Builds on the existing `ci.yml` / `release.yml` supply-chain surface from v1.0 Phase 4.
-**Requirements**: RELX-01, RELX-02
-**Success Criteria** (what must be TRUE):
-
-  1. A release-please workflow exists that, from Conventional Commits on main, maintains a release PR with a semantic version bump and a generated changelog, and tags `v*` on merge of that PR (release-please is the chosen tool — not semantic-release).
-  2. The release-please config (manifest + config file + workflow) is buildable and lint-clean locally / in the static-gates job — its YAML/JSON validates and `reuse lint` stays green; the first real release PR is the deferred on-runner acceptance.
-  3. The CI workflows run under `step-security/harden-runner` with an egress allowlist using an audit-then-block policy, applied to the relevant jobs.
-  4. Every third-party action across the touched workflows is pinned to a full commit SHA (including `harden-runner` and the release-please action), with the SHA-pin convention preserved repo-wide.
-  5. The harden-runner egress-allowlist policy and the release process are documented (CONTRIBUTING release section and/or a workflow comment) so the maintainer and future contributors can follow them; the first real enforcement is the deferred on-runner run.
-
-**Plans**: 2 plans
-
-Plans:
-**Wave 1**
-
-- [x] 08-01-PLAN.md — release-please surface (config + manifest + workflow) with a blocking live SHA-verification gate, seeded 1.1.0 / bootstrap-sha = the v1.1 commit, REUSE.toml registration (RELX-01, RELX-02)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 08-02-PLAN.md — harden ci.yml + release.yml (harden-runner audit step 0 on every job), repin the PR-title gate off the moving v5 tag, document the release + hardening policy in CONTRIBUTING.md (RELX-02, RELX-01)
-
-**Scope note**: CI-config + docs only, dev-box-buildable and statically validatable (YAML/JSON parse + `reuse lint`); the live release-please PR and live harden-runner enforcement are the deferred ACC-02 on-runner acceptance, not a PR-CI command. RELX-01 = release-please (locked, do not propose semantic-release). All actions SHA-pinned; SPDX headers on every new/changed file (planning artifacts via REUSE.toml per CICD-08). Any baseline-architecture deviation lands an ADR.
-
-### Phase 9: Auto Node Selection
-
-**Goal**: When the operator creates a workspace without picking a node, the control plane chooses the least-loaded node that still passes the node-RAM capacity threshold — proven over the FakeComputeProvider's multi-node capacity — while manual node pick remains available and the `ComputeProvider` seam stays free of Proxmox specifics.
-**Depends on**: Phase 1 (the v1.0 create saga + capacity guard) and Phase 2 (the create modal + `GET /api/v1/nodes` capacity surface). Independent of Phases 7 and 8 within v1.2.
-**Requirements**: WSX-01
-**Success Criteria** (what must be TRUE):
-
-  1. When the operator creates a workspace and supplies no node, the control plane auto-selects one: it picks a capacity-fitting node (one that passes the node-RAM threshold) and prefers the least-loaded among the fitting nodes.
-  2. When no node passes the capacity threshold, auto-select refuses creation with the existing capacity envelope error (no overcommit) rather than forcing a workspace onto an over-threshold node.
-  3. Manual node selection still works end-to-end — an operator who picks a node in the create modal gets that node, and the manual path is unchanged.
-  4. The selection logic depends only on the `ComputeProvider` capacity surface (node memory fraction / threshold) — no Proxmox-specific type or detail leaks past the seam, and the seam-leakage guard stays green.
-  5. Auto-select is proven over the FakeComputeProvider's multi-node capacity with unit/integration tests (least-loaded-fitting node chosen, over-threshold node skipped, no-fit refuses); real multi-node validation is the deferred dev-homelab smoke (ACC-01).
-
-**Plans**: 3 plans
-
-Plans:
-**Wave 1**
-
-- [x] 09-01-PLAN.md — foundations: extend `FakeComputeProvider` with optional per-node `node_fractions` (backward-compat float), add the `worker_nodes` Settings list (default `[default_node]`), factor the shared `_fits` capacity helper, and make `/nodes` enumerate `worker_nodes` (WSX-01)
-
-**Wave 2** *(blocked on Wave 1 completion)*
-
-- [x] 09-02-PLAN.md — core selection: `WorkspaceCreate.node` → `Optional[str] = None`, a `selectNode()` service method (least-loaded fitting, tie→name asc, skip-on-raise, no-fit→`CapacityError`) wired INSIDE `_create_lock`, plus the criterion-5 unit + auto/manual integration matrix (WSX-01)
-
-**Wave 3** *(blocked on Wave 2 completion)*
-
-- [x] 09-03-PLAN.md — UI touch: `NewWorkspaceModal` defaults to "Auto (least-loaded)" (drop first-node-on-mount), Auto sends `node: null`, manual pick retained; `node` optional in the UI create type; vitest coverage (WSX-01)
-
-**Scope note**: Primarily a backend phase — the create-saga node-selection logic over the two provider ABCs — with one small create-modal UI touch (an "auto / no node" option so the operator can decline a manual pick). CI-provable over the Fake provider's multi-node `getNodeMemory`; no real Proxmox. snake_case DB → camelCase JSON preserved; the `ComputeProvider`/`DbProvider` seams stay abstract. Tests land with the change; SPDX headers on every changed file. A baseline-architecture deviation (if any) lands an ADR.
+</details>
 
 ## Progress
-
-**Execution Order:**
-Phases execute in numeric order: 7 → 8 → 9. The dependency edges between them are empty — Phase 7 (frontend/test), Phase 8 (CI config/docs), and Phase 9 (backend + small UI) touch disjoint surfaces and may be planned/executed in parallel.
 
 | Phase | Milestone | Plans Complete | Status   | Completed  |
 |-------|-----------|----------------|----------|------------|
@@ -177,6 +109,6 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 4. Hardening & Release | v1.0 | 5/5 | Complete | 2026-06-11 |
 | 5. Stop/Start Controls + Drawer Polish | v1.1 | 4/4 | Complete | 2026-06-14 |
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
-| 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete    | 2026-06-15 |
-| 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete    | 2026-06-15 |
-| 9. Auto Node Selection | v1.2 | 3/3 | Complete    | 2026-06-16 |
+| 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete | 2026-06-15 |
+| 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete | 2026-06-15 |
+| 9. Auto Node Selection | v1.2 | 3/3 | Complete | 2026-06-16 |

@@ -1,5 +1,20 @@
 # Milestones
 
+## v1.2 Backlog Fixes + Release Automation (Shipped: 2026-06-16)
+
+**Phases completed:** 3 phases, 6 plans, 14 tasks
+
+**Key accomplishments:**
+
+- LeafPanel now wires onTerminalEvent -> useInvalidateWorkspaces so a terminal error/close fast-reconciles the workspace list ahead of the ~3s poll, and stop-start.spec.ts is hardened with panel-scoped locators + per-test id-scoped backend cleanup.
+- release-please manifest-mode surface (config + manifest seeded 1.1.0 + push:main workflow) with harden-runner audit step 0, every action pinned to a live-verified upstream commit SHA, and the corrected v1.1-COMMIT bootstrap-sha.
+- harden-runner (audit) inserted as the literal step 0 of all four CI/release jobs, the PR-title gate repinned off its moving `v5` tag onto the immutable `v5.5.3` SHA, and the release process documented — closing the one live moving-tag defect so every `uses:` across all three workflows is now a 40-hex commit SHA.
+- Per-node Fake fractions, a `worker_nodes` Settings list derived from `default_node`, and a shared `lib.capacity._fits` comparator wired into a multi-node `GET /api/v1/nodes` — the seam-clean primitives Plan 02 auto-select and Plan 03 modal build on.
+- `WorkspaceCreate.node` becomes optional and `createWorkspace` auto-selects the least-loaded fitting node (via `selectNode`) once inside `_create_lock` — select → capacity guard → VMID reserve stay one atomic critical section, the manual pick is unchanged, and a no-fit refuses with the `capacity_exceeded` envelope before any row is reserved.
+- `NewWorkspaceModal` now defaults to an "Auto (least-loaded)" node option (the first-node-on-mount default removed), accepts Auto as a valid form state, and submits `node: null` so the backend auto-selects — while a manual pick still sends the chosen node string unchanged; `WorkspaceCreate.node` becomes optional to mirror the backend `Optional[str]=None`, and three failing-first vitest cases prove Auto-default + null-payload + manual-still-works.
+
+---
+
 ## v1.1 UI Polish + Stop/Start Controls (Shipped: 2026-06-15)
 
 **Phases completed:** 2 phases, 5 plans, 9 tasks

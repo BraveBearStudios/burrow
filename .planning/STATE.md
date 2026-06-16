@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Backlog Fixes + Release Automation
-status: verifying
+status: Awaiting next milestone
 stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-06-16T08:30:30.031Z"
-last_activity: 2026-06-16
+last_updated: "2026-06-16T20:00:32.103Z"
+last_activity: 2026-06-16 — Milestone v1.2 completed and archived
 progress:
   total_phases: 3
   completed_phases: 3
@@ -30,10 +30,10 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: 9
-Plan: Not started
-Status: Phase complete — ready for verification
-Last activity: 2026-06-16
+Phase: Milestone v1.2 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-06-16 — Milestone v1.2 completed and archived
 
 ## Performance Metrics
 
@@ -238,4 +238,4 @@ Next plan: Plan Phase 7 with `/gsd:plan-phase 7` (Backlog Fixes — UI-12 fast-r
 
 ## Operator Next Steps
 
-- Plan the first v1.2 phase with `/gsd:plan-phase 7`.
+- Start the next milestone with /gsd:new-milestone

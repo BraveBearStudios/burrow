@@ -174,4 +174,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-16 — v1.2 milestone code-complete: Phase 7 (fast-reconcile + e2e hardening), Phase 8 (release-please + harden-runner), Phase 9 (auto node selection, WSX-01) all verified. Deferred on-runner/real-infra acceptances remain: ACC-01 (homelab smoke incl. real multi-node auto-select), ACC-02 (first live release PR + egress block-flip), ACC-03 (real GHCR publish + cosign/attestation verify). Next: milestone audit → complete → cleanup.*
+*Last updated: 2026-06-16 after the v1.2 milestone close. Phases 7-9 shipped and the close-out audit passed (5/5 requirements, integration WIRED, 0 blockers). Deferred real-infra / v2 acceptances remain: ACC-01 (homelab smoke incl. real multi-node auto-select), ACC-02 (first live release PR + egress block-flip), ACC-03 (real GHCR publish + cosign/attestation verify), WSX-02/WSX-03 (persistent workspaces + scrollback restore), and the 07r e2e-cleanup nit. Next: run /gsd:new-milestone to scope v1.3.*
