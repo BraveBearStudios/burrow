@@ -29,7 +29,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 ### Compute & Capacity (WSX)
 
-- [ ] **WSX-01**: Workspace creation can auto-select the worker node — when the operator does not pick a node, the control plane chooses a capacity-fitting node (least-loaded that passes the node-RAM threshold), proven over the FakeComputeProvider's multi-node capacity. Manual node pick remains available. (Real multi-node validation is the dev-homelab smoke.)
+- [x] **WSX-01**: Workspace creation can auto-select the worker node — when the operator does not pick a node, the control plane chooses a capacity-fitting node (least-loaded that passes the node-RAM threshold), proven over the FakeComputeProvider's multi-node capacity. Manual node pick remains available. (Real multi-node validation is the dev-homelab smoke.)
 
 ### Release & Runner (RELX)
 
@@ -87,7 +87,7 @@ Which phases cover which requirements. **Populated during roadmap creation.**
 | CICD-09 | Phase 7 | Complete |
 | RELX-01 | Phase 8 | Complete |
 | RELX-02 | Phase 8 | Complete |
-| WSX-01 | Phase 9 | Pending |
+| WSX-01 | Phase 9 | Complete |
 
 **Coverage:**
 

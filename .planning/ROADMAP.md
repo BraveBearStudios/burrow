@@ -151,7 +151,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 09-01-PLAN.md — foundations: extend `FakeComputeProvider` with optional per-node `node_fractions` (backward-compat float), add the `worker_nodes` Settings list (default `[default_node]`), factor the shared `_fits` capacity helper, and make `/nodes` enumerate `worker_nodes` (WSX-01)
+- [x] 09-01-PLAN.md — foundations: extend `FakeComputeProvider` with optional per-node `node_fractions` (backward-compat float), add the `worker_nodes` Settings list (default `[default_node]`), factor the shared `_fits` capacity helper, and make `/nodes` enumerate `worker_nodes` (WSX-01)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -179,4 +179,4 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete    | 2026-06-15 |
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete    | 2026-06-15 |
-| 9. Auto Node Selection | v1.2 | 0/3 | Not started | - |
+| 9. Auto Node Selection | v1.2 | 1/3 | In Progress|  |
