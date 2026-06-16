@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Backlog Fixes + Release Automation
-status: executing
+status: verifying
 stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-06-16T07:35:49.443Z"
+last_updated: "2026-06-16T07:54:57.121Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 6
-  completed_plans: 5
-  percent: 67
+  completed_plans: 6
+  percent: 100
 ---
 
 <!--
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 Phase: 9 (Auto Node Selection) — EXECUTING
 Plan: 3 of 3
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-16
 
 ## Performance Metrics
@@ -97,6 +97,7 @@ Last activity: 2026-06-16
 | Phase 8 P08-02 | 5min | 3 tasks | 3 files |
 | Phase 9 P09-01 | 18min | 2 tasks | 7 files |
 | Phase 9 P09-02 | 20 | 2 tasks | 5 files |
+| Phase 9 P09-03 | 7 min | 2 tasks tasks | 4 files files |
 
 ## Accumulated Context
 
@@ -194,6 +195,7 @@ Recent decisions affecting current work:
 - [Phase 9]: Shared lib.capacity._fits (fraction <= threshold, strict > refuses) is the single capacity comparator for /nodes and (Plan 02) auto-select; pure arithmetic to keep seam-leakage guard green
 - [Phase ?]: [Phase 9 P09-02]: WSX-01 auto-select wired into createWorkspace INSIDE _create_lock — node resolved ONCE to a guaranteed str (payload.node if not None else await selectNode()) before the step-0 capacity guard, then threaded through guard/reserve/clone/start/getIp/compensate; manual node pick skips selectNode entirely and is byte-for-byte unchanged. selectNode picks least-loaded fitting node (tie by name asc, raising-node skip, _fits boundary eligible), raising CapacityError(message=) capacity_exceeded on no-fit. _reserve_vmid_and_row takes an explicit node:str and persists it (NOT NULL workspaces.node). Select->guard->reserve stay one critical section (no overcommit window, ADR-0010 preserved); seam-leakage guard green. 199 pytest + mypy(0) + ruff all green.
 - [Phase ?]: [Phase 9 P09-02]: CapacityError gained an additive keyword-only message= so the no-fit auto path raises a manual-pick hint while the single-arg CapacityError(node) manual-over-threshold callers and the invariant .code=capacity_exceeded are unchanged. WorkspaceCreate.node is Optional[str]=None (None/omitted=auto, explicit string=manual) via the existing CamelModel (still camelCase, no separate flag/sentinel). End-to-end auto/manual proven over integration_client with class-level monkeypatch of FakeComputeProvider.getNodeMemory + settings.worker_nodes/capacity_threshold (no Fake-injection seam); no-fit returns the capacity_exceeded envelope (HTTP 409) with NO orphan row (refused before reservation).
+- [Phase 9]: [Plan 09-03]: NewWorkspaceModal defaults to an Auto (least-loaded) <option value=""> (the first-node-on-mount useEffect removed); the empty-string sentinel reuses the existing node state default and submits as node: null (node || null) so the backend auto-selects, while a manual pick sends the chosen node string unchanged. isValid drops the node requirement (name+projectRepo only) so Auto is a valid form state. ui WorkspaceCreate.node becomes node?: string | null to mirror the backend Optional[str]=None. The MSW POST handler derives the least-loaded seed node (autoSelectedNode, tie by name asc) when body.node is absent so the auto-path response carries a real node like the backend. WSX-01 now complete end-to-end (backend + create-modal). vitest 117/117 + tsc(0) + biome ci clean.
 
 ### Pending Todos
 
@@ -228,7 +230,7 @@ acceptances — CI never touches real Proxmox; see the milestone audits + each p
 
 ## Session Continuity
 
-Last session: 2026-06-16T07:35:49.429Z
+Last session: 2026-06-16T07:54:57.108Z
 Stopped at: Completed 09-02-PLAN.md
 Resume file: None
 Next plan: Plan Phase 7 with `/gsd:plan-phase 7` (Backlog Fixes — UI-12 fast-reconcile + CICD-09 e2e hardening). Phases 8 (release hardening) and 9 (auto node selection) touch disjoint surfaces and may be planned in parallel.

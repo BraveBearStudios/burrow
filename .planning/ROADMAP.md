@@ -86,7 +86,7 @@ v1.0 real-infra acceptance (ACC-01/02/03). See `milestones/v1.1-MILESTONE-AUDIT.
 
 - [x] **Phase 7: Backlog Fixes (Fast-Reconcile + E2E Hardening)** - Wire the `LeafPanel onTerminalEvent` fast-reconcile so the workspace list refreshes on a terminal error/close (UI-12), and harden the stop/start Playwright e2e with panel-scoped locators + per-test backend isolation (CICD-09) (completed 2026-06-15)
 - [x] **Phase 8: Release Hardening (release-please + harden-runner)** - Add release-please Conventional-Commit-driven release PRs (RELX-01) and a `step-security/harden-runner` egress allowlist with all third-party actions SHA-pinned (RELX-02) (completed 2026-06-15)
-- [ ] **Phase 9: Auto Node Selection** - Capacity-aware auto node selection at create time — least-loaded node that passes the RAM threshold, proven over the FakeComputeProvider's multi-node capacity, with manual pick retained (WSX-01)
+- [x] **Phase 9: Auto Node Selection** - Capacity-aware auto node selection at create time — least-loaded node that passes the RAM threshold, proven over the FakeComputeProvider's multi-node capacity, with manual pick retained (WSX-01) (completed 2026-06-16)
 
 ## Phase Details
 
@@ -159,7 +159,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 09-03-PLAN.md — UI touch: `NewWorkspaceModal` defaults to "Auto (least-loaded)" (drop first-node-on-mount), Auto sends `node: null`, manual pick retained; `node` optional in the UI create type; vitest coverage (WSX-01)
+- [x] 09-03-PLAN.md — UI touch: `NewWorkspaceModal` defaults to "Auto (least-loaded)" (drop first-node-on-mount), Auto sends `node: null`, manual pick retained; `node` optional in the UI create type; vitest coverage (WSX-01)
 
 **Scope note**: Primarily a backend phase — the create-saga node-selection logic over the two provider ABCs — with one small create-modal UI touch (an "auto / no node" option so the operator can decline a manual pick). CI-provable over the Fake provider's multi-node `getNodeMemory`; no real Proxmox. snake_case DB → camelCase JSON preserved; the `ComputeProvider`/`DbProvider` seams stay abstract. Tests land with the change; SPDX headers on every changed file. A baseline-architecture deviation (if any) lands an ADR.
 
@@ -179,4 +179,4 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete    | 2026-06-15 |
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete    | 2026-06-15 |
-| 9. Auto Node Selection | v1.2 | 2/3 | In Progress|  |
+| 9. Auto Node Selection | v1.2 | 3/3 | Complete   | 2026-06-16 |
