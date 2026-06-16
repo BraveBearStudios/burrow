@@ -33,7 +33,7 @@ async function createWorkspace(page: Page, name: string): Promise<void> {
 	await page.locator("#ws-name").fill(name);
 	await page.locator("#ws-repo").fill(`github.com/acme/${name}`);
 	await page.locator("#ws-branch").fill("main");
-	// Node defaults to the first node from GET /api/v1/nodes; leave it as-is.
+	// Node defaults to "Auto (least-loaded)" (value ""); leave it as-is so the backend auto-selects.
 
 	await page.getByRole("button", { name: "Create" }).click();
 	await expect(dialog).toBeHidden({ timeout: 30_000 });
