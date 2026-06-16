@@ -68,10 +68,16 @@ class FakeComputeProvider(ComputeProvider):
         self,
         failures: FakeFailures | None = None,
         node_memory: float = _DEFAULT_NODE_MEMORY,
+        node_fractions: dict[str, float] | None = None,
     ) -> None:
         self._containers: dict[int, _FakeContainer] = {}
         self._failures = failures or FakeFailures()
         self._node_memory = node_memory
+        # Optional per-node used-memory fractions (WSX-01): when a node name is in
+        # this dict, getNodeMemory returns its value; otherwise it falls back to the
+        # single _node_memory float, so a dict need not enumerate every node. An
+        # empty/None dict keeps the single-float behavior (full backward-compat).
+        self._node_fractions = node_fractions or {}
         self._call_counts: dict[str, int] = {}
 
     # ── internal helpers ──────────────────────────────────────────────────
@@ -199,7 +205,8 @@ class FakeComputeProvider(ComputeProvider):
 
     async def getNodeMemory(self, node: str) -> float:
         self._maybe_fail("getNodeMemory")
-        return self._node_memory
+        # Per-node fraction when configured; single-float fallback otherwise (WSX-01).
+        return self._node_fractions.get(node, self._node_memory)
 
     async def waitTask(self, node: str, upid: str, timeout: float) -> ComputeTask:
         # Fake tasks are synchronous — no sleep, return OK immediately (SC-1).
