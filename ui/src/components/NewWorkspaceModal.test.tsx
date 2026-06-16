@@ -252,8 +252,10 @@ describe("NewWorkspaceModal — Auto (least-loaded) default (WSX-01)", () => {
 			expect(useLayoutStore.getState().mosaicNode).toBe("ws-created"),
 		);
 		await waitFor(() => expect(onClose).toHaveBeenCalled());
-		// The Auto path sent node: null (not a node string) so the backend auto-selects.
-		expect(captured.body?.node ?? null).toBeNull();
+		// The Auto path sent node: null SPECIFICALLY (not "", not undefined/omitted) so
+		// the backend auto-selects. toHaveProperty asserts the exact value, catching a
+		// regression that started sending "" or dropped the key (IN-04).
+		expect(captured.body).toHaveProperty("node", null);
 		unmount();
 	});
 
