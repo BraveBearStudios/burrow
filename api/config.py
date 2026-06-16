@@ -11,7 +11,7 @@ Security note: never disable TLS verification. The Proxmox client validates the
 node CA cert at ``proxmox_ca_cert_path`` instead (see ``.env.example``).
 """
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     worker_pool_start: int = 200
     worker_pool_end: int = 299
     default_node: str = "pve1"
+    # Candidate-node topology auto-select (WSX-01) iterates. Declared with an empty
+    # default_factory (never a shared mutable literal) and DERIVED from the resolved
+    # default_node by the validator below, so a BURROW_DEFAULT_NODE / explicit
+    # default_node override propagates into the default. An explicit non-empty
+    # worker_nodes is left untouched.
+    worker_nodes: list[str] = Field(default_factory=list)
 
     # ── Worker net0 / static-IP-from-VMID (ADR-0004) ──────────────────────
     # Placeholders only — the real LAN topology lives in the gitignored .env.
@@ -97,6 +103,19 @@ class Settings(BaseSettings):
     # reservation race (SC-3/SC-4) surfaces a retryable VmidTakenError rather
     # than a raw "database is locked" OperationalError (CR-02).
     sqlite_busy_timeout_ms: int = 5000
+
+    @model_validator(mode="after")
+    def _derive_worker_nodes_default(self) -> "Settings":
+        """Default worker_nodes to ``[default_node]`` when empty/unset (WSX-01).
+
+        Deriving the default from the resolved ``default_node`` (rather than a
+        hardcoded ``["pve1"]`` literal) means a ``BURROW_DEFAULT_NODE`` / explicit
+        ``default_node`` override propagates into the candidate list. An explicit
+        non-empty ``worker_nodes`` is honored unchanged.
+        """
+        if not self.worker_nodes:
+            self.worker_nodes = [self.default_node]
+        return self
 
 
 settings = Settings()

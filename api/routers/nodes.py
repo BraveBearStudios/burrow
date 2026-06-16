@@ -3,10 +3,13 @@
 """Nodes router — read-only per-node capacity ``GET /api/v1/nodes`` (UI-04).
 
 A thin, envelope-wrapped capacity view the UI's status bar / top-bar chips read
-(UI-04). For each known node (v1: the single ``settings.default_node``) it reports
-the compute backend's real used-memory FRACTION (``getNodeMemory``), the configured
-``capacity_threshold``, and the strict over-threshold flag the capacity guard uses
-(CAP-01: ``fraction > threshold``; the boundary ``== threshold`` is NOT over).
+(UI-04). For each node in ``settings.worker_nodes`` (the operator topology list,
+default ``[default_node]``) it reports the compute backend's real used-memory FRACTION
+(``getNodeMemory``), the configured ``capacity_threshold``, and the strict over-threshold
+flag the capacity guard uses (CAP-01: ``fraction > threshold``; the boundary
+``== threshold`` is NOT over). The over-threshold decision goes through the shared
+``lib.capacity._fits`` helper so the displayed capacity matches the auto-select
+decision (WSX-01).
 
 It exposes only what the provider can actually supply — no fabricated "free GB". The
 UI derives its chip text from these real numbers.
@@ -20,6 +23,7 @@ from fastapi import APIRouter, Depends
 
 from compute.provider import ComputeProvider
 from config import settings
+from lib.capacity import _fits
 from lib.envelope import respond
 
 from main import get_compute
@@ -39,7 +43,9 @@ async def _node_capacity(compute: ComputeProvider, node: str) -> dict[str, objec
         fraction: float | None = await compute.getNodeMemory(node)
     except Exception:
         fraction = None
-    over_threshold = fraction is not None and fraction > threshold
+    # Shared comparator (T-09-01): the route and (Plan 02) auto-select agree on
+    # eligibility. A null fraction (degrade-not-500) is never over-threshold.
+    over_threshold = fraction is not None and not _fits(fraction, threshold)
     return {
         "node": node,
         "memoryUsedFraction": fraction,
@@ -53,5 +59,5 @@ async def list_nodes(
     compute: ComputeProvider = Depends(get_compute),
 ) -> dict[str, object]:
     """Return per-node capacity (fraction + threshold + over flag); degrade, never 500."""
-    nodes = [await _node_capacity(compute, settings.default_node)]
+    nodes = [await _node_capacity(compute, n) for n in settings.worker_nodes]
     return respond(nodes)
