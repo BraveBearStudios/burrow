@@ -153,7 +153,9 @@ export const handlers = [
 	// POST /api/v1/workspaces — synchronous create returns a running workspace (v1 saga).
 	// When body.node is null/omitted (the Auto path) the backend auto-selects the
 	// least-loaded node; this fake mirrors that by deriving the least-loaded seed node
-	// (node1 @ 0.42) so the created row always carries a real node string.
+	// (node1 @ 0.42) so the created row always carries a real node string. IN-01: the
+	// backend's create route returns HTTP 200 (synchronous create of the final row),
+	// so this double returns 200 too — backend and doubles must not drift.
 	http.post("/api/v1/workspaces", async ({ request }) => {
 		const body = (await request.json()) as WorkspaceCreate;
 		const created: Workspace = {
@@ -171,7 +173,7 @@ export const handlers = [
 			destroyedAt: null,
 			deletedAt: null,
 		};
-		return HttpResponse.json(envelope(created), { status: 201 });
+		return HttpResponse.json(envelope(created), { status: 200 });
 	}),
 
 	// DELETE /api/v1/workspaces/:id — destroy (stop+destroy CT, soft-delete row).

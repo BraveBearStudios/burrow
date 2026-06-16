@@ -204,7 +204,9 @@ describe("NewWorkspaceModal — Auto (least-loaded) default (WSX-01)", () => {
 						meta: { requestId: "t", timestamp: "2026-06-10T00:00:00Z" },
 						error: null,
 					},
-					{ status: 201 },
+					// IN-01: the backend create route returns 200 — keep this double
+					// aligned so the UI doubles never drift from the backend status.
+					{ status: 200 },
 				);
 			}),
 		);
