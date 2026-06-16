@@ -32,10 +32,15 @@ class Workspace(CamelModel):
 
 
 class WorkspaceCreate(CamelModel):
-    """Request body for creating a workspace."""
+    """Request body for creating a workspace.
+
+    ``node`` is OPTIONAL: ``None``/omitted signals AUTO placement (the saga
+    selects the least-loaded fitting node via ``WorkspaceService.selectNode``),
+    while an explicit node string is the unchanged manual path (WSX-01).
+    """
 
     name: str
     project_repo: str
     project_branch: str = "main"
     plugin_set: str = "default"
-    node: str
+    node: str | None = None

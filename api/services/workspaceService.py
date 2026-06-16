@@ -30,6 +30,7 @@ from models.compute import BootConfig
 from models.workspace import Workspace, WorkspaceCreate
 
 from config import Settings
+from lib.capacity import _fits
 from lib.errors import (
     CapacityError,
     NoFreeVmidError,
@@ -141,18 +142,30 @@ class WorkspaceService:
         # before the multi-second clone below so concurrent creates parallelize the
         # slow saga steps (FROZEN guardrail 6).
         async with self._create_lock:
-            # 0 — capacity guard (CAP-01); node is operator-selected (CAP-04).
-            if await self.compute.getNodeMemory(payload.node) > self.settings.capacity_threshold:
-                raise CapacityError(payload.node)
-            # 1 — reserve VMID via the DB partial-unique INSERT (the race arbiter).
-            ws = await self._reserve_vmid_and_row(payload)
+            # 0a — resolve the target node ONCE, inside the lock (WSX-01). When the
+            # operator omitted a node (`payload.node is None`), auto-select the
+            # least-loaded fitting node; an explicit node string is the unchanged
+            # manual path and skips selection entirely. LOCKED: selection MUST stay
+            # inside this critical section so select -> guard -> reserve run on the
+            # SAME node and two concurrent creates cannot both pass a stale read and
+            # overcommit (Pitfall 5 / ADR-0010). Do NOT move it before `async with`
+            # or after the lock release. `node` is now a guaranteed `str`.
+            node = payload.node if payload.node is not None else await self.selectNode()
+            # 0b — capacity guard (CAP-01) on the CHOSEN node (CAP-04). For the auto
+            # path selectNode already guaranteed `_fits`, but the guard is the single
+            # authoritative threshold check both paths pass through.
+            if await self.compute.getNodeMemory(node) > self.settings.capacity_threshold:
+                raise CapacityError(node)
+            # 1 — reserve VMID via the DB partial-unique INSERT (the race arbiter);
+            # persist the chosen node on the row (never None).
+            ws = await self._reserve_vmid_and_row(payload, node)
         vmid = ws.vmid
         assert vmid is not None  # reservation always assigns a vmid
 
         try:
             # 2 — clone the golden template (provider blocks on the UPID, SC-1).
             await self.compute.cloneCt(
-                self.settings.template_vmid, vmid, payload.name, payload.node
+                self.settings.template_vmid, vmid, payload.name, node
             )
             # 3 — persist boot intent (pull-at-boot DB checkpoint, ADR-0002). WR-03:
             # the per-workspace boot intent (project repo/branch) is the row data
@@ -166,9 +179,9 @@ class WorkspaceService:
             # to persist intent but wrote nothing.
             await self._persist_boot_intent(ws, payload)
             # 4 — start the container (UPID-blocked).
-            await self.compute.startCt(payload.node, vmid)
+            await self.compute.startCt(node, vmid)
             # 5 — resolve the static IP from the VMID (computed, not polled).
-            ip = await self.compute.getIp(payload.node, vmid)
+            ip = await self.compute.getIp(node, vmid)
             await self.db.updateWorkspace(ws.id, {"lxc_ip": ip})
             # 6 — await ttyd health (httpx poll; injectable for the unit tier).
             await self._wait_ttyd(ip)
@@ -176,7 +189,7 @@ class WorkspaceService:
             await self.db.logEvent(ws.id, "workspace.created", {})
             return await self.db.updateWorkspace(ws.id, {"status": "running"})
         except Exception as exc:
-            await self._compensate(payload.node, vmid)
+            await self._compensate(node, vmid)
             # Land the row in `error` FIRST and guard it — this is the SC-11
             # guarantee (never stuck `creating`, Pitfall 4). A failure in the
             # status write or the best-effort event log must NOT mask the
@@ -193,17 +206,58 @@ class WorkspaceService:
                 pass  # event log is best-effort diagnostics, not the landing
             raise exc
 
-    async def _reserve_vmid_and_row(self, payload: WorkspaceCreate) -> Workspace:
+    async def selectNode(self) -> str:
+        """Return the least-loaded node that fits under the capacity threshold (WSX-01).
+
+        The LOCKED auto-placement algorithm (09-RESEARCH): iterate the operator's
+        ``settings.worker_nodes`` topology, reading each node's used-memory fraction
+        via the ONLY seam call ``getNodeMemory`` (no new ABC method, no ``proxmoxer``).
+        A node whose ``getNodeMemory`` raises is SKIPPED (mirrors the ``/nodes``
+        degrade-not-500 posture). A node is eligible when ``_fits(fraction, threshold)``
+        — the SAME shared comparator the UI's displayed capacity uses, so the
+        placement decision and the displayed capacity can never drift (T-09-01;
+        ``_fits`` is ``fraction <= threshold``, so the boundary ``==`` is eligible).
+
+        Among the fitting nodes the least-loaded wins, ties broken by node NAME
+        ascending so selection is deterministic. If NO node fits, the existing
+        ``CapacityError`` (``capacity_exceeded``) is raised with a manual-pick hint —
+        no overcommit (T-09-01).
+
+        Seam discipline: this method references ONLY ``getNodeMemory``,
+        ``settings.worker_nodes``, ``_fits`` and ``CapacityError`` — no provider
+        concrete, no driver symbol — so the seam-leakage guard stays green (T-09-02).
+        """
+        fitting: list[tuple[float, str]] = []
+        for node in self.settings.worker_nodes:
+            try:
+                fraction = await self.compute.getNodeMemory(node)
+            except Exception:
+                continue  # unreachable node is skipped (degrade-not-500 parity)
+            if _fits(fraction, self.settings.capacity_threshold):
+                fitting.append((fraction, node))
+        if not fitting:
+            raise CapacityError(
+                message="All nodes at capacity. Pick a node manually to override."
+            )
+        # Least fraction wins; tie -> node name ascending (deterministic placement).
+        fitting.sort(key=lambda fn: (fn[0], fn[1]))
+        return fitting[0][1]
+
+    async def _reserve_vmid_and_row(self, payload: WorkspaceCreate, node: str) -> Workspace:
         """Reserve a VMID by INSERT under the partial-unique index (SC-3/SC-4).
 
         ``getNextVmid`` is a pure scan over the (compute ∪ DB) used-set; the
         atomic reservation is the ``createWorkspace`` INSERT. A ``VmidTakenError``
         means another saga won the race for that VMID — re-scan and retry, bounded
         by :data:`_RESERVE_ATTEMPTS`. Pool exhaustion raises ``NoFreeVmidError``.
+
+        ``node`` is the resolved target (the auto-selected node when the operator
+        omitted one, else the manual pick) — never ``None`` — so the persisted row
+        always carries a concrete node (WSX-01), satisfying the NOT NULL column.
         """
         base = {
             "name": payload.name,
-            "node": payload.node,
+            "node": node,
             "project_repo": payload.project_repo,
             "project_branch": payload.project_branch,
             "plugin_set": payload.plugin_set,

@@ -35,13 +35,27 @@ class IllegalTransitionError(ServiceError):
 
 
 class CapacityError(ServiceError):
-    """The selected node is over the capacity threshold; create is refused (CAP-01)."""
+    """A node is over the capacity threshold; create is refused (CAP-01, WSX-01).
+
+    Two refusal shapes share the one ``capacity_exceeded`` code:
+
+    - the operator-selected node is over threshold (manual path) -> the default
+      message names that node (``CapacityError(node)``), and
+    - auto-select found NO fitting node -> a custom ``message=`` carries the
+      manual-pick hint (``CapacityError(message=…)``).
+
+    ``message`` is keyword-only and additive: existing single-arg
+    ``CapacityError(node)`` callers are unchanged, and ``.code`` is invariant.
+    """
 
     code = "capacity_exceeded"
 
-    def __init__(self, node: str) -> None:
+    def __init__(self, node: str | None = None, *, message: str | None = None) -> None:
         self.node = node
-        super().__init__(f"node {node!r} is over the capacity threshold")
+        if message is not None:
+            super().__init__(message)
+        else:
+            super().__init__(f"node {node!r} is over the capacity threshold")
 
 
 class NoFreeVmidError(ServiceError):
