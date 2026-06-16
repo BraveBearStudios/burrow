@@ -155,7 +155,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 09-02-PLAN.md — core selection: `WorkspaceCreate.node` → `Optional[str] = None`, a `selectNode()` service method (least-loaded fitting, tie→name asc, skip-on-raise, no-fit→`CapacityError`) wired INSIDE `_create_lock`, plus the criterion-5 unit + auto/manual integration matrix (WSX-01)
+- [x] 09-02-PLAN.md — core selection: `WorkspaceCreate.node` → `Optional[str] = None`, a `selectNode()` service method (least-loaded fitting, tie→name asc, skip-on-raise, no-fit→`CapacityError`) wired INSIDE `_create_lock`, plus the criterion-5 unit + auto/manual integration matrix (WSX-01)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -179,4 +179,4 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete    | 2026-06-15 |
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete    | 2026-06-15 |
-| 9. Auto Node Selection | v1.2 | 1/3 | In Progress|  |
+| 9. Auto Node Selection | v1.2 | 2/3 | In Progress|  |

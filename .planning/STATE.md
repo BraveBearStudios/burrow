@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Backlog Fixes + Release Automation
 status: executing
-stopped_at: Completed 09-01-PLAN.md
-last_updated: "2026-06-16T07:11:51.603Z"
+stopped_at: Completed 09-02-PLAN.md
+last_updated: "2026-06-16T07:35:49.443Z"
 last_activity: 2026-06-16
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 6
-  completed_plans: 4
+  completed_plans: 5
   percent: 67
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 ## Current Position
 
 Phase: 9 (Auto Node Selection) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-06-16
 
@@ -96,6 +96,7 @@ Last activity: 2026-06-16
 | Phase 8 P08-01 | 12 | 3 tasks | 4 files |
 | Phase 8 P08-02 | 5min | 3 tasks | 3 files |
 | Phase 9 P09-01 | 18min | 2 tasks | 7 files |
+| Phase 9 P09-02 | 20 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -191,6 +192,8 @@ Recent decisions affecting current work:
 - [Phase 8]: [Plan 08-02]: CI surface hardening + SHA-pin closeout. harden-runner (audit) inserted as the literal step 0 (before actions/checkout) of all four CI/release jobs — ci.yml static-gates/pr-title/build-scan + release.yml publish — using step-security/harden-runner@9af89fc (v2.19.4) re-asserted against Plan 08-01's live-verified record (no drift). The PR-title gate was repinned off its moving v5 major tag (e32d7e60) onto the immutable v5.5.3 SHA 0723387faaf9b38adef4775cd42cfd5155ed6017 with an honest # v5.5.3 comment, closing the one live moving-tag defect. After the edits every uses: across all three workflows (25 refs) is a 40-hex commit SHA with no @vN floating tag; no pre-existing pin was changed; release.yml's v* trigger + four-scope publish permissions are untouched. CONTRIBUTING.md gained a Release process section (release-please tag-based chain, squash-merge PR-title linkage, harden-runner audit-then-block ACC-02 policy, GITHUB_TOKEN-retrigger caveat), no em dashes / horizontal rules. Full Phase 8 static suite green: 3 workflow YAML parse + 2 JSON parse + cross-workflow SHA regex + reuse lint 329/329. RELX-02 complete; Phase 8 plan-complete (2/2). The harden-runner block flip + discovered egress allowlist stays the deferred ACC-02 on-runner acceptance.
 - [Phase 9]: worker_nodes default derived from default_node via model_validator(mode=after) so a BURROW_DEFAULT_NODE override propagates; no new ComputeProvider ABC method
 - [Phase 9]: Shared lib.capacity._fits (fraction <= threshold, strict > refuses) is the single capacity comparator for /nodes and (Plan 02) auto-select; pure arithmetic to keep seam-leakage guard green
+- [Phase ?]: [Phase 9 P09-02]: WSX-01 auto-select wired into createWorkspace INSIDE _create_lock — node resolved ONCE to a guaranteed str (payload.node if not None else await selectNode()) before the step-0 capacity guard, then threaded through guard/reserve/clone/start/getIp/compensate; manual node pick skips selectNode entirely and is byte-for-byte unchanged. selectNode picks least-loaded fitting node (tie by name asc, raising-node skip, _fits boundary eligible), raising CapacityError(message=) capacity_exceeded on no-fit. _reserve_vmid_and_row takes an explicit node:str and persists it (NOT NULL workspaces.node). Select->guard->reserve stay one critical section (no overcommit window, ADR-0010 preserved); seam-leakage guard green. 199 pytest + mypy(0) + ruff all green.
+- [Phase ?]: [Phase 9 P09-02]: CapacityError gained an additive keyword-only message= so the no-fit auto path raises a manual-pick hint while the single-arg CapacityError(node) manual-over-threshold callers and the invariant .code=capacity_exceeded are unchanged. WorkspaceCreate.node is Optional[str]=None (None/omitted=auto, explicit string=manual) via the existing CamelModel (still camelCase, no separate flag/sentinel). End-to-end auto/manual proven over integration_client with class-level monkeypatch of FakeComputeProvider.getNodeMemory + settings.worker_nodes/capacity_threshold (no Fake-injection seam); no-fit returns the capacity_exceeded envelope (HTTP 409) with NO orphan row (refused before reservation).
 
 ### Pending Todos
 
@@ -225,8 +228,8 @@ acceptances — CI never touches real Proxmox; see the milestone audits + each p
 
 ## Session Continuity
 
-Last session: 2026-06-16T07:11:51.587Z
-Stopped at: Completed 09-01-PLAN.md
+Last session: 2026-06-16T07:35:49.429Z
+Stopped at: Completed 09-02-PLAN.md
 Resume file: None
 Next plan: Plan Phase 7 with `/gsd:plan-phase 7` (Backlog Fixes — UI-12 fast-reconcile + CICD-09 e2e hardening). Phases 8 (release hardening) and 9 (auto node selection) touch disjoint surfaces and may be planned in parallel.
 
