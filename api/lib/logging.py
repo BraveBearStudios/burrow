@@ -32,6 +32,10 @@ _ALLOWED_EXTRA_KEYS: frozenset[str] = frozenset(
         "method",
         "path",
         "request_id",
+        # IN-03: auto-select no-fit diagnostics — non-secret by construction (node
+        # names + memory fractions, and the numeric capacity threshold).
+        "considered",
+        "threshold",
     }
 )
 

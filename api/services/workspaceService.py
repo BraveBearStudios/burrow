@@ -233,14 +233,28 @@ class WorkspaceService:
         concrete, no driver symbol — so the seam-leakage guard stays green (T-09-02).
         """
         fitting: list[tuple[float, str]] = []
+        # IN-03: record each considered node's outcome (its fraction, or "unreachable"
+        # when getNodeMemory raised) so the no-fit branch can log WHY Auto refused —
+        # all non-secret (node names + fractions) for the ACC-01 homelab smoke.
+        considered: dict[str, str] = {}
         for node in self.settings.worker_nodes:
             try:
                 fraction = await self.compute.getNodeMemory(node)
             except Exception:
+                considered[node] = "unreachable"
                 continue  # unreachable node is skipped (degrade-not-500 parity)
+            considered[node] = f"{fraction:.3f}"
             if _fits(fraction, self.settings.capacity_threshold):
                 fitting.append((fraction, node))
         if not fitting:
+            # Diagnosability only (IN-03): does not change the raised wire message.
+            logger.warning(
+                "auto-select found no fitting node",
+                extra={
+                    "considered": considered,
+                    "threshold": self.settings.capacity_threshold,
+                },
+            )
             raise CapacityError(
                 message=(
                     "No node has available capacity. Pick a node manually to "

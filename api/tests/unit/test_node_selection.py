@@ -127,6 +127,37 @@ async def test_no_fit_raises_capacity_error_with_manual_pick_hint(
     assert await db.listWorkspaces() == []
 
 
+async def test_no_fit_logs_considered_nodes_and_fractions(
+    db: SqliteProvider, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """IN-03: the no-fit branch logs each considered node + its fraction (diagnosability)."""
+    import logging
+
+    # pve1 over threshold (recorded by fraction); pve2 raises -> recorded "unreachable".
+    compute = FakeComputeProvider(node_fractions={"pve1": 0.95, "pve2": 0.3})
+    original = compute.getNodeMemory
+
+    async def _raise_pve2(node: str) -> float:
+        if node == "pve2":
+            raise RuntimeError("compute backend down for pve2")
+        return await original(node)
+
+    monkeypatch.setattr(compute, "getNodeMemory", _raise_pve2)
+    service = _service(compute, db, monkeypatch, worker_nodes=["pve1", "pve2"], threshold=0.80)
+
+    with caplog.at_level(logging.WARNING, logger="burrow.workspace"):
+        with pytest.raises(CapacityError):
+            await service.selectNode()
+
+    no_fit = [r for r in caplog.records if r.message == "auto-select found no fitting node"]
+    assert len(no_fit) == 1
+    record = no_fit[0]
+    # Non-secret diagnostics: node names + fractions + the threshold.
+    assert record.considered["pve1"] == "0.950"
+    assert record.considered["pve2"] == "unreachable"
+    assert record.threshold == 0.80
+
+
 async def test_raising_node_is_skipped_then_fitting_node_chosen(
     db: SqliteProvider, monkeypatch: pytest.MonkeyPatch
 ) -> None:
