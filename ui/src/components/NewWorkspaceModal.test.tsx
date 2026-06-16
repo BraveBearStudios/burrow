@@ -22,6 +22,7 @@ import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { server } from "../../tests/msw/server";
 import { useLayoutStore } from "../store/layoutStore";
+import type { WorkspaceCreate } from "../types/workspace";
 import { NewWorkspaceModal } from "./NewWorkspaceModal";
 
 function renderModal(onClose = vi.fn()) {
@@ -168,6 +169,109 @@ describe("NewWorkspaceModal — create saga (UI-03)", () => {
 		// The panel never opened and the modal stayed up (no auto-close on error).
 		expect(useLayoutStore.getState().mosaicNode).toBeNull();
 		expect(onClose).not.toHaveBeenCalled();
+		unmount();
+	});
+});
+
+describe("NewWorkspaceModal — Auto (least-loaded) default (WSX-01)", () => {
+	// Register a POST override that captures the parsed request body, returning the
+	// standard created-row envelope with a server-derived node so the auto path round
+	// trips like the backend (which fills the chosen node on the row).
+	function captureCreateBody() {
+		const captured: { body: WorkspaceCreate | null } = { body: null };
+		server.use(
+			http.post("/api/v1/workspaces", async ({ request }) => {
+				const body = (await request.json()) as WorkspaceCreate;
+				captured.body = body;
+				return HttpResponse.json(
+					{
+						data: {
+							id: "ws-created",
+							name: body.name,
+							status: "running",
+							vmid: 110,
+							// Auto (null/omitted) → the server picks the least-loaded node1.
+							node: body.node ?? "node1",
+							lxcIp: "10.99.0.110",
+							projectRepo: body.projectRepo,
+							projectBranch: body.projectBranch ?? "main",
+							pluginSet: body.pluginSet ?? "default",
+							createdAt: "2026-06-10T02:00:00Z",
+							stoppedAt: null,
+							destroyedAt: null,
+							deletedAt: null,
+						},
+						meta: { requestId: "t", timestamp: "2026-06-10T00:00:00Z" },
+						error: null,
+					},
+					{ status: 201 },
+				);
+			}),
+		);
+		return captured;
+	}
+
+	/** Fill only the two required fields, leaving the Node select on its default. */
+	function fillRequiredOnly() {
+		fireEvent.change(screen.getByLabelText("Name"), {
+			target: { value: "project-omega" },
+		});
+		fireEvent.change(screen.getByLabelText("Git repo"), {
+			target: { value: "github.com/acme/omega" },
+		});
+	}
+
+	it("defaults the Node select to Auto and enables Create with only Name + Git repo", async () => {
+		renderModal();
+		await waitFor(() =>
+			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
+		);
+		// The Auto option exists and is the selected default (no first-node-on-mount).
+		const select = screen.getByLabelText("Node") as HTMLSelectElement;
+		expect(
+			screen.getByRole("option", { name: "Auto (least-loaded)" }),
+		).toBeInTheDocument();
+		expect(select.value).toBe("");
+		// Auto is a valid form state: Name + Git repo alone enable Create.
+		fillRequiredOnly();
+		expect(screen.getByRole("button", { name: /Create/ })).toBeEnabled();
+	});
+
+	it("submits the Auto choice with node null and opens the panel + closes", async () => {
+		const captured = captureCreateBody();
+		const { onClose, unmount } = renderModal();
+		await waitFor(() =>
+			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
+		);
+		fillRequiredOnly(); // leave Auto selected
+		fireEvent.click(screen.getByRole("button", { name: /Create/ }));
+
+		await waitFor(() =>
+			expect(useLayoutStore.getState().mosaicNode).toBe("ws-created"),
+		);
+		await waitFor(() => expect(onClose).toHaveBeenCalled());
+		// The Auto path sent node: null (not a node string) so the backend auto-selects.
+		expect(captured.body?.node ?? null).toBeNull();
+		unmount();
+	});
+
+	it("still submits a manual node pick with the chosen node string", async () => {
+		const captured = captureCreateBody();
+		const { unmount } = renderModal();
+		await waitFor(() =>
+			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
+		);
+		fillRequiredOnly();
+		// Explicitly pick node1 — the unchanged manual path.
+		fireEvent.change(screen.getByLabelText("Node"), {
+			target: { value: "node1" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: /Create/ }));
+
+		await waitFor(() =>
+			expect(useLayoutStore.getState().mosaicNode).toBe("ws-created"),
+		);
+		expect(captured.body?.node).toBe("node1");
 		unmount();
 	});
 });
