@@ -105,16 +105,24 @@ class Settings(BaseSettings):
     sqlite_busy_timeout_ms: int = 5000
 
     @model_validator(mode="after")
-    def _derive_worker_nodes_default(self) -> "Settings":
-        """Default worker_nodes to ``[default_node]`` when empty/unset (WSX-01).
+    def _normalize_worker_nodes(self) -> "Settings":
+        """Normalize ``worker_nodes``, defaulting to ``[default_node]`` (WSX-01, WR-02).
 
-        Deriving the default from the resolved ``default_node`` (rather than a
-        hardcoded ``["pve1"]`` literal) means a ``BURROW_DEFAULT_NODE`` / explicit
-        ``default_node`` override propagates into the candidate list. An explicit
-        non-empty ``worker_nodes`` is honored unchanged.
+        Strips surrounding whitespace, drops empty entries, and de-duplicates while
+        preserving order — so a comma-split env source like ``pve1,,pve1, pve2``
+        cannot feed an empty-string or duplicate node into ``selectNode``'s loop
+        (where an empty name would be probed and could be persisted as a bogus
+        target). If nothing survives normalization (unset or all-empty),
+        ``worker_nodes`` falls back to ``[default_node]`` — deriving the default
+        from the resolved ``default_node`` so a ``BURROW_DEFAULT_NODE`` / explicit
+        override propagates into the candidate list.
         """
-        if not self.worker_nodes:
-            self.worker_nodes = [self.default_node]
+        seen: list[str] = []
+        for node in self.worker_nodes:
+            name = node.strip()
+            if name and name not in seen:
+                seen.append(name)
+        self.worker_nodes = seen if seen else [self.default_node]
         return self
 
 

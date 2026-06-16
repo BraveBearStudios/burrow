@@ -48,3 +48,15 @@ def test_worker_nodes_explicit_override_is_respected() -> None:
     """An explicit non-empty worker_nodes is left untouched by the validator."""
     settings = Settings(worker_nodes=["a", "b"])
     assert settings.worker_nodes == ["a", "b"]
+
+
+def test_worker_nodes_normalizes_whitespace_empties_and_dupes() -> None:
+    """WR-02: strip whitespace, drop empty entries, de-dup preserving order."""
+    settings = Settings(worker_nodes=["pve1", "", "pve1", " pve2 "])
+    assert settings.worker_nodes == ["pve1", "pve2"]
+
+
+def test_worker_nodes_all_empty_falls_back_to_default_node() -> None:
+    """WR-02: when nothing survives normalization, fall back to [default_node]."""
+    settings = Settings(default_node="pveZ", worker_nodes=["", "  "])
+    assert settings.worker_nodes == ["pveZ"]
