@@ -18,9 +18,17 @@ class ServiceError(Exception):
 
     The ``.code`` attribute is the stable wire code the router emits; subclasses
     set it as a class attribute so ``error.code`` is invariant across instances.
+
+    ``safe_message`` is an OPTIONAL, author-curated operator-facing string the
+    router may surface verbatim. It is ONLY ever set to vetted, wire-safe literals
+    (never raw ``str(exc)``, never user/topology/secret data) so the no-leak
+    contract (ASVS V7, T-01-14) holds: when it is ``None`` the router falls back to
+    the static ``_SAFE_ERROR_MESSAGES`` table keyed by ``.code``. The diagnostic
+    ``str(exc)`` is kept for logs and is never surfaced.
     """
 
     code: str = "service_error"
+    safe_message: str | None = None
 
 
 class IllegalTransitionError(ServiceError):
@@ -40,12 +48,17 @@ class CapacityError(ServiceError):
     Two refusal shapes share the one ``capacity_exceeded`` code:
 
     - the operator-selected node is over threshold (manual path) -> the default
-      message names that node (``CapacityError(node)``), and
-    - auto-select found NO fitting node -> a custom ``message=`` carries the
-      manual-pick hint (``CapacityError(message=…)``).
+      message names that node (``CapacityError(node)``) and carries NO
+      ``safe_message``, so the router emits the static
+      "The selected node is over capacity." — correct for the manual path, and
+    - auto-select found NO fitting node -> a curated ``message=`` doubles as the
+      ``safe_message`` the router surfaces verbatim, carrying the manual-pick hint
+      (``CapacityError(message=…)``).
 
     ``message`` is keyword-only and additive: existing single-arg
-    ``CapacityError(node)`` callers are unchanged, and ``.code`` is invariant.
+    ``CapacityError(node)`` callers are unchanged, and ``.code`` is invariant. When
+    supplied, ``message`` is an AUTHOR-CURATED literal (no untrusted/secret data),
+    so promoting it to ``safe_message`` keeps the no-leak contract (ASVS V7).
     """
 
     code = "capacity_exceeded"
@@ -53,6 +66,8 @@ class CapacityError(ServiceError):
     def __init__(self, node: str | None = None, *, message: str | None = None) -> None:
         self.node = node
         if message is not None:
+            # Curated literal: safe to surface verbatim at the wire boundary.
+            self.safe_message = message
             super().__init__(message)
         else:
             super().__init__(f"node {node!r} is over the capacity threshold")

@@ -237,7 +237,10 @@ class WorkspaceService:
                 fitting.append((fraction, node))
         if not fitting:
             raise CapacityError(
-                message="All nodes at capacity. Pick a node manually to override."
+                message=(
+                    "No node has available capacity. Pick a node manually to "
+                    "override, or free capacity and retry."
+                )
             )
         # Least fraction wins; tie -> node name ascending (deterministic placement).
         fitting.sort(key=lambda fn: (fn[0], fn[1]))

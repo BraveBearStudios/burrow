@@ -198,12 +198,17 @@ def _service_error_handler(request: Request, exc: Exception) -> JSONResponse:
     """Map a typed :class:`ServiceError` to its deterministic status + envelope.
 
     The wire ``code`` is the error's stable ``.code``; the message is a safe,
-    operator-facing string (never the raw exception text, T-01-14). Unmapped
-    service errors fall back to 400.
+    operator-facing string (never the raw exception text, T-01-14). A per-instance
+    ``safe_message`` is preferred when the error carries one (an author-curated
+    literal, e.g. the auto no-fit manual-pick hint), else the static
+    ``_SAFE_ERROR_MESSAGES`` entry for ``.code`` is used. Raw ``str(exc)`` is NEVER
+    surfaced. Unmapped service errors fall back to 400.
     """
     assert isinstance(exc, ServiceError)
     status = _SERVICE_ERROR_STATUS.get(type(exc), 400)
-    message = _SAFE_ERROR_MESSAGES.get(exc.code, _SAFE_ERROR_MESSAGES["service_error"])
+    message = getattr(exc, "safe_message", None) or _SAFE_ERROR_MESSAGES.get(
+        exc.code, _SAFE_ERROR_MESSAGES["service_error"]
+    )
     return JSONResponse(status_code=status, content=respond_error(code=exc.code, message=message))
 
 

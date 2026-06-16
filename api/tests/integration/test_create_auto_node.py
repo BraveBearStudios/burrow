@@ -127,6 +127,12 @@ async def test_auto_no_fit_refuses_with_capacity_envelope_and_no_orphan(
     _assert_envelope(body)
     assert body["data"] is None
     assert body["error"]["code"] == "capacity_exceeded"
+    # WR-01: the curated auto no-fit hint must reach the wire verbatim — the
+    # operator is told to pick a node manually, NOT the manual-path "selected node"
+    # string (which is wrong here: they chose Auto, no node was selected).
+    error_message = body["error"]["message"]
+    assert "manually" in error_message.lower()
+    assert "selected node" not in error_message.lower()
 
     # No-fit is refused at selection, BEFORE reservation: no orphan row persisted.
     listed = (await integration_client.get("/api/v1/workspaces")).json()
