@@ -146,8 +146,21 @@ Plans:
   4. The selection logic depends only on the `ComputeProvider` capacity surface (node memory fraction / threshold) — no Proxmox-specific type or detail leaks past the seam, and the seam-leakage guard stays green.
   5. Auto-select is proven over the FakeComputeProvider's multi-node capacity with unit/integration tests (least-loaded-fitting node chosen, over-threshold node skipped, no-fit refuses); real multi-node validation is the deferred dev-homelab smoke (ACC-01).
 
-**Plans**: TBD
-**UI hint**: yes
+**Plans**: 3 plans
+
+Plans:
+**Wave 1**
+
+- [ ] 09-01-PLAN.md — foundations: extend `FakeComputeProvider` with optional per-node `node_fractions` (backward-compat float), add the `worker_nodes` Settings list (default `[default_node]`), factor the shared `_fits` capacity helper, and make `/nodes` enumerate `worker_nodes` (WSX-01)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 09-02-PLAN.md — core selection: `WorkspaceCreate.node` → `Optional[str] = None`, a `selectNode()` service method (least-loaded fitting, tie→name asc, skip-on-raise, no-fit→`CapacityError`) wired INSIDE `_create_lock`, plus the criterion-5 unit + auto/manual integration matrix (WSX-01)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 09-03-PLAN.md — UI touch: `NewWorkspaceModal` defaults to "Auto (least-loaded)" (drop first-node-on-mount), Auto sends `node: null`, manual pick retained; `node` optional in the UI create type; vitest coverage (WSX-01)
+
 **Scope note**: Primarily a backend phase — the create-saga node-selection logic over the two provider ABCs — with one small create-modal UI touch (an "auto / no node" option so the operator can decline a manual pick). CI-provable over the Fake provider's multi-node `getNodeMemory`; no real Proxmox. snake_case DB → camelCase JSON preserved; the `ComputeProvider`/`DbProvider` seams stay abstract. Tests land with the change; SPDX headers on every changed file. A baseline-architecture deviation (if any) lands an ADR.
 
 ## Progress
@@ -166,4 +179,4 @@ Phases execute in numeric order: 7 → 8 → 9. The dependency edges between the
 | 6. CI / Tooling Robustness | v1.1 | 1/1 | Complete | 2026-06-15 |
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete    | 2026-06-15 |
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete    | 2026-06-15 |
-| 9. Auto Node Selection | v1.2 | 0/? | Not started | - |
+| 9. Auto Node Selection | v1.2 | 0/3 | Not started | - |
