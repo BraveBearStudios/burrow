@@ -202,7 +202,8 @@ Recent decisions affecting current work:
 
 [From .planning/todos/pending/ — ideas captured during sessions]
 
-None yet.
+- 07r-harden-stop-start-e2e-cleanup (ui/e2e) — 3 Phase-7 review warnings, e2e cleanup robustness
+- 2026-06-18-support-multiple-ai-coding-agents-in-workers (general) — boot Cursor / GitHub Copilot / Codex in workers, not just Claude Code
 
 ### Blockers/Concerns
 
