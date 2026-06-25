@@ -323,9 +323,16 @@ fi
 # --interface 0.0.0.0 exposes :7681 on the worker LAN address so the proxy can
 # reach it; the LAN boundary + least privilege are the v1 controls (LAN-only,
 # no auth — ADR-0007). NO --once: tab close detaches, never terminates.
-log "starting persistent LAN-bound ttyd on :7681 (cmd: ${CLAUDE_CMD}, cwd: ${START_DIR})"
+#
+# The inner shell wraps the worker command in `tmux new-session -A -s burrow`
+# (one fixed session per worker; WSX-03 / ADR-0014). `-A` reattaches to the
+# existing `burrow` session if it is already running, so a ttyd/web-client
+# reconnect to a still-running worker resumes the live session and its
+# scrollback instead of starting fresh. The ttyd flags stay FROZEN
+# (SC-8 / SC-9 / ADR-0006 / ADR-0007).
+log "starting persistent LAN-bound ttyd on :7681 (tmux session 'burrow', cmd: ${CLAUDE_CMD}, cwd: ${START_DIR})"
 exec ttyd \
   --port 7681 \
   --writable \
   --interface 0.0.0.0 \
-  bash -lc "cd '${START_DIR}' && exec ${CLAUDE_CMD}"
+  bash -lc "cd '${START_DIR}' && exec tmux new-session -A -s burrow ${CLAUDE_CMD}"
