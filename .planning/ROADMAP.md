@@ -145,7 +145,7 @@ worker template. *Token-at-rest ADR avoided by design (`.env`-only, validate-in-
 Plans:
 
 - [x] 10-01-PLAN.md — Mocked-proxmoxer integration tier (TEST-01, the hard gate): `mock_proxmox.py` UPID + `ResourceException` factories + self-tests over the real provider
-- [ ] 10-02-PLAN.md — Stop/start e2e hardening (TEST-02, 07r): W2 asserted cleanup DELETE + W3 two-Start-affordance assertion
+- [x] 10-02-PLAN.md — Stop/start e2e hardening (TEST-02, 07r): W2 asserted cleanup DELETE + W3 two-Start-affordance assertion
 - [ ] 10-03-PLAN.md — Persistence data-model foundation (WSX-02): `003` migration (`persistent` column + `settings` singleton), DTO field, provider/saga threading, ADR-0011 + ADR-0013
 - [ ] 10-04-PLAN.md — Reaper carve-out + persistence lock (WSX-04): carve-out comment + negative-control reaper tests + persistent stop->start round-trip
 
@@ -229,7 +229,7 @@ Plans:
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete | 2026-06-15 |
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete | 2026-06-15 |
 | 9. Auto Node Selection | v1.2 | 3/3 | Complete | 2026-06-16 |
-| 10. Persistence Data Model + Reaper Carve-out | v1.3 | 1/4 | In Progress|  |
+| 10. Persistence Data Model + Reaper Carve-out | v1.3 | 2/4 | In Progress|  |
 | 11. Scrollback Restore | v1.3 | 0/? | Not started | - |
 | 12. Setup Wizard Backend | v1.3 | 0/? | Not started | - |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 0/? | Not started | - |

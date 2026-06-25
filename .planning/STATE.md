@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Go Live
 status: executing
-stopped_at: v1.3 roadmap created (Phases 10-14)
-last_updated: "2026-06-25T09:59:54.590Z"
+stopped_at: Completed 10-02-PLAN.md (TEST-02 / 07r e2e hardening)
+last_updated: "2026-06-25T10:15:37.818Z"
 last_activity: 2026-06-25
 progress:
   total_phases: 5
   completed_phases: 0
   total_plans: 4
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-06-24)
 ## Current Position
 
 Phase: 10 (persistence-data-model-reaper-carve-out) — EXECUTING
-Plan: 2 of 4
+Plan: 3 of 4
 Status: Ready to execute
 Last activity: 2026-06-25
 
@@ -100,6 +100,7 @@ Last activity: 2026-06-25
 | Phase 9 P09-02 | 20 | 2 tasks | 5 files |
 | Phase 9 P09-03 | 7 min | 2 tasks tasks | 4 files files |
 | Phase 10 P01 | 8 | 2 tasks | 2 files |
+| Phase 10 P02 | 5 | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -148,6 +149,7 @@ Recent decisions affecting current work:
 - [Phase 8]: [Plan 08-02]: harden-runner (audit) is the literal step 0 of all four CI/release jobs; every `uses:` across all three workflows (25 refs) is a 40-hex commit SHA. **(v1.3 Phase 14 ACC-02 flips harden-runner egress `audit`→`block` with the discovered allowlist + lands the first live release-please PR; pre-seed Fulcio/Rekor/TUF in the allowlist.)**
 - [Phase 9]: [Plan 09-03]: NewWorkspaceModal defaults to an Auto (least-loaded) <option value=""> and submits node: null; isValid drops the node requirement. **(v1.3 Phase 13 adds a `persistent` checkbox onto this SAME modal — default unchecked = ephemeral — completing the UI half of WSX-02 against the Phase 10 backend.)**
 - [Phase ?]: [Plan 10-01]: TEST-01 hard gate GREEN — mocked-proxmoxer integration tier (api/tests/integration/mock_proxmox.py factories + test_mock_proxmox.py self-tests) drives the REAL ProxmoxComputeProvider through running->stopped UPID polling + ResourceException 404/500 inspector branches the Fake never triggers. responses (NOT respx); 9-segment UPID via make_upid; ResourceException raised via responses body=<exc> to hit _is_not_found/_is_running_or_locked exactly. Unblocks persistence-compute Plans 03/04.
+- [Phase ?]: [Plan 10-02]: TEST-02 / 07r e2e hardening landed in ui/tests/e2e/stop-start.spec.ts. W2: the afterEach now captures the cleanup request.delete and asserts expect([200,404]).toContain(res.status()) so a swallowed teardown fails loudly at root cause instead of leaking Fake state as a downstream flaky order-dependent failure (RESEARCH Pitfall 6); cleanup stays id-scoped over createdIds (no broad wipe). W3: the round-trip asserts toHaveCount(2) over the two Start affordances (header button TerminalPanel.tsx:374-383 + placeholder CTA :461-476) and the placeholder CTA visible in the role=status region, BEFORE the unchanged strict-mode placeholder-scoped Start CLICK. W1 id-tracking + unique-per-run names untouched; suite green 5/5. Test-only edit, independent of the Phase-10 api/persistence plans.
 
 ### Pending Todos
 
@@ -189,8 +191,8 @@ real-boot-v2 rows are now CLAIMED by v1.3.
 
 ## Session Continuity
 
-Last session: 2026-06-25T09:59:31.310Z
-Stopped at: v1.3 roadmap created (Phases 10-14)
+Last session: 2026-06-25T10:15:37.810Z
+Stopped at: Completed 10-02-PLAN.md (TEST-02 / 07r e2e hardening)
 Resume file: None
 Next plan: Plan Phase 10 with `/gsd:plan-phase 10` (Persistence Data Model + Reaper Carve-out — the v1.3 foundation: `003` migration + reaper negative-control test + mocked-proxmoxer integration tier). Phase 11 (scrollback, worker-side) and Phase 12 (wizard backend) parallelize off Phase 10.
 
