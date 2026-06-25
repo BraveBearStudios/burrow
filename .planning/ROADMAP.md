@@ -186,7 +186,12 @@ Plans:
   4. `testConnection` and `verifyTemplate` exist on BOTH the Fake and Proxmox `ComputeProvider` impls with no Proxmox specifics leaking past the ABC (seam-leakage guard stays green).
   5. A sentinel-token test proves the Proxmox token is written only to the gitignored `.env`, validated in-memory, and never persisted to the DB, returned in any `data`/`error` envelope, or written to any log line or event blob.
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+
+- [ ] 12-01-PLAN.md - Compute-seam foundation: testConnection/verifyTemplate ABC + DTOs + Proxmox (ephemeral read-only client, 9-priv assertion) + Fake parity + SecretStr/logger token hardening + read-only getSetupState()
+- [ ] 12-02-PLAN.md - Setup API surface: POST /api/v1/setup/{test-connection,verify-template} + token-free error codes + SETUP-03 /api/v1/health reuse + the sentinel-token leak hard gate (SETUP-07) + read-only/zero-resource assertion + ADR-0012
+
 **ADR**: ADR-0012 (new `ComputeProvider` capabilities — `testConnection`/`verifyTemplate`, Fake parity); ADR-0011 (setup-state store, if not already landed in Phase 10). *Token-at-rest ADR avoided by design.*
 
 ### Phase 13: Setup Wizard UI + First-Run Gate
