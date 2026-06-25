@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Go Live
-status: verifying
+status: executing
 stopped_at: Completed 11-01-PLAN.md (WSX-03 tmux scrollback reattach)
-last_updated: "2026-06-25T22:19:28.575Z"
+last_updated: "2026-06-25T23:29:42.308Z"
 last_activity: 2026-06-25
 progress:
   total_phases: 5
   completed_phases: 2
-  total_plans: 6
-  completed_plans: 6
+  total_plans: 8
+  completed_plans: 7
   percent: 40
 ---
 
@@ -26,13 +26,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-24)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 11 — scrollback-restore
+**Current focus:** Phase 12 — setup-wizard-backend
 
 ## Current Position
 
-Phase: 12
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 12 (setup-wizard-backend) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-06-25
 
 ## Performance Metrics
@@ -107,6 +107,7 @@ Last activity: 2026-06-25
 | Phase 10 P04 | 12 | 3 tasks | 3 files |
 | Phase 11 P01 | 9 | 3 tasks | 3 files |
 | Phase 11 P02 | 4 | 2 tasks | 1 files |
+| Phase 12 P01 | 22 | 3 tasks | 11 files |
 
 ## Accumulated Context
 
@@ -160,6 +161,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 10-04]: WSX-04 reaper carve-out locked — comment-only predicate (unchanged, git-diff verified) + 2 RED-if-regressed negative-control tests (persistent-stopped spared, proven RED by injecting a status==stopped reap then restoring; soft-deleted-persistent reclaimed) + 3 WSX-02 round-trip tests (persistent camelCase round-trip, default ephemeral, stop->start same id/vmid). _create override annotation widened str->object. Full api suite 215 passed.
 - [Phase ?]: [Plan 11-01]: WSX-03 tmux scrollback reattach landed. burrow-boot.sh inner ttyd shell now execs tmux new-session -A -s burrow ${CLAUDE_CMD} (one fixed burrow session/worker; -A reattaches to the live session + scrollback on ttyd/web-client reconnect, never respawns on attach). ttyd flags frozen, bash -n clean, relay (api/routers/terminal.py) byte-unchanged (criterion 4). Boot harness asserts tmux new-session/-A/-s burrow in normalized recorded argv (criterion 1) + new test_two_boots_stable_tmux_session proves -A idempotency across two boots (criterion 3); tests/boot green 22 passed. ADR-0014 (ADR-0013 format, no em dashes) records the HONEST contract: reattach-on-reconnect now; cross-reboot scrollback (pipe-pane/CRIU) deferred to v1.4 (WSX-06). tmux binary + /etc/tmux.conf baked by Plan 11-02.
 - [Phase ?]: [Plan 11-02]: WSX-03 criterion 2 (worker tmux baseline) landed. provision-template.sh now bakes tmux (unpinned in the apt-install line alongside ttyd/jq; tmux 3.4 / Ubuntu 24.04 recorded in the top-of-file pin comment per the pin-by-comment convention, NOT an apt =version lock) plus a minimal /etc/tmux.conf written via a single-quoted heredoc before the apt-cache clean, containing EXACTLY set -g history-limit 50000 (bounded per-pane scrollback, T-11-03 DoS mitigation) and set -g window-size latest (the single-reconnecting-web-client resize fix) - no mouse/status/theme (YAGNI). SPDX header + set -euo pipefail intact, bash -n clean. Only provision-template.sh touched; relay byte-unchanged (criterion 4). Closes Phase 11 (11-01 wired the tmux new-session -A reattach in burrow-boot.sh; 11-02 bakes the binary + config it execs against).
+- [Phase 12]: [Plan 12-01]: Setup caps landed. testConnection validates an operator-typed PVE token via an EPHEMERAL throwaway proxmoxer client over a single read-only GET /access/permissions (never self._api), asserts the host-prime 9-priv BurrowProvisioner set (REQUIRED_PRIVS frozenset), returns ConnectionResult(success, missingPrivileges=sorted(missing)), creates ZERO resources; verifyTemplate is GET-only. proxmox_token_value -> SecretStr (read only via get_secret_value at the proxmoxer boundary; git_credential_token untouched); setup_logging pins proxmoxer/urllib3/requests to WARNING; SetupAuth/SetupUnreachable carry FIXED token-free messages. Fake parity via FakeFailures setup toggles. DbProvider.getSetupState() read-only (setter deferred Phase 13, ADR-0011). Full api suite 228 passed; seam-leakage green.
 
 ### Pending Todos
 
@@ -201,7 +203,7 @@ real-boot-v2 rows are now CLAIMED by v1.3.
 
 ## Session Continuity
 
-Last session: 2026-06-25T21:46:43.083Z
+Last session: 2026-06-25T23:23:17.887Z
 Stopped at: Completed 11-01-PLAN.md (WSX-03 tmux scrollback reattach)
 Resume file: None
 Next plan: Plan Phase 10 with `/gsd:plan-phase 10` (Persistence Data Model + Reaper Carve-out — the v1.3 foundation: `003` migration + reaper negative-control test + mocked-proxmoxer integration tier). Phase 11 (scrollback, worker-side) and Phase 12 (wizard backend) parallelize off Phase 10.
