@@ -149,6 +149,36 @@ def test_sql_guard_actually_bites() -> None:
     assert not _has_sql_keyword(clean), "guard must not trip on docstring prose"
 
 
+def test_setup_caps_keep_no_proxmox_specifics_past_the_abc() -> None:
+    """SETUP-07 / criterion 4: the two new caps leak no Proxmox type into routers/models.
+
+    The global guard above already scans every ``api/`` file, so ``routers/setup.py``
+    is covered automatically. This is the explicit, self-documenting anchor for the
+    two new methods (``testConnection``/``verifyTemplate``): the wizard router and the
+    setup DTOs (``ConnectionResult``/``TemplateResult`` in ``models/compute.py``) must
+    name NO ``proxmoxer``/``ProxmoxAPI``/``ResourceException`` symbol as code — the
+    caps stay provider-neutral so a Proxmox specific cannot ride the seam to the UI.
+    """
+    forbidden = {"proxmoxer", "ProxmoxAPI", "ResourceException"}
+    for rel in ("routers/setup.py", "models/compute.py"):
+        path = _API_ROOT / rel
+        assert path.exists(), f"expected {rel} to exist"
+        names = _code_tokens(path.read_text(encoding="utf-8"))
+        leaked = forbidden & names
+        assert not leaked, (
+            f"seam leak: {sorted(leaked)} used as code in {rel}; the two new setup "
+            "caps must stay provider-neutral (no Proxmox specifics past the ABC)"
+        )
+
+    # The neutral DTOs the two methods return are CamelModel (provider-agnostic),
+    # not a driver type — assert the contract holds at the model layer.
+    from models.base import CamelModel
+    from models.compute import ConnectionResult, TemplateResult
+
+    assert issubclass(ConnectionResult, CamelModel)
+    assert issubclass(TemplateResult, CamelModel)
+
+
 def test_migrations_dir_is_the_schema_home() -> None:
     """Sanity anchor: the SQL the guard exempts actually lives where we claim."""
     migrations = _API_ROOT / "db" / "migrations"
