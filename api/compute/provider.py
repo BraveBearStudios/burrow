@@ -21,7 +21,13 @@ Errors are a typed hierarchy (:class:`ComputeError` and subclasses); routers
 
 from abc import ABC, abstractmethod
 
-from models.compute import BootConfig, ComputeStatus, ComputeTask
+from models.compute import (
+    BootConfig,
+    ComputeStatus,
+    ComputeTask,
+    ConnectionResult,
+    TemplateResult,
+)
 
 
 class ComputeError(Exception):
@@ -42,6 +48,24 @@ class TaskFailedError(ComputeError):
 
 class LxcNotReadyError(ComputeError):
     """A container is not in the expected ready state for the operation."""
+
+
+class SetupUnreachableError(ComputeError):
+    """The Proxmox host/network was unreachable during setup validation.
+
+    Carries a FIXED, token-free message: no raw driver exception string (which
+    can embed auth context) is interpolated, so the operator-typed token cannot
+    leak through the error (SETUP-07).
+    """
+
+
+class SetupAuthError(ComputeError):
+    """The token was rejected during setup validation (401/403).
+
+    Carries a FIXED, token-free message (SETUP-07): the raw proxmoxer exception
+    string is never interpolated, so the rejected token never reaches an envelope
+    or log line.
+    """
 
 
 class ComputeProvider(ABC):
@@ -162,4 +186,34 @@ class ComputeProvider(ABC):
     @abstractmethod
     async def healthcheck(self) -> bool:
         """Return ``True`` when the compute backend is reachable (PLAT-03)."""
+        ...
+
+    @abstractmethod
+    async def testConnection(
+        self, host: str, user: str, token_name: str, token_value: str
+    ) -> ConnectionResult:
+        """Validate a host/token strictly READ-ONLY and report missing privileges.
+
+        Asserts the BurrowProvisioner privilege set is present via the privsep
+        token's EFFECTIVE permissions (a single read-only probe) and creates ZERO
+        resources (SETUP-01). The Proxmox impl builds an EPHEMERAL throwaway client
+        from these exact request-body creds (never the runtime ``self._api``),
+        issues one GET, and discards it.
+
+        ``token_value`` is transient request-body input: it is NEVER persisted,
+        returned in any envelope, or written to a log line (SETUP-07). No driver
+        type (``proxmoxer``/``ProxmoxAPI``) crosses this interface; auth/connect
+        failures surface as :class:`SetupAuthError` / :class:`SetupUnreachableError`
+        with fixed token-free messages.
+        """
+        ...
+
+    @abstractmethod
+    async def verifyTemplate(self, template_vmid: int, node: str) -> TemplateResult:
+        """Report whether the golden template exists and is usable, READ-ONLY.
+
+        Issues template GETs only and mutates NOTHING (SETUP-02): ``exists`` =
+        the template VMID resolved on ``node``; ``usable`` = it exists AND is a
+        template. No driver type crosses this interface.
+        """
         ...

@@ -97,3 +97,14 @@ class DbProvider(ABC):
     async def healthcheck(self) -> bool:
         """Return ``True`` when the store is reachable (cheap ``SELECT 1``, PLAT-03)."""
         ...
+
+    @abstractmethod
+    async def getSetupState(self) -> dict[str, Any]:
+        """Return the singleton setup-state row (``id=1``), READ-ONLY this phase.
+
+        Reads ``settings.setupCompletedAt`` (``003`` migration; seeded ``NULL``)
+        as ``{"setupCompletedAt": <iso str | None>}``. The setter
+        (``setSetupCompleted``) is DEFERRED to Phase 13 — Phase 12 only reads, it
+        mutates nothing (ADR-0011).
+        """
+        ...
