@@ -35,7 +35,7 @@ _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 # Select the camelCase columns AS the snake_case model field names so an
 # aiosqlite.Row maps directly onto Workspace via populate_by_name.
 _WORKSPACE_COLUMNS = (
-    "id, name, status, vmid, node, "
+    "id, name, status, vmid, node, persistent, "
     "lxcIp AS lxc_ip, projectRepo AS project_repo, projectBranch AS project_branch, "
     "pluginSet AS plugin_set, createdAt AS created_at, stoppedAt AS stopped_at, "
     "destroyedAt AS destroyed_at, deletedAt AS deleted_at"
@@ -130,8 +130,9 @@ class SqliteProvider(DbProvider):
             try:
                 await conn.execute(
                     "INSERT INTO workspaces "
-                    "(id, name, status, vmid, node, lxcIp, projectRepo, projectBranch, pluginSet) "
-                    "VALUES (:id, :name, :status, :vmid, :node, :lxcIp, "
+                    "(id, name, status, vmid, node, persistent, "
+                    "lxcIp, projectRepo, projectBranch, pluginSet) "
+                    "VALUES (:id, :name, :status, :vmid, :node, :persistent, :lxcIp, "
                     ":projectRepo, :projectBranch, :pluginSet)",
                     {
                         "id": workspace_id,
@@ -139,6 +140,7 @@ class SqliteProvider(DbProvider):
                         "status": data.get("status", "creating"),
                         "vmid": data.get("vmid"),
                         "node": data["node"],
+                        "persistent": data.get("persistent", False),
                         "lxcIp": data.get("lxc_ip"),
                         "projectRepo": data["project_repo"],
                         "projectBranch": data.get("project_branch", "main"),

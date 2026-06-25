@@ -29,6 +29,7 @@ class Workspace(CamelModel):
     stopped_at: str | None
     destroyed_at: str | None
     deleted_at: str | None
+    persistent: bool = False  # WSX-02; stored INTEGER 0/1, Pydantic coerces to bool
 
 
 class WorkspaceCreate(CamelModel):
@@ -44,3 +45,4 @@ class WorkspaceCreate(CamelModel):
     project_branch: str = "main"
     plugin_set: str = "default"
     node: str | None = None
+    persistent: bool = False  # opt-in; default ephemeral (CONTEXT-locked WSX-02)

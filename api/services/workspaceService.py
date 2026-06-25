@@ -284,6 +284,7 @@ class WorkspaceService:
             "project_branch": payload.project_branch,
             "plugin_set": payload.plugin_set,
             "status": "creating",
+            "persistent": payload.persistent,  # WSX-02; flows into createWorkspace INSERT
         }
         for _ in range(_RESERVE_ATTEMPTS):
             used = await self.compute.usedVmids() | await self._db_used_vmids()
