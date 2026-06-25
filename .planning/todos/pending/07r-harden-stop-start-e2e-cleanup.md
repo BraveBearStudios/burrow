@@ -8,6 +8,7 @@ title: Harden stop-start e2e cleanup robustness (3 Phase-7 review warnings)
 area: ui/e2e
 source: 07-REVIEW.md W1/W2/W3
 severity: warning
+resolves_phase: 10
 files:
   - ui/tests/e2e/stop-start.spec.ts
   - ui/src/components/WorkspaceLayout.test.tsx
