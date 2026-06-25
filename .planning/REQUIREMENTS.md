@@ -82,7 +82,7 @@ Explicitly excluded. Anti-features from research belong here with reasoning.
 
 ## Traceability
 
-Initial mapping (finalized by the roadmapper). Each requirement maps to exactly one phase.
+Finalized by the roadmapper (2026-06-25). Each requirement maps to exactly one phase; no requirement appears in two phases. Phases 10/12/13 are CI-provable over the FakeComputeProvider, Phase 11 is worker-side (CI-provable via the boot harness), Phase 14 is operator-run human UAT on real infra.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
@@ -111,4 +111,4 @@ Initial mapping (finalized by the roadmapper). Each requirement maps to exactly 
 
 ---
 *Requirements defined: 2026-06-24*
-*Last updated: 2026-06-24 after initial v1.3 definition*
+*Last updated: 2026-06-25 — traceability finalized by the roadmapper against ROADMAP.md Phases 10-14 (15/15 mapped, 0 unmapped, no duplicates)*
