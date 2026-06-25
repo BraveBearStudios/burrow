@@ -167,7 +167,7 @@ Plans:
 **Plans**: 2 plans
 Plans:
 
-- [ ] 11-01-PLAN.md: boot-side tmux wrap + reattach harness + ADR-0014 (WSX-03 criteria 1, 3, 4) - tmux new-session -A -s burrow in burrow-boot.sh, argv assertion + second-boot reattach test, ADR-0014.
+- [x] 11-01-PLAN.md: boot-side tmux wrap + reattach harness + ADR-0014 (WSX-03 criteria 1, 3, 4) - tmux new-session -A -s burrow in burrow-boot.sh, argv assertion + second-boot reattach test, ADR-0014.
 - [ ] 11-02-PLAN.md: worker-template tmux baseline (WSX-03 criterion 2) - add tmux to the apt line + record the 3.4 pin + bake /etc/tmux.conf (history-limit 50000 + window-size latest).
 
 **ADR**: ADR-0014 (tmux scrollback in the worker template — tmux 3.4 over zellij, bounded history, reconnect-survival only)
@@ -235,7 +235,7 @@ Plans:
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete | 2026-06-15 |
 | 9. Auto Node Selection | v1.2 | 3/3 | Complete | 2026-06-16 |
 | 10. Persistence Data Model + Reaper Carve-out | v1.3 | 4/4 | Complete    | 2026-06-25 |
-| 11. Scrollback Restore | v1.3 | 0/2 | Not started | - |
+| 11. Scrollback Restore | v1.3 | 1/2 | In Progress|  |
 | 12. Setup Wizard Backend | v1.3 | 0/? | Not started | - |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 0/? | Not started | - |
 | 14. First Real-Infra Acceptance | v1.3 | 0/? | Not started | - |
