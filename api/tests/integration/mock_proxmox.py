@@ -59,9 +59,19 @@ def register_task_poll(
     exact ``running``->``stopped`` sequence the Fake never triggers. proxmoxer unwraps
     the ``data`` envelope, so the registered body is what ``_block`` inspects
     (``status`` + ``exitstatus``).
+
+    Per-URL ordering contract (WR-04): replay order is scoped to the status URL, and
+    that URL is derived from the UPID. Registering the SAME ``upid`` twice would
+    interleave both calls' running/stopped bodies on one URL and silently mis-poll,
+    so this asserts the UPID's status URL is not already registered. Distinct UPIDs
+    (distinct URLs) are independent and may be registered in any order.
     """
     base = f"https://{host}:8006/api2/json"
     url = f"{base}/nodes/{node}/tasks/{upid}/status"
+    assert not any(r.url == url for r in responses.registered()), (
+        f"status URL already registered for upid {upid!r}; re-using a UPID across "
+        "register_task_poll calls interleaves running/stopped bodies (WR-04)"
+    )
     for _ in range(running_polls):
         responses.add(
             responses.GET,
