@@ -15,8 +15,14 @@ ALTER TABLE workspaces ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0;
 --     creating a divergent config. setupCompletedAt is an ISO-8601 timestamp
 --     (NULL = unconfigured), consumed by the Phase 12 setup wizard. It is a
 --     NON-sensitive timestamp only; no secret is stored here.
-CREATE TABLE settings (
+--
+--     IF NOT EXISTS + INSERT OR IGNORE keep (2)/(3) re-runnable: executescript is
+--     non-atomic (an implicit COMMIT precedes the script and the statements are NOT
+--     wrapped in one transaction), so a mid-script failure after (1) commits would
+--     re-run this file from the top without these guards (WR-03). The ALTER in (1)
+--     is recovered separately in migrate() (it catches "duplicate column name").
+CREATE TABLE IF NOT EXISTS settings (
   id               INTEGER PRIMARY KEY CHECK (id = 1),
   setupCompletedAt TEXT          -- ISO-8601 when setup finished; NULL = unconfigured
 );
-INSERT INTO settings (id, setupCompletedAt) VALUES (1, NULL);
+INSERT OR IGNORE INTO settings (id, setupCompletedAt) VALUES (1, NULL);

@@ -16,6 +16,7 @@ snake_case field names so a row maps straight onto the model.
 """
 
 import json
+import logging
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -29,6 +30,8 @@ from models.template import Template
 from models.workspace import Workspace
 
 from db.provider import DbProvider, VmidTakenError
+
+logger = logging.getLogger("burrow.sqlite")
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
@@ -108,7 +111,7 @@ class SqliteProvider(DbProvider):
                 version = path.stem
                 if version in applied:
                     continue
-                await conn.executescript(path.read_text(encoding="utf-8"))
+                await self._apply_migration_file(conn, path)
                 await conn.execute("INSERT INTO schema_migrations (version) VALUES (?)", (version,))
             await conn.commit()
         self._migrated = True
@@ -121,6 +124,41 @@ class SqliteProvider(DbProvider):
     def _row_to_workspace(row: aiosqlite.Row) -> Workspace:
         """Map a workspaces row (snake_case-aliased) onto the Workspace DTO."""
         return Workspace.model_validate(dict(row))
+
+    @staticmethod
+    async def _apply_migration_file(conn: aiosqlite.Connection, path: Path) -> None:
+        """Run a migration script, recovering from a partial-apply re-run (WR-03).
+
+        ``executescript`` is non-atomic: it issues an implicit COMMIT before the
+        script and does NOT wrap the statements in one transaction. A mid-script
+        failure can therefore commit an early ``ALTER TABLE ADD COLUMN`` while the
+        ledger row (written by the caller, after this returns) never lands. The next
+        ``migrate()`` re-runs the file from the top and the ADD COLUMN now raises
+        ``OperationalError: duplicate column name``, wedging migration permanently.
+
+        Recovery: catch exactly that "duplicate column name" error and re-run the
+        script with the already-applied ADD COLUMN statements stripped. The rest of
+        the migration is authored idempotently (``CREATE TABLE IF NOT EXISTS`` /
+        ``INSERT OR IGNORE``), so replaying the remainder is safe and lets the caller
+        ledger the version, converging the half-applied DB onto the target schema.
+        """
+        script = path.read_text(encoding="utf-8")
+        try:
+            await conn.executescript(script)
+        except aiosqlite.OperationalError as exc:
+            if "duplicate column name" not in str(exc).lower():
+                raise
+            logger.warning(
+                "migration re-run found an already-applied column; "
+                "replaying the idempotent remainder",
+                extra={"migration": path.name, "cause": str(exc)},
+            )
+            remainder = "\n".join(
+                line
+                for line in script.splitlines()
+                if not line.lstrip().upper().startswith("ALTER TABLE")
+            )
+            await conn.executescript(remainder)
 
     # ── DbProvider contract ───────────────────────────────────────────────
     async def createWorkspace(self, data: dict[str, Any]) -> Workspace:

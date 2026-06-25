@@ -135,3 +135,50 @@ async def test_fresh_and_migrated_converge(tmp_path: Path) -> None:
     fresh_settings = _column_names(await _table_info(fresh._database_path, "settings"))
     migrated_settings = _column_names(await _table_info(migrated_path, "settings"))
     assert fresh_settings == migrated_settings == {"id", "setupCompletedAt"}
+
+
+async def _apply_partial_003(database_path: str) -> None:
+    """Simulate a 003 apply that died mid-script: column added, 003 unledgered.
+
+    ``executescript`` is non-atomic, so a failure after statement (1) commits leaves
+    the ``persistent`` column durably added while the 003 ledger row is never written
+    (the caller writes it only after the whole script returns). This reproduces that
+    half-applied state: 001 + 002 ledgered, the ``persistent`` ALTER committed, the
+    ``settings`` table absent, and NO ledger row for 003 (WR-03).
+    """
+    await _apply_pre_003(database_path)
+    async with aiosqlite.connect(database_path) as conn:
+        await conn.executescript(
+            "ALTER TABLE workspaces ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0;"
+        )
+        await conn.commit()
+
+
+async def test_migrate_recovers_from_partial_003_apply(tmp_path: Path) -> None:
+    """A re-run after a partial 003 apply converges instead of wedging (WR-03).
+
+    Before the fix, the re-run's ``ALTER TABLE ... ADD COLUMN persistent`` raised
+    ``OperationalError: duplicate column name`` and migration wedged permanently.
+    The fix catches that on re-run and replays the idempotent remainder, so this
+    asserts ``migrate()`` succeeds, 003 ends ledgered, the column survives, and the
+    ``settings`` singleton is seeded.
+    """
+    db_path = str(tmp_path / "partial.db")
+    await _apply_partial_003(db_path)
+
+    provider = SqliteProvider(_DbSettings(database_path=db_path))
+    await provider.migrate()  # must NOT raise "duplicate column name"
+
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT version FROM schema_migrations")
+        applied = {row["version"] for row in await cursor.fetchall()}
+        await cursor.close()
+        cursor = await conn.execute("SELECT id, setupCompletedAt FROM settings")
+        settings_rows = list(await cursor.fetchall())
+        await cursor.close()
+    assert "003_persistent_and_settings" in applied
+    assert "persistent" in _column_names(await _table_info(db_path, "workspaces"))
+    assert len(settings_rows) == 1
+    assert settings_rows[0]["id"] == 1
+    assert settings_rows[0]["setupCompletedAt"] is None
