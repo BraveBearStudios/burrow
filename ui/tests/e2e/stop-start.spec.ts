@@ -133,6 +133,20 @@ test("stop → placeholder → start → reconnect round-trip", async ({ page })
 		timeout: 15_000,
 	});
 
+	// W3 — after a Stop, BOTH Start affordances exist for THIS panel: the header
+	// icon button (TerminalPanel.tsx:374-383) AND the placeholder CTA inside the
+	// `role="status"` "Workspace stopped" region (TerminalPanel.tsx:461-476). A
+	// regression that drops the header Start button while stopped would fail this
+	// count, not silently pass.
+	const startButtons = panel.getByRole("button", { name: "Start workspace" });
+	await expect(startButtons).toHaveCount(2);
+	const stoppedRegion = panel.getByRole("status").filter({
+		hasText: "Workspace stopped",
+	});
+	await expect(
+		stoppedRegion.getByRole("button", { name: "Start workspace" }),
+	).toBeVisible();
+
 	// ── Start: from the placeholder CTA → POST /start → terminal reconnects ─────
 	// A stopped panel renders TWO "Start workspace" affordances (the header icon
 	// button + the placeholder CTA). Scope the click to the placeholder region
