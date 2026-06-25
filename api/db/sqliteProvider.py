@@ -35,6 +35,11 @@ logger = logging.getLogger("burrow.sqlite")
 
 _MIGRATIONS_DIR = Path(__file__).parent / "migrations"
 
+# ADR-0013: `persistent` is create-time only in v1.3, never mutable post-create.
+# Enforced at the updateWorkspace seam so the "create-time only" decision is a
+# typed policy at the call site, not just prose in the ADR.
+_IMMUTABLE_FIELDS = {"persistent"}
+
 # Select the camelCase columns AS the snake_case model field names so an
 # aiosqlite.Row maps directly onto Workspace via populate_by_name.
 _WORKSPACE_COLUMNS = (
@@ -260,6 +265,11 @@ class SqliteProvider(DbProvider):
         assignments: list[str] = []
         params: dict[str, Any] = {"id": workspaceId}
         for field_name, value in updates.items():
+            if field_name in _IMMUTABLE_FIELDS:
+                # Deliberate policy, not an accidental column_map omission: surface
+                # a distinct, self-documenting error rather than the opaque
+                # "unknown workspace field" KeyError below (WR-01 / ADR-0013).
+                raise ValueError(f"{field_name} is immutable after create (ADR-0013)")
             column = column_map.get(field_name)
             if column is None:
                 raise KeyError(f"unknown workspace field: {field_name}")
