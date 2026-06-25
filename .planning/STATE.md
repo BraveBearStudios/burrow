@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Go Live
-status: executing
+status: verifying
 stopped_at: Completed 10-03-PLAN.md (WSX-02 persistence data model)
-last_updated: "2026-06-25T10:43:55.218Z"
+last_updated: "2026-06-25T11:00:54.106Z"
 last_activity: 2026-06-25
 progress:
   total_phases: 5
-  completed_phases: 0
+  completed_phases: 1
   total_plans: 4
-  completed_plans: 3
-  percent: 0
+  completed_plans: 4
+  percent: 20
 ---
 
 <!--
@@ -32,7 +32,7 @@ See: .planning/PROJECT.md (updated 2026-06-24)
 
 Phase: 10 (persistence-data-model-reaper-carve-out) — EXECUTING
 Plan: 4 of 4
-Status: Ready to execute
+Status: Phase complete — ready for verification
 Last activity: 2026-06-25
 
 ## Performance Metrics
@@ -102,6 +102,7 @@ Last activity: 2026-06-25
 | Phase 10 P01 | 8 | 2 tasks | 2 files |
 | Phase 10 P02 | 5 | 2 tasks | 1 files |
 | Phase 10 P03 | 17 | 3 tasks | 7 files |
+| Phase 10 P04 | 12 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -152,6 +153,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 10-01]: TEST-01 hard gate GREEN — mocked-proxmoxer integration tier (api/tests/integration/mock_proxmox.py factories + test_mock_proxmox.py self-tests) drives the REAL ProxmoxComputeProvider through running->stopped UPID polling + ResourceException 404/500 inspector branches the Fake never triggers. responses (NOT respx); 9-segment UPID via make_upid; ResourceException raised via responses body=<exc> to hit _is_not_found/_is_running_or_locked exactly. Unblocks persistence-compute Plans 03/04.
 - [Phase ?]: [Plan 10-02]: TEST-02 / 07r e2e hardening landed in ui/tests/e2e/stop-start.spec.ts. W2: the afterEach now captures the cleanup request.delete and asserts expect([200,404]).toContain(res.status()) so a swallowed teardown fails loudly at root cause instead of leaking Fake state as a downstream flaky order-dependent failure (RESEARCH Pitfall 6); cleanup stays id-scoped over createdIds (no broad wipe). W3: the round-trip asserts toHaveCount(2) over the two Start affordances (header button TerminalPanel.tsx:374-383 + placeholder CTA :461-476) and the placeholder CTA visible in the role=status region, BEFORE the unchanged strict-mode placeholder-scoped Start CLICK. W1 id-tracking + unique-per-run names untouched; suite green 5/5. Test-only edit, independent of the Phase-10 api/persistence plans.
 - [Phase ?]: [Plan 10-03]: WSX-02 persistence data model landed. 003 migration adds workspaces.persistent (INTEGER NOT NULL DEFAULT 0; the DEFAULT is mandatory for SQLite ADD COLUMN NOT NULL on a non-empty table and is the v1.2 backfill) plus a singleton settings table (id INTEGER PRIMARY KEY CHECK id=1, setupCompletedAt TEXT, seeded id=1/NULL) through the UNCHANGED schema_migrations ledger. persistent bool=False threads through both DTOs, sqliteProvider SELECT+INSERT (data.get default False), and the create-saga reservation base dict; default create stays ephemeral. Create-time-only (updateWorkspace column_map untouched). ADR-0011 (settings singleton setup-state store, shared with Phase 12) + ADR-0013 (Tier-1 persistence = plain pct stop/start same-VMID disk-preserved; snapshots/CRIU deferred v1.4+) authored. test_migrations.py locks DEFAULT-0 backfill, singleton seed+invariant, fresh==migrated convergence. Full api suite 210 passed.
+- [Phase ?]: [Plan 10-04]: WSX-04 reaper carve-out locked — comment-only predicate (unchanged, git-diff verified) + 2 RED-if-regressed negative-control tests (persistent-stopped spared, proven RED by injecting a status==stopped reap then restoring; soft-deleted-persistent reclaimed) + 3 WSX-02 round-trip tests (persistent camelCase round-trip, default ephemeral, stop->start same id/vmid). _create override annotation widened str->object. Full api suite 215 passed.
 
 ### Pending Todos
 
@@ -193,7 +195,7 @@ real-boot-v2 rows are now CLAIMED by v1.3.
 
 ## Session Continuity
 
-Last session: 2026-06-25T10:43:55.210Z
+Last session: 2026-06-25T11:00:21.202Z
 Stopped at: Completed 10-03-PLAN.md (WSX-02 persistence data model)
 Resume file: None
 Next plan: Plan Phase 10 with `/gsd:plan-phase 10` (Persistence Data Model + Reaper Carve-out — the v1.3 foundation: `003` migration + reaper negative-control test + mocked-proxmoxer integration tier). Phase 11 (scrollback, worker-side) and Phase 12 (wizard backend) parallelize off Phase 10.

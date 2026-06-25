@@ -36,7 +36,7 @@ the ACC items are operator-run human UAT on real infrastructure.
 
 - [x] **WSX-02**: Operator can mark a workspace **persistent** at create time (default remains ephemeral); a persistent workspace survives stop→start with its disk and database row intact instead of being destroyed.
 - [ ] **WSX-03**: A persistent workspace's terminal **scrollback survives stop→start** — on reconnect the operator sees prior scrollback (worker-side tmux `new-session -A` reattach).
-- [ ] **WSX-04**: The orphan reaper **never destroys a persistent stopped workspace** (the orphan predicate keys on "no owning row," not on "stopped" state), proven by a negative-control regression test.
+- [x] **WSX-04**: The orphan reaper **never destroys a persistent stopped workspace** (the orphan predicate keys on "no owning row," not on "stopped" state), proven by a negative-control regression test.
 
 ### Test Hardening (TEST)
 
@@ -87,7 +87,7 @@ Finalized by the roadmapper (2026-06-25). Each requirement maps to exactly one p
 | Requirement | Phase | Status |
 |-------------|-------|--------|
 | WSX-02  | Phase 10 | Complete |
-| WSX-04  | Phase 10 | Pending |
+| WSX-04  | Phase 10 | Complete |
 | TEST-01 | Phase 10 | Complete |
 | TEST-02 | Phase 10 | Complete |
 | WSX-03  | Phase 11 | Pending |

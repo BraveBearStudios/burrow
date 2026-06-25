@@ -113,7 +113,7 @@ Grounded in `.planning/research/SUMMARY.md`. Locked decisions: persistence is op
 (default ephemeral); the reaper gets a carve-out + regression test only (no new auto-reaping); the
 Proxmox token is validate-in-memory, `.env`-only (no secret-at-rest).
 
-- [ ] **Phase 10: Persistence Data Model + Reaper Carve-out** — `003` migration (`settings` singleton + `persistent` column), reaper-never-reaps-a-persistent-stopped-workspace negative-control test, mocked-proxmoxer integration tier (CI-provable)
+- [x] **Phase 10: Persistence Data Model + Reaper Carve-out** — `003` migration (`settings` singleton + `persistent` column), reaper-never-reaps-a-persistent-stopped-workspace negative-control test, mocked-proxmoxer integration tier (CI-provable) (completed 2026-06-25)
 - [ ] **Phase 11: Scrollback Restore** — worker-side tmux `new-session -A` in `burrow-boot.sh` + baked `/etc/tmux.conf` so scrollback survives stop→start (worker-side, CI-provable via the boot harness)
 - [ ] **Phase 12: Setup Wizard Backend** — `testConnection`/`verifyTemplate` on both providers, `routers/setup.py` + `SetupService`, token hygiene (CI-provable)
 - [ ] **Phase 13: Setup Wizard UI + First-Run Gate** — `SetupWizard.tsx`, `App.tsx` first-run gate off `setupCompletedAt`, `persistent` checkbox in `NewWorkspaceModal` (CI-provable)
@@ -147,7 +147,7 @@ Plans:
 - [x] 10-01-PLAN.md — Mocked-proxmoxer integration tier (TEST-01, the hard gate): `mock_proxmox.py` UPID + `ResourceException` factories + self-tests over the real provider
 - [x] 10-02-PLAN.md — Stop/start e2e hardening (TEST-02, 07r): W2 asserted cleanup DELETE + W3 two-Start-affordance assertion
 - [x] 10-03-PLAN.md — Persistence data-model foundation (WSX-02): `003` migration (`persistent` column + `settings` singleton), DTO field, provider/saga threading, ADR-0011 + ADR-0013
-- [ ] 10-04-PLAN.md — Reaper carve-out + persistence lock (WSX-04): carve-out comment + negative-control reaper tests + persistent stop->start round-trip
+- [x] 10-04-PLAN.md — Reaper carve-out + persistence lock (WSX-04): carve-out comment + negative-control reaper tests + persistent stop->start round-trip
 
 **ADR**: ADR-0013 (persistence model — Tier-1 `persistent` flag; snapshots/suspend deferred); ADR-0011 (setup-state store — the `settings` singleton carrying `setupCompletedAt`, shared with Phase 12)
 
@@ -229,7 +229,7 @@ Plans:
 | 7. Backlog Fixes (Fast-Reconcile + E2E Hardening) | v1.2 | 1/1 | Complete | 2026-06-15 |
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete | 2026-06-15 |
 | 9. Auto Node Selection | v1.2 | 3/3 | Complete | 2026-06-16 |
-| 10. Persistence Data Model + Reaper Carve-out | v1.3 | 3/4 | In Progress|  |
+| 10. Persistence Data Model + Reaper Carve-out | v1.3 | 4/4 | Complete   | 2026-06-25 |
 | 11. Scrollback Restore | v1.3 | 0/? | Not started | - |
 | 12. Setup Wizard Backend | v1.3 | 0/? | Not started | - |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 0/? | Not started | - |
