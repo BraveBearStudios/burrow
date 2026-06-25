@@ -74,6 +74,18 @@ systemctl enable burrow-worker.service
 log "creating /etc/burrow/worker.env placeholder (populated at boot)"
 mkdir -p /etc/burrow && touch /etc/burrow/worker.env
 
+# --- Baked /etc/tmux.conf -----------------------------------------------------
+# Minimal scrollback config read by tmux on every worker boot (WSX-03 criterion 2).
+# history-limit 50000 caps per-pane scrollback (~a few MB/pane, vs the tmux
+# default 2000); window-size latest sizes the pane to the newest attached client
+# (the single-reconnecting-web-client resize fix). No mouse/status/theme (YAGNI).
+log "baking /etc/tmux.conf (history-limit 50000 + window-size latest)"
+cat > /etc/tmux.conf <<'TMUXCONF'
+set -g history-limit 50000
+set -g window-size latest
+TMUXCONF
+chmod 644 /etc/tmux.conf
+
 # --- Shrink the image --------------------------------------------------------
 log "cleaning apt caches"
 apt-get clean && rm -rf /var/lib/apt/lists/*
