@@ -213,6 +213,74 @@ async def test_reap_does_not_log_destroyed_for_out_of_pool_or_owned_cts(
     assert not [r for r in caplog.records if r.message == "reaper.destroyed"]
 
 
+# ── WSX-04: persistence carve-out negative-controls (RED-if-regressed) ────────
+async def test_persistent_stopped_workspace_is_never_reaped(
+    compute: FakeComputeProvider, db: SqliteProvider
+) -> None:
+    """A persistent STOPPED workspace keeps a live row → spared by the reaper (SC3).
+
+    The orphan predicate keys on ownership (`vmid in live_vmids`), never on
+    `stopped` state: a stopped persistent workspace keeps a live DB row, so its
+    vmid stays in `live_vmids` and the CT survives the reap. This test is
+    RED-if-regressed — it fails the instant the predicate ever adds a
+    `status == "stopped"` (or `persistent`) reaping branch, because the CT here is
+    spared SOLELY because it is live-owned, despite being stopped.
+    """
+    vmid = real_settings.worker_pool_start + 20
+    ws = await db.createWorkspace(
+        {
+            "name": "persistent-stopped",
+            "node": "pve1",
+            "project_repo": "git@example.com:acme/x.git",
+            "vmid": vmid,
+            "status": "stopped",
+            "persistent": True,
+        }
+    )
+    compute._containers[vmid] = _FakeContainer(
+        vmid=vmid, name="persistent-stopped", node="pve1", running=False
+    )
+
+    await _reconciler(compute, db, now=datetime.now(timezone.utc)).reconcile_once()
+
+    assert vmid in compute._containers  # survives the reap (live-owned, never on state)
+    row = await db.getWorkspace(ws.id)
+    assert row is not None
+    assert row.status == "stopped"  # the DB row is intact — not reaped to error/destroyed
+    assert row.persistent is True
+
+
+async def test_soft_deleted_persistent_workspace_becomes_orphan_eligible(
+    compute: FakeComputeProvider, db: SqliteProvider
+) -> None:
+    """A SOFT-DELETED persistent workspace drops from listWorkspaces() → reclaimable.
+
+    Delete is NOT a persistence shield: a soft-deleted row leaves
+    ``listWorkspaces()`` (which filters ``WHERE deletedAt IS NULL``), so its vmid
+    leaves ``live_vmids`` and the in-pool CT becomes orphan-eligible. This is the
+    inverse control proving the bound is ownership-keyed, not persistence-keyed.
+    """
+    vmid = real_settings.worker_pool_start + 21
+    ws = await db.createWorkspace(
+        {
+            "name": "persistent-deleted",
+            "node": "pve1",
+            "project_repo": "git@example.com:acme/x.git",
+            "vmid": vmid,
+            "status": "stopped",
+            "persistent": True,
+        }
+    )
+    compute._containers[vmid] = _FakeContainer(
+        vmid=vmid, name="persistent-deleted", node="pve1", running=False
+    )
+    await db.softDeleteWorkspace(ws.id)  # explicit teardown drops the live-row protection
+
+    await _reconciler(compute, db, now=datetime.now(timezone.utc)).reconcile_once()
+
+    assert vmid not in compute._containers  # reclaimed — delete is not a persistence shield
+
+
 # ── Test 2: timed-out creating row swept to error (CAP-03) ────────────────────
 async def test_timed_out_creating_row_is_reaped_to_error(
     compute: FakeComputeProvider, db: SqliteProvider
