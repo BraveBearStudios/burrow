@@ -235,7 +235,7 @@ Plans:
 | 8. Release Hardening (release-please + harden-runner) | v1.2 | 2/2 | Complete | 2026-06-15 |
 | 9. Auto Node Selection | v1.2 | 3/3 | Complete | 2026-06-16 |
 | 10. Persistence Data Model + Reaper Carve-out | v1.3 | 4/4 | Complete    | 2026-06-25 |
-| 11. Scrollback Restore | v1.3 | 2/2 | Complete   | 2026-06-25 |
+| 11. Scrollback Restore | v1.3 | 2/2 | Complete    | 2026-06-25 |
 | 12. Setup Wizard Backend | v1.3 | 0/? | Not started | - |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 0/? | Not started | - |
 | 14. First Real-Infra Acceptance | v1.3 | 0/? | Not started | - |
