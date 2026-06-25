@@ -138,7 +138,12 @@ worker template. *Token-at-rest ADR avoided by design (`.env`-only, validate-in-
   3. A negative-control regression test proves the orphan reaper never destroys a persistent stopped workspace — the orphan predicate keys on "no owning DB row," not on `stopped` state (RED if the predicate ever regresses to state-based reaping).
   4. A mocked-proxmoxer integration tier exercises real-shaped UPID async-task polling and `ResourceException` error shapes, covering the setup/persistence compute paths the Fake never triggers.
   5. The stop/start e2e cleanup is hardened (07r): per-test workspace-id tracking, an asserted cleanup `DELETE` success, and an explicit two-Start-affordance assertion; the suite is order-independent.
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+- [ ] 10-01-PLAN.md — Mocked-proxmoxer integration tier (TEST-01, the hard gate): `mock_proxmox.py` UPID + `ResourceException` factories + self-tests over the real provider
+- [ ] 10-02-PLAN.md — Stop/start e2e hardening (TEST-02, 07r): W2 asserted cleanup DELETE + W3 two-Start-affordance assertion
+- [ ] 10-03-PLAN.md — Persistence data-model foundation (WSX-02): `003` migration (`persistent` column + `settings` singleton), DTO field, provider/saga threading, ADR-0011 + ADR-0013
+- [ ] 10-04-PLAN.md — Reaper carve-out + persistence lock (WSX-04): carve-out comment + negative-control reaper tests + persistent stop->start round-trip
 **ADR**: ADR-0013 (persistence model — Tier-1 `persistent` flag; snapshots/suspend deferred); ADR-0011 (setup-state store — the `settings` singleton carrying `setupCompletedAt`, shared with Phase 12)
 
 ### Phase 11: Scrollback Restore
