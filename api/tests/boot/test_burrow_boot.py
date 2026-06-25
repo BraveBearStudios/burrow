@@ -99,8 +99,15 @@ def test_fetch_then_clone_happy_path(
 
     # The stub ttyd recorded the FROZEN argv (persistent + LAN-bound).
     argv = (home / "ttyd-argv.txt").read_text()
-    assert "--interface 0.0.0.0" in argv.replace("\n", " "), f"ttyd argv: {argv!r}"
+    normalized = argv.replace("\n", " ")
+    assert "--interface 0.0.0.0" in normalized, f"ttyd argv: {argv!r}"
     assert "--once" not in argv, f"ttyd must be persistent (no --once): {argv!r}"
+
+    # WSX-03 criterion 1: the worker shell is wrapped in tmux new-session -A -s burrow,
+    # so a ttyd/web-client reconnect reattaches to the live `burrow` session + scrollback.
+    assert "tmux new-session" in normalized, f"ttyd must exec a tmux-wrapped shell: {argv!r}"
+    assert "-A" in normalized, f"tmux wrap must use -A (attach-or-create): {argv!r}"
+    assert "-s burrow" in normalized, f"tmux wrap must target the `burrow` session: {argv!r}"
 
 
 def test_bootconfig_retry_then_fail(
@@ -245,6 +252,45 @@ def test_two_boots_identical_plugin_tree(
     tree2 = _digest(_plugins_dir(home2))
     assert tree1, "no plugin files were installed — nothing to compare"
     assert tree1 == tree2, "two boots of the same manifest produced different plugin trees (SC-2)"
+
+
+def test_two_boots_stable_tmux_session(
+    boot_script: Path,
+    manifest_config_repo: Callable[..., ManifestConfigRepo],
+    stub_ttyd_path: Path,
+    tmp_path: Path,
+) -> None:
+    """Two boots over the same manifest both exec the stable `burrow` tmux session (WSX-03, criterion 3).
+
+    The `-A` idempotency contract: a second boot reattaches to the existing `burrow`
+    session rather than starting a fresh one. Proven hermetically — the stub ttyd
+    records its argv and we assert the invocation string, NOT a live tmux server.
+    This proves the reattach mechanism is wired (reattach on reconnect to a still-
+    running worker); it does NOT assert scrollback survives a real CT halt (that is
+    cross-reboot scrollback, WSX-06, deferred to v1.4).
+    """
+    repo = manifest_config_repo(include_binary=True)
+
+    boot1 = tmp_path / "boot1"
+    boot1.mkdir()
+    boot2 = tmp_path / "boot2"
+    boot2.mkdir()
+    with serve_bootconfig(repo) as cp:
+        proc1, home1, _e1 = _run_boot(
+            boot_script, control_plane=cp.url, tmp_path=boot1, stub_bin=stub_ttyd_path
+        )
+        proc2, home2, _e2 = _run_boot(
+            boot_script, control_plane=cp.url, tmp_path=boot2, stub_bin=stub_ttyd_path
+        )
+    assert proc1.returncode == 0, f"boot1 failed:\n{proc1.stdout}\n{proc1.stderr}"
+    assert proc2.returncode == 0, f"boot2 failed:\n{proc2.stdout}\n{proc2.stderr}"
+
+    argv1 = (home1 / "ttyd-argv.txt").read_text().replace("\n", " ")
+    argv2 = (home2 / "ttyd-argv.txt").read_text().replace("\n", " ")
+    for label, argv in (("boot1", argv1), ("boot2", argv2)):
+        assert "tmux new-session -A -s burrow" in argv, (
+            f"{label} must exec the stable `tmux new-session -A -s burrow` invocation: {argv!r}"
+        )
 
 
 def test_bad_manifest_fails_boot(
