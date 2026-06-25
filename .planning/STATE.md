@@ -1,15 +1,16 @@
 ---
 gsd_state_version: 1.0
 milestone: v1.3
-milestone_name: "Go Live: Guided Setup + Real-Infra Acceptance + Persistence"
-status: ready to plan
-last_updated: "2026-06-25T01:37:48.810Z"
+milestone_name: Go Live
+status: executing
+stopped_at: v1.3 roadmap created (Phases 10-14)
+last_updated: "2026-06-25T09:59:54.590Z"
 last_activity: 2026-06-25
 progress:
   total_phases: 5
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 4
+  completed_plans: 1
   percent: 0
 ---
 
@@ -25,14 +26,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-24)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 10 — Persistence Data Model + Reaper Carve-out (v1.3 foundation)
+**Current focus:** Phase 10 — persistence-data-model-reaper-carve-out
 
 ## Current Position
 
-Phase: Phase 10 — Persistence Data Model + Reaper Carve-out
-Plan: —
-Status: Not started (roadmap created; ready to plan)
-Last activity: 2026-06-25 — Milestone v1.3 roadmap created (Phases 10-14)
+Phase: 10 (persistence-data-model-reaper-carve-out) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
+Last activity: 2026-06-25
 
 ## Performance Metrics
 
@@ -98,6 +99,7 @@ Last activity: 2026-06-25 — Milestone v1.3 roadmap created (Phases 10-14)
 | Phase 9 P09-01 | 18min | 2 tasks | 7 files |
 | Phase 9 P09-02 | 20 | 2 tasks | 5 files |
 | Phase 9 P09-03 | 7 min | 2 tasks tasks | 4 files files |
+| Phase 10 P01 | 8 | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -145,6 +147,7 @@ Recent decisions affecting current work:
 - [Phase 04]: [Plan 04-05]: Release supply-chain workflow (CICD-05). `.github/workflows/release.yml` on `v*` tag / release published: one `publish` job with EXACTLY `contents:read + packages:write + id-token:write + attestations:write` over a two-image matrix; cosign keyless + SLSA attestation, every step bound `@<digest>`. **(v1.3 Phase 14 ACC-03 is the FIRST real exercise of this path — real GHCR push + `cosign verify` + `gh attestation verify` against the published `@sha256:` digest; verify by digest not tag, exactly 4 publish perms.)**
 - [Phase 8]: [Plan 08-02]: harden-runner (audit) is the literal step 0 of all four CI/release jobs; every `uses:` across all three workflows (25 refs) is a 40-hex commit SHA. **(v1.3 Phase 14 ACC-02 flips harden-runner egress `audit`→`block` with the discovered allowlist + lands the first live release-please PR; pre-seed Fulcio/Rekor/TUF in the allowlist.)**
 - [Phase 9]: [Plan 09-03]: NewWorkspaceModal defaults to an Auto (least-loaded) <option value=""> and submits node: null; isValid drops the node requirement. **(v1.3 Phase 13 adds a `persistent` checkbox onto this SAME modal — default unchecked = ephemeral — completing the UI half of WSX-02 against the Phase 10 backend.)**
+- [Phase ?]: [Plan 10-01]: TEST-01 hard gate GREEN — mocked-proxmoxer integration tier (api/tests/integration/mock_proxmox.py factories + test_mock_proxmox.py self-tests) drives the REAL ProxmoxComputeProvider through running->stopped UPID polling + ResourceException 404/500 inspector branches the Fake never triggers. responses (NOT respx); 9-segment UPID via make_upid; ResourceException raised via responses body=<exc> to hit _is_not_found/_is_running_or_locked exactly. Unblocks persistence-compute Plans 03/04.
 
 ### Pending Todos
 
@@ -186,7 +189,7 @@ real-boot-v2 rows are now CLAIMED by v1.3.
 
 ## Session Continuity
 
-Last session: 2026-06-25T01:37:48.810Z
+Last session: 2026-06-25T09:59:31.310Z
 Stopped at: v1.3 roadmap created (Phases 10-14)
 Resume file: None
 Next plan: Plan Phase 10 with `/gsd:plan-phase 10` (Persistence Data Model + Reaper Carve-out — the v1.3 foundation: `003` migration + reaper negative-control test + mocked-proxmoxer integration tier). Phase 11 (scrollback, worker-side) and Phase 12 (wizard backend) parallelize off Phase 10.

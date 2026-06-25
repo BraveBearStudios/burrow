@@ -40,7 +40,7 @@ the ACC items are operator-run human UAT on real infrastructure.
 
 ### Test Hardening (TEST)
 
-- [ ] **TEST-01**: New setup/persistence compute paths are covered by a **mocked-proxmoxer integration tier** exercising real-shaped UPID async-task polling and `ResourceException` error shapes (closing the Fake-vs-real gap before the persistence-compute work).
+- [x] **TEST-01**: New setup/persistence compute paths are covered by a **mocked-proxmoxer integration tier** exercising real-shaped UPID async-task polling and `ResourceException` error shapes (closing the Fake-vs-real gap before the persistence-compute work).
 - [ ] **TEST-02**: The stop/start e2e suite cleanup is hardened (07r) — per-test workspace-id tracking (W1), asserted cleanup `DELETE` success (W2), and an explicit two-Start-affordance assertion (W3).
 
 ### Real-Infra Acceptance (ACC) — operator-run human UAT on real hardware
@@ -88,7 +88,7 @@ Finalized by the roadmapper (2026-06-25). Each requirement maps to exactly one p
 |-------------|-------|--------|
 | WSX-02  | Phase 10 | Pending |
 | WSX-04  | Phase 10 | Pending |
-| TEST-01 | Phase 10 | Pending |
+| TEST-01 | Phase 10 | Complete |
 | TEST-02 | Phase 10 | Pending |
 | WSX-03  | Phase 11 | Pending |
 | SETUP-01 | Phase 12 | Pending |
@@ -103,6 +103,7 @@ Finalized by the roadmapper (2026-06-25). Each requirement maps to exactly one p
 | ACC-03  | Phase 14 | Pending |
 
 **Coverage:**
+
 - v1.3 requirements: 15 total
 - Mapped to phases: 15
 - Unmapped: 0 ✓
