@@ -25,7 +25,7 @@ def _assert_envelope(payload: dict[str, object]) -> None:
     assert "requestId" in payload["meta"] and "timestamp" in payload["meta"]
 
 
-async def _create(client: httpx.AsyncClient, **overrides: str) -> dict[str, object]:
+async def _create(client: httpx.AsyncClient, **overrides: object) -> dict[str, object]:
     body = {**_CREATE_BODY, **overrides}
     response = await client.post("/api/v1/workspaces", json=body)
     assert response.status_code == 200, response.text
@@ -41,6 +41,49 @@ async def test_create_reaches_running(integration_client: httpx.AsyncClient) -> 
     assert data["name"] == "alpha"
     assert data["vmid"] is not None
     assert data["projectRepo"] == "git@example.com:acme/alpha.git"
+
+
+async def test_persistent_create_round_trips_camelcase(
+    integration_client: httpx.AsyncClient,
+) -> None:
+    """``persistent=True`` round-trips DB→API as the camelCase ``persistent`` key (WSX-02)."""
+    data = await _create(integration_client, persistent=True)
+    assert data["persistent"] is True
+
+
+async def test_default_create_is_ephemeral(integration_client: httpx.AsyncClient) -> None:
+    """The default create body (no ``persistent``) stays ephemeral (CONTEXT-locked WSX-02)."""
+    data = await _create(integration_client)
+    assert data["persistent"] is False
+
+
+async def test_persistent_workspace_survives_stop_start_round_trip(
+    integration_client: httpx.AsyncClient,
+) -> None:
+    """A persistent workspace survives stop→start: same id/vmid, ``persistent`` still true (SC2).
+
+    Tier-1 persistence reuses the SAME VMID across ``pct stop``/``pct start`` (disk
+    preserved, no soft-delete), so the started workspace returns to ``running`` with
+    the identical id + vmid and ``persistent`` unchanged.
+    """
+    created = await _create(integration_client, persistent=True)
+    wid = created["id"]
+    created_vmid = created["vmid"]
+
+    stop_resp = await integration_client.post(f"/api/v1/workspaces/{wid}/stop")
+    assert stop_resp.status_code == 200, stop_resp.text
+    stopped = stop_resp.json()
+    _assert_envelope(stopped)
+    assert stopped["data"]["status"] == "stopped"
+
+    start_resp = await integration_client.post(f"/api/v1/workspaces/{wid}/start")
+    assert start_resp.status_code == 200, start_resp.text
+    started = start_resp.json()
+    _assert_envelope(started)
+    assert started["data"]["status"] == "running"
+    assert started["data"]["persistent"] is True
+    assert started["data"]["id"] == wid  # same DB row
+    assert started["data"]["vmid"] == created_vmid  # same VMID reused (Tier-1, no soft-delete)
 
 
 async def test_list_and_status_filter(integration_client: httpx.AsyncClient) -> None:
