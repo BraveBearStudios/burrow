@@ -23,7 +23,8 @@ prior scrollback. A real `pct stop` halts the LXC and kills the tmux server, so
 tmux alone does NOT preserve scrollback across a full container halt. That is
 cross-reboot scrollback, a distinct and heavier problem (it needs `pipe-pane`
 logging to durable storage, or CRIU suspend-to-disk), and it is deferred to v1.4
-as WSX-06. ADR-0013 already records that Tier-1 persistence preserves files on
+as WSX-07 (pipe-pane cross-reboot scrollback) and WSX-06 (CRIU suspend-resume).
+ADR-0013 already records that Tier-1 persistence preserves files on
 disk, not live-session state; this ADR fills the live-session seam for the
 reconnect case only, and is careful not to over-claim the halt case.
 
