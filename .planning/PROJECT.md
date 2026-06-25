@@ -25,27 +25,31 @@ from a browser, with each session running in an ephemeral, reproducible containe
 that is gone when destroyed. If everything else fails, *creating a workspace and
 getting a live, interactive Claude Code terminal in the browser* must work.
 
-## Current Milestone: v1.2 Backlog Fixes + Release Automation
+## Current Milestone: v1.3 Go Live (Guided Homelab Setup + Real-Infra Acceptance + Persistence)
 
-**Goal:** Clear the v1.1 backlog debt, harden the release/CI surface, and add
-capacity-aware auto node selection — all dev-box-buildable and CI-provable over
-the Fake provider.
+**Goal:** Take Burrow from CI-proven-over-Fake to actually running on the
+operator's real Proxmox — a guided in-app setup wizard, the real-infra
+acceptance smoke, and workspaces that persist across stop/start with restored
+scrollback.
 
 **Target features:**
-- Wire the `LeafPanel onTerminalEvent` fast-reconcile so the workspace list
-  refreshes on a terminal error/close, not just the ~3s poll (WR-01).
-- Harden the stop/start e2e suite: scoped selectors + per-test backend isolation (WR-02).
-- Release automation via **release-please** — Conventional-Commit-driven release
-  PRs that bump version + changelog + tag on merge (RELX-01).
-- `step-security/harden-runner` egress allowlist on the CI workflows, actions
-  SHA-pinned (RELX-02).
-- Capacity-aware auto node selection at create time, proven over the
-  FakeComputeProvider's multi-node capacity (WSX-01).
+- **In-app setup wizard:** browser flow to connect + validate a Proxmox
+  host/token, provision/verify the golden template, health-check, and land the
+  first real workspace. CI-provable over a Fake/mock Proxmox connection; the
+  PVE-side least-priv user/role/token creation stays operator-run (the wizard
+  validates a provided token + guides the manual steps, not silently around them).
+- **Real-infra acceptance (ACC-01/02/03):** dev-homelab smoke (real
+  create→terminal→stop→start→destroy + reaper/auto-stop/capacity on real CTs),
+  first live release-please PR + harden-runner egress block-flip, real GHCR
+  publish + cosign/attestation verify. Operator-run on real hardware (human UAT).
+- **Real-boot v2 persistence:** persistent/snapshotted workspaces that survive
+  stop/start instead of being destroyed (WSX-02), and full terminal scrollback
+  restore via tmux/zellij in the worker (WSX-03).
+- Ride-along: harden the stop/start e2e cleanup robustness (07r — W1/W2/W3).
 
-**Out of this milestone (tracked, deferred):** the dev-homelab smoke + first real
-CI/GHCR release (ACC-01/02/03) and the real-boot v2 items (WSX-02 persistent
-workspaces, WSX-03 scrollback restore) — they need real Proxmox / a live runner,
-off the dev box.
+**Out of this milestone (deferred):** multi-agent workers (Cursor / Copilot CLI /
+Codex CLI in workers) — a full milestone of its own, research-first, deferred to
+v1.4. The todo stays in `.planning/todos/pending/` unlinked.
 
 ## Requirements
 
@@ -80,9 +84,9 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 
 ### Active
 
-<!-- v1.2 active scope lives in REQUIREMENTS.md (WR-01/WR-02, RELX-01/02, WSX-01); below is the carried real-infra acceptance debt. -->
+<!-- v1.3 active scope lives in REQUIREMENTS.md (setup wizard, ACC-01/02/03 real-infra acceptance, WSX-02/WSX-03 persistence, 07r e2e nit). -->
 
-- [ ] Run and record the dev-homelab smoke + first CI release (flip the ★ items above + the per-phase `*-HUMAN-UAT.md` checklists to passed)
+- [ ] Milestone v1.3 Go Live — see REQUIREMENTS.md. The carried ACC-01/02/03 real-infra acceptance (flip the ★ items above + the per-phase `*-HUMAN-UAT.md` checklists to passed) is now **in-scope this milestone**, not deferred.
 
 ### Out of Scope
 
@@ -174,4 +178,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-16 after the v1.2 milestone close. Phases 7-9 shipped and the close-out audit passed (5/5 requirements, integration WIRED, 0 blockers). Deferred real-infra / v2 acceptances remain: ACC-01 (homelab smoke incl. real multi-node auto-select), ACC-02 (first live release PR + egress block-flip), ACC-03 (real GHCR publish + cosign/attestation verify), WSX-02/WSX-03 (persistent workspaces + scrollback restore), and the 07r e2e-cleanup nit. Next: run /gsd:new-milestone to scope v1.3.*
+*Last updated: 2026-06-24 — v1.3 "Go Live" started. Scope: an in-app guided setup wizard (connect/validate Proxmox → provision/verify template → health-check → first workspace), real-infra acceptance (ACC-01/02/03, now in-scope), real-boot v2 persistence (WSX-02 persistent/snapshotted workspaces + WSX-03 scrollback restore), and the 07r stop/start e2e cleanup nit. Multi-agent workers (Cursor/Copilot/Codex) deferred to v1.4, research-first. Phase numbering continues from v1.2's last phase (9) → v1.3 resumes at 10.*

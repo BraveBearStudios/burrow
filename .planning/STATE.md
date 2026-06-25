@@ -1,17 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v1.2
-milestone_name: Backlog Fixes + Release Automation
-status: Awaiting next milestone
-stopped_at: Completed 09-02-PLAN.md
-last_updated: "2026-06-16T20:00:32.103Z"
-last_activity: 2026-06-16 — Milestone v1.2 completed and archived
+milestone: v1.3
+milestone_name: "Go Live: Guided Setup + Real-Infra Acceptance + Persistence"
+status: planning
+last_updated: "2026-06-25T01:37:48.810Z"
+last_activity: 2026-06-25
 progress:
-  total_phases: 3
-  completed_phases: 3
-  total_plans: 6
-  completed_plans: 6
-  percent: 100
+  total_phases: 0
+  completed_phases: 0
+  total_plans: 0
+  completed_plans: 0
+  percent: 0
 ---
 
 <!--
@@ -30,10 +29,10 @@ See: .planning/PROJECT.md (updated 2026-06-13)
 
 ## Current Position
 
-Phase: Milestone v1.2 complete
+Phase: Not started (defining requirements)
 Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-06-16 — Milestone v1.2 completed and archived
+Status: Defining requirements
+Last activity: 2026-06-25 — Milestone v1.3 started
 
 ## Performance Metrics
 
