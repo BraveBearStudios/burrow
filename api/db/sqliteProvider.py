@@ -212,6 +212,15 @@ class SqliteProvider(DbProvider):
                 # bounded retry loop re-scans on) rather than escaping as a raw
                 # driver error. Any other OperationalError propagates unchanged.
                 if "database is locked" in str(exc).lower():
+                    # WR-02: this branch launders ANY "database is locked" into the
+                    # retryable lost-race signal, so an unrelated lock/IO problem
+                    # would otherwise surface as a misleading "pool exhausted"
+                    # (NoFreeVmidError) after the service exhausts its retries. Log
+                    # the raw cause at WARNING so a real lock problem stays visible.
+                    logger.warning(
+                        "create INSERT hit a lock; treating as lost-race",
+                        extra={"workspace_id": workspace_id, "cause": str(exc)},
+                    )
                     raise VmidTakenError(str(exc)) from exc
                 raise
             await conn.commit()
