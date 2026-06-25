@@ -22,11 +22,17 @@ import logging
 from collections.abc import AsyncIterator
 
 from fastapi import Depends, FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from compute.fakeProvider import FakeComputeProvider
-from compute.provider import ComputeError, ComputeProvider
+from compute.provider import (
+    ComputeError,
+    ComputeProvider,
+    SetupAuthError,
+    SetupUnreachableError,
+)
 from compute.proxmoxProvider import ProxmoxComputeProvider
 from config import settings
 from db.provider import DbProvider
@@ -72,6 +78,22 @@ _SAFE_ERROR_MESSAGES: dict[str, str] = {
     "boot_failed": "The workspace failed to boot.",
     "compute_error": "The compute backend is unavailable.",
     "service_error": "The request could not be completed.",
+    "validation_error": "Request validation failed.",
+    # Setup-wizard codes (SETUP-07). Every message is FIXED and token-free: the raw
+    # proxmoxer exception string (which can embed auth context / the rejected token)
+    # is NEVER interpolated, so the operator-typed token cannot leak through an error.
+    "setup_unreachable": "Could not reach the Proxmox host.",
+    "setup_auth_failed": "The Proxmox token was rejected.",
+    "setup_missing_privileges": "The Proxmox token is missing required privileges.",
+    "setup_template_not_found": "The worker template was not found on the target node.",
+}
+
+# Setup ComputeError subclass -> (envelope code, HTTP status). A rejected token is a
+# 400 (operator-fixable input); an unreachable host is a 502 (upstream gateway down).
+# Both emit a FIXED token-free message from ``_SAFE_ERROR_MESSAGES`` — never str(exc).
+_SETUP_ERROR_MAP: dict[type[ComputeError], tuple[str, int]] = {
+    SetupAuthError: ("setup_auth_failed", 400),
+    SetupUnreachableError: ("setup_unreachable", 502),
 }
 
 
@@ -218,6 +240,45 @@ def _compute_error_handler(request: Request, exc: Exception) -> JSONResponse:
     return JSONResponse(status_code=502, content=body)
 
 
+def _validation_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Map a 422 :class:`RequestValidationError` to a leak-free envelope (T-12-04).
+
+    FastAPI's default 422 body echoes the raw submitted ``input`` for each error,
+    which would leak a request-body secret (the operator-typed ``SecretStr`` token
+    on ``/setup/test-connection``, SETUP-07). This handler re-shapes validation
+    errors into the standard error envelope carrying ONLY each error's ``loc``,
+    ``msg``, and ``type`` — never the submitted ``input``/``ctx``. So a token sent
+    alongside a missing/invalid field can never reach the 422 response.
+    """
+    assert isinstance(exc, RequestValidationError)
+    safe_errors = [
+        {"loc": list(err.get("loc", ())), "msg": err.get("msg", ""), "type": err.get("type", "")}
+        for err in exc.errors()
+    ]
+    body = respond_error(code="validation_error", message="Request validation failed.")
+    assert isinstance(body["error"], dict)
+    body["error"]["details"] = safe_errors
+    return JSONResponse(status_code=422, content=body)
+
+
+def _setup_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Map a setup-validation :class:`ComputeError` to its token-free envelope code.
+
+    The wizard's auth/connect failures (``SetupAuthError``/``SetupUnreachableError``)
+    get their OWN ``error.code`` so the Phase 13 UI can differentiate, with a FIXED
+    operator-facing message from ``_SAFE_ERROR_MESSAGES``. The raw ``str(exc)`` is
+    NEVER surfaced — it can embed the rejected token (SETUP-07). An unmapped setup
+    error falls back to the generic compute envelope.
+    """
+    assert isinstance(exc, ComputeError)
+    mapping = _SETUP_ERROR_MAP.get(type(exc))
+    if mapping is None:
+        return _compute_error_handler(request, exc)
+    code, status = mapping
+    body = respond_error(code=code, message=_SAFE_ERROR_MESSAGES[code])
+    return JSONResponse(status_code=status, content=body)
+
+
 def create_app() -> FastAPI:
     """Build and configure the Burrow control-plane FastAPI app.
 
@@ -233,8 +294,13 @@ def create_app() -> FastAPI:
     setup_logging()
     app = FastAPI(title="Burrow Control Plane", version="0.1.0", lifespan=lifespan)
     app.add_exception_handler(Exception, _envelope_exception_handler)
+    app.add_exception_handler(RequestValidationError, _validation_error_handler)
     app.add_exception_handler(ServiceError, _service_error_handler)
     app.add_exception_handler(ComputeError, _compute_error_handler)
+    # More-specific setup handlers: a SetupAuthError/SetupUnreachableError gets its
+    # own token-free envelope code/status rather than the generic compute_error 502.
+    app.add_exception_handler(SetupAuthError, _setup_error_handler)
+    app.add_exception_handler(SetupUnreachableError, _setup_error_handler)
 
     # Inner→outer add order: SecurityHeaders first, CORS last (outermost).
     app.add_middleware(SecurityHeadersMiddleware)
@@ -249,13 +315,14 @@ def create_app() -> FastAPI:
     # Deferred import: routers import the DI seams (get_service/get_compute/get_db)
     # from this module, so they are imported here — after those names are defined —
     # to avoid a circular import at module load.
-    from routers import health, internal, nodes, templates, terminal, workspaces
+    from routers import health, internal, nodes, setup, templates, terminal, workspaces
 
     app.include_router(workspaces.router)
     app.include_router(templates.router)
     app.include_router(health.router)
     app.include_router(internal.router)
     app.include_router(nodes.router)
+    app.include_router(setup.router)
     # The terminal bridge lives OUTSIDE /api/v1 by design (CLAUDE.md /ws/* WS
     # convention); its prefix is /ws.
     app.include_router(terminal.router)
