@@ -89,7 +89,12 @@ test.afterEach(async ({ request }) => {
 		if (!id) {
 			continue;
 		}
-		await request.delete(`/api/v1/workspaces/${id}`);
+		const res = await request.delete(`/api/v1/workspaces/${id}`);
+		// W2: assert the cleanup DELETE actually succeeded — 200 (deleted) or 404
+		// (the row was already terminated through the UI). Any other status means a
+		// silently-failing backend cleanup that would leak Fake state into a sibling
+		// test and surface as a flaky order-dependent failure far from its cause.
+		expect([200, 404]).toContain(res.status());
 	}
 });
 
