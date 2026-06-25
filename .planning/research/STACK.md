@@ -3,244 +3,177 @@ SPDX-FileCopyrightText: 2026 Brave Bear Studios
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# Stack Research
+# Stack Research — Burrow v1.3 "Go Live"
 
-**Domain:** Self-hosted browser control-plane for ephemeral Claude Code worker LXCs (FastAPI control plane + Vite/React tiling terminal UI + Proxmox compute)
-**Researched:** 2026-06-09
-**Confidence:** HIGH (all versions verified live against npm registry and PyPI JSON API on the research date; friction points verified against official docs)
+**Domain:** Self-hosted browser manager for concurrent Claude Code sessions (Proxmox LXC workers). SUBSEQUENT milestone — NEW capabilities only.
+**Researched:** 2026-06-24
+**Confidence:** HIGH (every external version verified against the upstream release page; integration points read in the live repo files)
 
-> **Mandate:** The stack is fixed by `docs/tech-spec.md`. This file does **not** propose a new stack — it pins exact current-stable versions, confirms mutual compatibility, and flags where the spec's loose ranges are now behind reality. Every version below was read from `npm view <pkg> version` / `pip`/PyPI `…/json` on 2026-06-09, not from training data.
+> **Scope.** This file covers ONLY the stack deltas the three v1.3 capabilities need (setup wizard, real-boot v2 persistence, first real-infra acceptance). The shipped v1.2 stack — FastAPI / Python 3.12 / uv / proxmoxer / aiosqlite; React 19 / TanStack Query / Zustand / xterm.js / react-mosaic / Vite / biome; the cosign/syft/trivy/release-please supply-chain path — is already validated and is NOT re-litigated here. The full v1.0 pin table lives in git history of this file; this revision is the v1.3 delta.
 
 ## Headline Findings (read first)
 
-1. **react-mosaic-component + React 19: RESOLVED, no fork/override needed.** Latest **stable** `react-mosaic-component@6.2.0` (published 2026-04-16) declares peer `react: ">=16"`, which React 19 satisfies. Its drag backbone `react-dnd@16.0.1` requires `react >= 16.14` — also satisfied. **Use 6.2.0 stable. Do NOT chase `7.0.0-beta0`** (the npm `latest` tag points at a beta; the newer-dated stable is 6.2.0). No peer-dep override, no fork. Confidence: HIGH.
-2. **Tailwind v4 uses the `@tailwindcss/vite` plugin, not PostCSS, and has NO `tailwind.config.ts`.** v4 is CSS-first config (`@import "tailwindcss"` + `@theme {}` in CSS). The spec's `ui/tailwind.config.ts` (repo tree §4.1) is the **v3 pattern and should be dropped**. Confidence: HIGH (official docs).
-3. **`@xterm/*` scoped packages are correct; legacy `xterm`/`xterm-addon-*` are deprecated.** npm marks `xterm@5.3.0` as "now deprecated. Move to @xterm/xterm instead." Confidence: HIGH.
-4. **WS proxy: keep FastAPI/Starlette native WebSocket for the *browser* side, and the `websockets` library for the *upstream ttyd* side.** FastAPI only gives you the server endpoint; it has no WS *client*, so you need a client lib to dial ttyd. `uvicorn[standard]` already pulls `websockets`, so it adds no new top-level dependency. **Do NOT** reach for `aiohttp` or `socket.io`. Confidence: HIGH.
-5. **The spec's loose ranges are now a major version behind in several places** (Vite, TypeScript, Biome, Vitest, xterm, mypy). See "Spec-vs-reality deltas." None are blockers; they are pin decisions.
+1. **Terminal persistence → tmux 3.4 (Ubuntu 24.04 apt), NOT zellij.** One-line change in `burrow-boot.sh`'s `exec ttyd` + a small `/etc/tmux.conf` baked in `provision-template.sh`. **No app-code change in `api/` or `ui/`.** ttyd's own wiki documents the exact pattern: `ttyd tmux new -A -s <name>`.
+2. **Proxmox persistence is mostly already there.** `stopCt` already halts the CT and **preserves its disk** (it never destroyed anything — only `destroyCt` does). WSX-02's real new work is **snapshot/rollback**: three new `ComputeProvider` methods over the existing proxmoxer call style. **Suspend/resume is OUT** — CRIU is broken/unsupported for unprivileged LXC. Snapshots **require ZFS / LVM-thin / Ceph storage — NOT `dir`** (an operator infra prerequisite, not code).
+3. **Setup wizard needs ZERO new dependencies** — frontend or backend. It is plain TanStack Query mutations + a Zustand step slice hitting new FastAPI routes that call **existing** `ProxmoxComputeProvider` methods. Token storage reuses the existing `pydantic-settings` `.env` pattern (`settings.proxmox_token_value`).
+4. **First real release: the pins already in the repo are current and correct.** Stay on the pinned action SHAs (they install cosign **v2.x** via `cosign-installer@v3.10.0`). Do NOT chase cosign v3 this milestone (it needs cosign-installer v4). The Trivy SHA-pin is the right mitigation for 2026's two Trivy supply-chain compromises — verify, don't float.
 
-## Recommended Stack
+## Recommended Stack (NEW in v1.3)
 
-### Backend — Core (`api/`, Python 3.12)
+### Core Technologies
 
-| Technology | Version (pin) | Purpose | Why Recommended |
-|------------|---------------|---------|-----------------|
-| Python | 3.12.x | Runtime | Fixed by spec; 3.12 is current stable-LTS-grade, broad lib support. (3.13 exists but spec says 3.12; stay on spec.) |
-| FastAPI | 0.136.3 | HTTP + native WebSocket framework | Spec mandate. Native `@router.websocket` for the browser side; Pydantic v2 integration; ASGI. |
-| uvicorn[standard] | 0.49.0 | ASGI server | Spec mandate (systemd `ExecStart`). `[standard]` extra bundles `websockets>=10.4`, `httptools`, `uvloop`, `watchfiles`. |
-| pydantic | 2.13.4 | Models / envelope shaping | snake_case DB → camelCase JSON via `alias`/`populate_by_name` (CLAUDE.md convention). |
-| pydantic-settings | 2.14.1 | Env config (`api/config.py`) | Spec mandate; reads `.env` per §10.3. |
-| proxmoxer | 2.3.0 | Proxmox API client | Spec mandate (`ProxmoxService`). v2.x is the current line; pairs with `requests` (HTTPS backend). |
-| websockets | 16.0 | Upstream WS **client** to ttyd | The WS proxy's upstream leg (`§6.4`). Already transitively present via `uvicorn[standard]`. Pin it explicitly as a direct dep since code imports it. |
-| aiosqlite | 0.22.1 | Async SQLite driver (`DbProvider`) | Spec mandate / ADR-0001. v1 store behind the provider seam. |
-| httpx | 0.28.1 | Async HTTP (ttyd health poll) **and** ASGI test transport | Used in `_waitForTtyd` (§6.2) and integration tests (`httpx.ASGITransport`, ci-cd §4.3). |
+| Technology | Version | Purpose | Why Recommended |
+|------------|---------|---------|-----------------|
+| **tmux** | **3.4** (Ubuntu 24.04 `apt`, baked in `provision-template.sh`) | Durable terminal multiplexer in the worker: holds the live Claude session + full scrollback server-side so a reconnecting browser reattaches to the SAME session (WSX-03). | Already in the worker's distro repo → reproducible + apt-pinnable, no `curl\|bash` of a binary. ttyd's wiki documents `ttyd tmux new -A -s ttyd` exactly. tmux 3.4 has `window-size latest` (the resize fix for a single reconnecting web client). zellij is pre-1.0 (0.41) and has **no apt package** on 24.04. |
+| **Proxmox snapshot API** (via existing `proxmoxer==2.3.0`) | PVE 8.x endpoints | `POST/GET /nodes/{node}/lxc/{vmid}/snapshot`, `POST .../snapshot/{name}/rollback`, `DELETE .../snapshot/{name}` for persistent/snapshotted workspaces (WSX-02). | No new Python dep — proxmoxer already reaches arbitrary PVE paths in the exact `self._api.nodes(node).lxc(vmid)...` style used today in `proxmoxProvider.py`. Adds three async methods to the `ComputeProvider` seam. |
 
-### Backend — Dev / Test / Lint
+### Supporting Libraries
 
-| Tool | Version (pin) | Purpose | Notes |
-|------|---------------|---------|-------|
-| uv | 0.11.19 | Package + venv manager, lockfile | Spec mandate. `uv sync --frozen` in Dockerfile; `uv lock --check` is a CI gate (ci-cd §4.1). |
-| ruff | 0.15.16 | Lint + format | Spec mandate. `ruff check` + `ruff format --check` are Tier-0 gates. |
-| mypy | **2.1.0** | Strict type-check | Spec mandate (strict). **NOTE: mypy is now 2.x** — major bump from the 1.x era. Pin exactly and enable per-rule config; do not float. |
-| pytest | 9.0.3 | Test runner | Spec mandate. Config in `api/pyproject.toml` (ci-cd §8). |
-| pytest-asyncio | 1.4.0 | Async test support | Required for async services / WS proxy / `aiosqlite` tests. Set `asyncio_mode = "auto"`. |
-| respx | 0.23.1 | Mock httpx (Proxmox HTTP + ttyd health) | Spec mandate (ci-cd §4.3). Use **respx** since the code path is httpx-based; prefer it over `responses`. |
-| responses | 0.26.1 | Mock `requests` (proxmoxer's transport) | Use **only** where proxmoxer's underlying `requests` calls need mocking and respx can't reach them. Otherwise respx covers httpx. |
-| playwright (Python) | 1.60.0 | e2e driver (Tier 3) | Pin to the **same** version as the JS `@playwright/test` (both 1.60.0) so the browser binaries match. Pick one language for specs — see "What NOT to use." |
-| pip-audit | 2.10.0 | Dependency CVE audit | ci-cd §5.1 required job. |
-| asyncpg | 0.31.0 | Postgres driver (**stub only**) | Hosted path (`postgresProvider.py`). NOT installed in v1 runtime image; behind the seam. Listed for completeness. |
+| Library | Version | Purpose | When to Use |
+|---------|---------|---------|-------------|
+| (none) | — | Setup wizard frontend | A multi-step component using React Query mutations + a Zustand wizard slice (mirror `NewWorkspaceModal.tsx`'s boot-progress states). No form lib, no wizard lib, no new state lib. |
+| (none) | — | Setup wizard backend | New `routers/setup.py` validate endpoints calling existing `ProxmoxComputeProvider.healthcheck / getStatus / getNodeMemory` + the existing `/health`. No new pip dep. |
+| (none) | — | Token storage | `settings.proxmox_token_value` already exists in `api/config.py` + `.env.example`. The wizard validates a provided token; it is persisted to gitignored `.env`, NEVER returned in any `/api/v1` response or logged. |
 
-### Frontend — Core (`ui/`)
+### Release-chain tools (already pinned — confirm for first live run, do not bump)
 
-| Technology | Version (pin) | Purpose | Why Recommended |
-|------------|---------------|---------|-----------------|
-| Vite | **8.0.16** | Build tool / dev server | Spec says `^6`; current stable is **8**. Recommend Vite 8 (Rolldown-era). If risk-averse, Vite 6.4.3 is still on the `previous` tag — but the plugin ecosystem (below) has moved to v8. Decide at scaffold. |
-| React | 19.2.7 | UI framework | Spec mandate. |
-| react-dom | 19.2.7 | DOM renderer | Must match React exactly. |
-| TypeScript | **6.0.3** | Types | Spec says `^5`; current stable is **6**. Recommend TS 6; if a dep lags, TS 5.9.x is the fallback. |
-| @vitejs/plugin-react | 6.0.2 | React Fast Refresh / JSX | **Peer `vite: ^8.0.0`** — this is why Vite 8 is the coherent choice. On Vite 6 you must hold this plugin at its v4 line. |
-| @xterm/xterm | **6.0.0** | Terminal emulator | Scoped package. Spec says `^5.x`; current is **6**. API is stable across 5→6 for this use; pin 6. |
-| @xterm/addon-fit | **0.11.0** | Fit terminal to container | Spec says `^0.10.x`; current is **0.11.0**. |
-| @xterm/addon-web-links | **0.12.0** | Clickable URLs in terminal | Spec says `^0.11.x`; current is **0.12.0**. |
-| react-mosaic-component | **6.2.0** | Tiling/split/drag panel manager | **Stable**, React-19-compatible (`peer react >=16`). See headline #1. Pin `6.2.0`, NOT `7.0.0-beta0`. |
-| @tanstack/react-query | 5.101.0 | Server-state (workspace polling, mutations) | Spec mandate. Peer `react: ^18 || ^19` — React 19 OK. |
-| zustand | 5.0.14 | Client state (Mosaic tree, active workspace) | Spec mandate. Peer `react: >=18` — React 19 OK. |
-| tailwindcss | **4.3.0** | Styling | Spec mandate (`^4`). **v4 = CSS-first config, no JS config file.** |
-| @tailwindcss/vite | **4.3.0** | Tailwind's Vite integration | **Required for v4 + Vite** (replaces PostCSS plugin). Peer `vite: ^5.2 \|\| ^6 \|\| ^7 \|\| ^8` — works on both Vite 6 and 8. |
+| Tool | Pinned in repo | Current upstream (2026-06) | Notes for the first real run |
+|------|----------------|----------------------------|------------------------------|
+| `sigstore/cosign-installer` | `@v3.10.0` (installs **cosign v2.x**) | installer v4 (installs cosign v3.0.6); cosign CLI latest **v3.1.1** | **Keep v3.10.0.** cosign v2 keyless sign + the `cosign verify` flags documented in `release.yml` are correct as written. cosign v3 requires installer v4 — a separate deliberate bump, NOT part of "go live". |
+| `anchore/sbom-action` (syft) | `@v0.20.7` | syft CLI latest **v1.45.1** | The action bundles its own syft; pin is fine. SPDX + CycloneDX dual-format already wired. No change. |
+| Trivy image scan (in `ci.yml`) | SHA-pinned action | trivy CLI latest **v0.71.2** | ⚠️ Trivy's action/registry was compromised twice in 2026 (Mar 19; malicious v0.69.4/.5/.6). The repo's SHA-pin is exactly the right mitigation — **verify the pinned SHA predates/postdates safely and never float to a tag.** |
+| `googleapis/release-please-action` | `@v4.4.1` | v4 line current | Config `release-type: simple`, manifest-seeded. First live `push:main` opens the v1.3.0 PR. In v4 read `steps.release.outputs.release_created`, never the old `releases_created`. No change. |
+| `actions/attest-build-provenance` + `gh attestation verify` | `@v3.0.0` action; gh built-in | current | Runbook command in `release.yml` is correct: `gh attestation verify oci://ghcr.io/<owner>/burrow-api@sha256:<digest> --owner <owner>`. |
+| `cosign verify` (runbook) | documented in `release.yml` | matches cosign v2.x | `--certificate-identity-regexp 'https://github.com/<owner>/burrow/.*' --certificate-oidc-issuer https://token.actions.githubusercontent.com`. Correct for the keyless signature this pipeline emits. |
 
-### Frontend — Dev / Test / Lint
+## Integration Points (named, in the real files)
 
-| Tool | Version (pin) | Purpose | Notes |
-|------|---------------|---------|-------|
-| @biomejs/biome | **2.4.16** | Lint + format (replaces ESLint+Prettier) | Spec says `^1.x`; current is **2.x**. Biome 2 is the current line; **pin 2.4.16**. `biome.json` schema differs from 1.x — write it fresh, don't port a 1.x config. |
-| vitest | **4.1.8** | Unit/integration test runner | Spec implies Vitest; current is **4.x**. Pairs with Vite 8. Config in `ui/vitest.config.ts`. |
-| @testing-library/react | 16.3.2 | Component testing | Peer supports React 19 (`react ^18 || ^19`). |
-| @testing-library/jest-dom | 6.9.1 | DOM matchers | Standard companion. |
-| msw | 2.14.6 | API mocking (Tier-2 UI integration) | ci-cd §4.3. v2 is the current line (`http`/`HttpResponse` API), not legacy `rest`. |
-| @playwright/test | 1.60.0 | e2e (Tier 3) | Drives the full-stack compose. Keep version-locked with the Python playwright if both are present. |
+### 1. Terminal persistence — `cc-worker-config/lxc/worker-template/`
 
-### Worker LXC tooling (golden template — lives in `cc-worker-config`)
+**`--once` is already gone** (`burrow-boot.sh` lines 322-331; ADR-0006 "tab close DETACHES"). The remaining gap is the multiplexer: today ttyd execs `bash -lc "cd … && exec ${CLAUDE_CMD}"`, so the "session" is ttyd's own child pty — a WS reconnect lands on a **fresh shell with no scrollback**. tmux closes that gap with no app change.
 
-| Technology | Version (pin) | Purpose | Why Recommended |
-|------------|---------------|---------|-----------------|
-| Ubuntu | 24.04 LTS | Worker base OS | Spec mandate (CT template `ubuntu-24.04-standard`). Supported to 2029. |
-| Node.js | 22.x (LTS "Jod") | Runtime for Claude Code | Spec mandate. **22 is Active LTS until 2027-04-30** (verified vs nodejs Release schedule). Sound choice; Node 24 is the newer LTS but 22 is the safe pin and what the spec targets. |
-| @anthropic-ai/claude-code | 2.1.170 (track latest at provision) | The agent CLI | Engines `node >=18` (Node 22 fine). Installed `-g` at provision; this is the product's whole point — pin at provision time, refresh on reprovision. |
-| ttyd | distro package (Ubuntu 24.04 `apt`) | Terminal-over-HTTP/WS server in worker | Spec mandate. Binds `:7681` on `lo`; the control plane's WS proxy bridges to it. |
+**`provision-template.sh` — add `tmux` to the apt line (currently line 37) and bake a config:**
+```bash
+apt-get install -y git curl build-essential ttyd jq tmux   # add tmux
+cat >/etc/tmux.conf <<'EOF'
+set -g history-limit 100000   # deep scrollback restored on reattach (WSX-03)
+set -g mouse on               # xterm.js wheel -> tmux scroll
+set -g status off             # no tmux status bar; the browser is the chrome
+set -g window-size latest     # follow the most-recent client size (tmux 3.4);
+                              # avoids the "stuck at smallest detached client" resize bug
+set -g escape-time 10         # snappy ESC for a TUI agent over the WS
+EOF
+```
+
+**`burrow-boot.sh` lines 327-331 — the single `exec` change:**
+```bash
+exec ttyd \
+  --port 7681 \
+  --writable \
+  --interface 0.0.0.0 \
+  tmux -f /etc/tmux.conf new -A -s burrow \
+    bash -lc "cd '${START_DIR}' && exec ${CLAUDE_CMD}"
+```
+`new -A -s burrow` = "attach if the session exists, else create it." Every browser reconnect (the existing `useTerminal.ts` backoff path) re-runs this `exec`, reattaching to the **same live `burrow` session** with its full server-side scrollback. Destroy stays the only kill path; tab-close still just detaches. **No change to `api/` (WS proxy) or `ui/` (xterm.js)** — both are agnostic to what runs behind ttyd.
+
+### 2. Proxmox persistence — `api/compute/provider.py` + `proxmoxProvider.py` + `fakeProvider.py`
+
+**Reframe WSX-02 correctly:** "workspaces that survive stop/start instead of being destroyed" is **already true at the compute layer.** `stopCt` (`proxmoxProvider.py` line 250) calls `.status.stop.post()`, which halts the CT and **preserves its disk**; only `destroyCt` `delete()`s. The v1.2 gap was UX/state-machine, not compute. So WSX-02 = (a) keep disk on stop (done) + (b) add **snapshot/rollback** for checkpoint-before-risky-op.
+
+Add three methods to the `ComputeProvider` ABC (`provider.py`), implement in both providers, each `_block()`-ed on its UPID exactly like the existing lifecycle mutations:
+```python
+# proxmoxProvider.py — same self._api.nodes(node).lxc(vmid) style
+async def snapshotCt(self, node, vmid, snapname, description="") -> ComputeTask:
+    upid = await asyncio.to_thread(
+        lambda: self._api.nodes(node).lxc(vmid).snapshot.post(
+            snapname=snapname, description=description))
+    return await self._block(upid, timeout=self._settings.task_timeout)
+
+async def rollbackCt(self, node, vmid, snapname) -> ComputeTask:
+    upid = await asyncio.to_thread(
+        lambda: self._api.nodes(node).lxc(vmid).snapshot(snapname).rollback.post())
+    return await self._block(upid, timeout=self._settings.task_timeout)
+
+async def listSnapshots(self, node, vmid):
+    return await asyncio.to_thread(lambda: self._api.nodes(node).lxc(vmid).snapshot.get())
+```
+- **No `vmstate`/memory param** — that is QEMU-only. LXC snapshots are **disk-only (filesystem)**, which is exactly the persistence model needed and sidesteps CRIU entirely.
+- `FakeComputeProvider` gets an in-memory snapshot dict so the saga/integration tests stay hermetic (same discipline as the existing methods; the Fake is the CI substrate per `docs/ci-cd-and-testing.md` §4.4).
+- **Storage prerequisite (operator infra, document in host-prime):** the worker pool's storage must be `zfspool` / `lvmthin` / `ceph` — Proxmox refuses `pct snapshot` on `dir` storage type even on a ZFS/LVM-thin filesystem.
+- **ACL prerequisite (operator, document in host-prime):** snapshot/rollback need `VM.Snapshot` (and rollback) on the `burrow@pve` token's pool path — a Proxmox role addition, NOT a code change.
+
+### 3. Setup wizard — `api/routers/` + `ui/src/`
+
+- **Backend:** new `routers/setup.py` with read-only validate endpoints calling **existing** provider methods — `healthcheck()` (`proxmoxProvider.py` line 329, already wraps `version.get()`), `getNodeMemory()`, `getStatus(template_vmid)` to verify the golden template exists — plus confirming `/health` (db + proxmox) goes green. All under `/api/v1`, all using the standard `data`/`meta`/`error` envelope. PVE-side least-priv user/role/token creation stays operator-run; the wizard validates a *provided* token and guides the manual steps.
+- **Frontend:** a multi-step component using TanStack Query mutations per validate call + a Zustand slice for step/progress (same pattern as `layoutStore.ts` and `NewWorkspaceModal.tsx`'s boot-progress). No new dependency.
+- **Token security (reuse the existing pattern):** the token lives in `settings.proxmox_token_value` (pydantic-settings, read from gitignored `.env`). The wizard accepts + validates it, then guides the operator to persist it to `.env` (v1 no-secrets-manager posture, PROJECT.md Out of Scope). It is **NOT returned in any response, NOT logged** — same redaction discipline as `git_credential_token` in `burrow-boot.sh`. Validate endpoints return only a boolean/health verdict.
 
 ## Installation
 
-### Backend (`api/`, via uv)
-
 ```bash
-# Runtime deps (uv add → pyproject + uv.lock)
-uv add "fastapi==0.136.3" "uvicorn[standard]==0.49.0" \
-       "pydantic==2.13.4" "pydantic-settings==2.14.1" \
-       "proxmoxer==2.3.0" "websockets==16.0" \
-       "aiosqlite==0.22.1" "httpx==0.28.1"
+# Worker template (in provision-template.sh, inside the CT) — the ONLY new install:
+apt-get install -y tmux        # 3.4 from Ubuntu 24.04 noble
 
-# Dev / test / lint
-uv add --dev "ruff==0.15.16" "mypy==2.1.0" \
-       "pytest==9.0.3" "pytest-asyncio==1.4.0" \
-       "respx==0.23.1" "responses==0.26.1" \
-       "playwright==1.60.0" "pip-audit==2.10.0"
-# asyncpg is hosted-path only — do NOT add to v1 runtime.
+# api/ — NO new dependency. Snapshot methods use the already-pinned proxmoxer==2.3.0.
+# ui/ — NO new dependency. Wizard uses @tanstack/react-query + zustand already present.
 ```
-
-### Frontend (`ui/`)
-
-```bash
-# Runtime
-npm install react@19.2.7 react-dom@19.2.7 \
-  @xterm/xterm@6.0.0 @xterm/addon-fit@0.11.0 @xterm/addon-web-links@0.12.0 \
-  react-mosaic-component@6.2.0 \
-  @tanstack/react-query@5.101.0 zustand@5.0.14
-
-# Build + styling (Tailwind v4 = plugin, not PostCSS)
-npm install -D vite@8.0.16 @vitejs/plugin-react@6.0.2 typescript@6.0.3 \
-  tailwindcss@4.3.0 @tailwindcss/vite@4.3.0 \
-  @biomejs/biome@2.4.16
-
-# Test
-npm install -D vitest@4.1.8 \
-  @testing-library/react@16.3.2 @testing-library/jest-dom@6.9.1 \
-  msw@2.14.6 @playwright/test@1.60.0
-```
-
-### Tailwind v4 wiring (replaces the spec's `tailwind.config.ts`)
-
-```ts
-// vite.config.ts
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import tailwindcss from '@tailwindcss/vite'
-
-export default defineConfig({
-  plugins: [react(), tailwindcss()],
-})
-```
-
-```css
-/* src/index.css — v4 CSS-first config */
-@import "tailwindcss";
-
-@theme {
-  /* design-system tokens from design/ go here, NOT in a JS config */
-}
-```
-
-## Spec-vs-reality deltas (flag for roadmap)
-
-The spec's `^x` ranges were written against an earlier snapshot. Current stable has moved on. None block the build; each is a pin decision to make at scaffold:
-
-| Item | Spec says | Current stable (2026-06-09) | Action |
-|------|-----------|------------------------------|--------|
-| Vite | `^6.x` | **8.0.16** | Recommend Vite 8 (plugins moved to it). Spec range is satisfiable at 6.4.3 only if you also hold `@vitejs/plugin-react` at v4. |
-| TypeScript | `^5.x` | **6.0.3** | Recommend TS 6; fall back to 5.9.x only if a dep breaks. |
-| @biomejs/biome | `^1.x` | **2.4.16** | Use Biome 2. **Config schema changed** — write `biome.json` fresh. |
-| @xterm/xterm | `^5.x` | **6.0.0** | Use 6. Addons: fit `0.11.0`, web-links `0.12.0` (spec said 0.10/0.11). |
-| react-mosaic-component | `^7.x` | stable is **6.2.0** (7 is `beta0`) | **Use 6.2.0 stable.** Spec's `^7` would pull a beta — override the spec here. |
-| mypy | (implied 1.x era) | **2.1.0** | Pin mypy 2.x explicitly; strict config keys may differ from 1.x. |
-| Vitest | (implied) | **4.1.8** | Use Vitest 4 (matches Vite 8). |
-| Tailwind config file | `ui/tailwind.config.ts` in tree | v4 has **no JS config** | Drop `tailwind.config.ts`; use `@tailwindcss/vite` + CSS `@theme`. |
-| WS proxy imports (§6.4) | `import websockets; websockets.connect(...)`; `websockets.ConnectionClosed` | new asyncio API | Use `from websockets.asyncio.client import connect` and `from websockets.exceptions import ConnectionClosed`. `import websockets` still works but the legacy attribute paths are deprecated. |
-
-## WebSocket proxy: library decision (explicit)
-
-The terminal proxy has **two legs**, and they use **different** mechanisms — this is the right design, keep it:
-
-- **Browser ↔ control plane (downstream): FastAPI/Starlette native WebSocket.** `@router.websocket(...)`, `await ws.accept()`, `ws.iter_bytes()`, `ws.send_bytes()`. No extra library. This is the server side and FastAPI does it natively.
-- **Control plane ↔ ttyd (upstream): the `websockets` library client.** FastAPI/Starlette ships **no WebSocket client**, so dialing `ws://{lxcIp}:7681/ws` needs `websockets.asyncio.client.connect`. It is already in the dependency tree via `uvicorn[standard]`, so this adds **zero** new top-level runtime deps once pinned.
-
-**Do NOT** introduce `aiohttp` (second HTTP stack alongside httpx — redundant), `python-socketio`/`socket.io` (ttyd speaks raw WebSocket, not Socket.IO), or `wsproto` directly (lower-level than needed). One small correctness note for the spec code: ttyd uses a `tty`/`stdout` **subprotocol** and base64/byte framing depending on flags — when bridging, forward frames verbatim and set the WS subprotocol ttyd expects rather than assuming plain bytes.
 
 ## Alternatives Considered
 
 | Recommended | Alternative | When to Use Alternative |
 |-------------|-------------|-------------------------|
-| react-mosaic-component 6.2.0 | react-mosaic-component 7.0.0-beta0 | Only if a 6.2.0 bug forces it; 7 is beta (uuid 11, rdndmb 9) — wait for `7.0.0` stable. |
-| Vite 8 | Vite 6.4.3 (`previous` tag) | If a critical plugin you need has no Vite 8 build. Then also hold `@vitejs/plugin-react`@4 and `vitest`@2/3. |
-| TypeScript 6 | TypeScript 5.9.x | If a `@types/*` or tool lags TS 6. |
-| `websockets` (client) | `httpx-ws` 0.9.0 | If you want one library for both WS and HTTP; `httpx-ws` rides on httpx. Adds a dep `websockets` doesn't. Stick with `websockets` (already present). |
-| respx | responses 0.26.1 | When mocking proxmoxer's underlying `requests` calls that respx (httpx-only) can't intercept. |
-| Biome 2 | ESLint + Prettier | Never for this repo — spec mandates Biome; Biome 2 covers lint+format in one tool. |
+| **tmux 3.4** (apt, baked) | **zellij 0.41** | Only if you wanted built-in session-serialization-to-disk surviving a worker reboot/full clone. But Burrow's persistence is the LXC disk (snapshot/stop), not the multiplexer — and zellij has no apt package on 24.04, is pre-1.0, and would need a pinned binary download (a new supply-chain surface against the "no curl\|bash of a binary" preference). tmux wins on reproducibility + the documented ttyd pattern. |
+| **LXC disk snapshot (stop + snapshot/rollback)** | **CT suspend/resume (CRIU)** | Essentially never for unprivileged LXC. CRIU `pct suspend` fails on unprivileged CTs ("Can't dump nested uts namespace" / cgroup limits); upstream treats it as unsupported. Stop preserves disk and is reliable; that IS the persistence story. |
+| **ZFS / LVM-thin storage** | **`dir` storage** | Never, if you want snapshots. Proxmox refuses `pct snapshot` on a `dir`-storage CT even on a ZFS/LVM-thin filesystem — the *storage type* must be `zfspool`/`lvmthin`/`ceph`. Operator infra prerequisite, not code. |
+| **Keep cosign-installer@v3.10.0 (cosign v2)** | **Bump to installer v4 (cosign v3)** | Defer. cosign v2 keyless sign + verify is fully functional and already wired/documented. v3's new-bundle-format is a deliberate future bump, not first-live-release scope. |
+| **release-please** | semantic-release | Already chosen and shipped in v1.2 (RELX-01). Settled. |
 
-## What NOT to Use
+## What NOT to Use / NOT to Add
 
 | Avoid | Why | Use Instead |
 |-------|-----|-------------|
-| `xterm`, `xterm-addon-fit`, `xterm-addon-web-links` (unscoped) | npm-deprecated: "Move to @xterm/xterm instead." | `@xterm/xterm`, `@xterm/addon-fit`, `@xterm/addon-web-links` |
-| `react-mosaic-component@^7` / `7.0.0-beta0` | Pre-release; npm `latest` tag is misleading (stable 6.2.0 is newer-dated) | `react-mosaic-component@6.2.0` (stable, React-19 peer) |
-| `tailwind.config.ts` + `postcss.config.js` + `autoprefixer` | v3 pattern; not how Tailwind v4 + Vite works | `@tailwindcss/vite` plugin + CSS `@import "tailwindcss"` + `@theme {}` |
-| `websockets.legacy.client` / `websockets.client` legacy attrs | Deprecated in websockets 14+ | `from websockets.asyncio.client import connect` |
-| `aiohttp` / `requests` (as a 2nd async HTTP stack) | Duplicates httpx already in use | `httpx` (async) for app, `requests` only as proxmoxer's transport |
-| `python-socketio` / `socket.io-client` | ttyd is raw WebSocket, not Socket.IO | native FastAPI WS + `websockets` client |
-| ESLint + Prettier | Two tools, slower, not the mandated stack | `@biomejs/biome` v2 |
-| Postgres / `asyncpg` in the v1 runtime image | Hosted-path scope; ADR-0001 keeps v1 on SQLite | `aiosqlite` behind `DbProvider`; `asyncpg` only as the stubbed seam |
-| `xterm-addon-attach` for the WS wiring | Couples xterm directly to a socket; the spec wants custom reconnect/overlay control | Hand-rolled WS in `useTerminal.ts` writing to `term.write()` |
+| zellij in the worker | Pre-1.0, no 24.04 apt pkg, extra binary-download supply-chain surface; its disk-serialization is redundant with LXC-disk persistence | tmux 3.4 from apt |
+| `pct suspend` / CT suspend-resume / CRIU | Unsupported/broken for **unprivileged** LXC (the workers are unprivileged) | LXC `stop` (disk preserved) + snapshot/rollback |
+| `dir` storage for worker CTs | Proxmox blocks snapshots on `dir` storage type regardless of underlying FS | ZFS or LVM-thin (or Ceph) storage backend — operator prerequisite |
+| QEMU `vmstate` / RAM snapshots | Not available for LXC; LXC snapshots are disk-only | Disk-only `lxc/{vmid}/snapshot` (all WSX-02 needs) |
+| Any new frontend dep for the wizard (Formik / react-hook-form / wizard libs / a new state lib) | The wizard is a few sequential mutations + a step counter; existing TanStack Query + Zustand cover it; new deps add bundle + supply-chain + audit surface for nothing | `@tanstack/react-query` mutations + a Zustand wizard slice (mirror `NewWorkspaceModal`) |
+| Any new backend dep for the wizard | Validation = existing `ProxmoxComputeProvider.healthcheck/getStatus/getNodeMemory` + existing `/health` | The provider methods that already exist |
+| Returning/logging the Proxmox token from the wizard | Leaks the operator's PVE credential; breaks the no-secrets posture | Validate-only endpoints; token stays in gitignored `.env` via `settings.proxmox_token_value`; redact like `git_credential_token` |
+| A secrets manager for the token | Explicitly hosted-path scope (PROJECT.md Out of Scope); v1 is `.env` | gitignored `.env` + `.env.example` template |
+| Bumping cosign to v3 / chasing latest syft/trivy CLI mid-milestone | Churn during a "prove it works on real infra" milestone; the SHA-pinned actions bundle correct tool versions | The pins already in `release.yml` / `ci.yml` |
 
-## Version Compatibility (verified)
+## Version Compatibility
 
 | Package A | Compatible With | Notes |
 |-----------|-----------------|-------|
-| react-mosaic-component@6.2.0 | react@19.2.7 | peer `react: ">=16"` ✓; drag dep `react-dnd@16` needs `react >= 16.14` ✓. No override. |
-| @vitejs/plugin-react@6.0.2 | vite@8.0.16 | peer `vite: "^8.0.0"` ✓. (Forces Vite 8 if you want plugin v6.) |
-| @tailwindcss/vite@4.3.0 | vite@6 **and** vite@8 | peer `vite: "^5.2 \|\| ^6 \|\| ^7 \|\| ^8"` ✓ — Tailwind doesn't force the Vite major. |
-| @tanstack/react-query@5.101.0 | react@19.2.7 | peer `react: "^18 \|\| ^19"` ✓. |
-| zustand@5.0.14 | react@19.2.7 | peer `react: ">=18"` ✓. |
-| @testing-library/react@16.3.2 | react@19.2.7 | peer `react: "^18 \|\| ^19"` ✓. |
-| uvicorn[standard]@0.49.0 | websockets@16.0 | `[standard]` requires `websockets>=10.4`; 16.0 satisfies — same lib server + upstream-client. |
-| websockets@16.0 | Python 3.12 | `requires_python >=3.10` ✓. |
-| @anthropic-ai/claude-code@2.x | Node 22 LTS | engines `node >=18` ✓. |
-| playwright(py)@1.60.0 | @playwright/test@1.60.0 | Keep equal so browser binaries match if both languages are present. |
+| tmux 3.4 | ttyd 1.7.7, Ubuntu 24.04, xterm.js 6.0.0 | `ttyd tmux new -A -s` is the wiki-documented pattern; `window-size latest` requires tmux ≥2.9 (3.4 has it). |
+| proxmoxer 2.3.0 | PVE 8.x snapshot endpoints | `nodes().lxc().snapshot` path already reachable; no proxmoxer upgrade needed for snapshot/rollback. |
+| cosign-installer v3.10.0 | cosign v2.x CLI + the `cosign verify` flags in release.yml | ⚠️ cosign-installer v3 **cannot** install cosign v3 — installer v4 is required for v3. Stay on v2 for first release. |
+| `attest-build-provenance@v3.0.0` + `gh attestation verify` | OCI subject by digest, `--owner` | Runbook command in release.yml is current and correct. |
 
-## Stack Patterns by Variant
+## Open pins to confirm at the dev-homelab smoke (surface, don't silently assume)
 
-**If you want maximum currency (recommended):**
-- Vite 8 + TS 6 + Vitest 4 + `@vitejs/plugin-react`@6 + Biome 2 + xterm 6.
-- Because the plugin/test ecosystem has already moved here; staying current avoids a forced migration in a phase or two.
-
-**If a dependency forces conservatism:**
-- Drop to Vite 6.4.3 (`previous` tag) + `@vitejs/plugin-react`@4 + Vitest 2/3 + TS 5.9.
-- Because `@tailwindcss/vite` and `react-mosaic-component` both still work on Vite 6 — only the React/test plugins pin you to a Vite major.
-- This is the literal reading of the spec's `^6`/`^5` ranges; choose it only with a concrete blocker.
-
-## Open pins to confirm at scaffold (surface, don't silently pick)
-
-1. **Vite 6 vs 8 / TS 5 vs 6:** Spec text says 6/5; reality is 8/6. Recommend 8/6 but this is a deliberate spec deviation — log an ADR if you take it (CLAUDE.md: deviations need an ADR).
-2. **react-mosaic 6.2.0 over spec's `^7`:** Stable beats the spec's range; trivial to justify, but note it.
-3. **Tailwind config file removal:** Deleting the planned `ui/tailwind.config.ts` from the §4.1 tree is a (minor) spec deviation driven by v4.
-4. **Playwright language:** Pick **one** of Python `playwright` or JS `@playwright/test` for e2e specs to avoid double browser-binary management; ci-cd §8 places specs under `ui/tests/e2e/` (JS-leaning). Recommend `@playwright/test`.
+1. **Exact proxmoxer snapshot param names** (`snapname`, `description`) on the running PVE version — confirm at the real-infra smoke (the path pattern is solid; param names mirror qemu). 
+2. **Worker pool storage type is `zfspool`/`lvmthin`/`ceph`, not `dir`** — verify before relying on rollback (ACC-01).
+3. **`burrow@pve` token has `VM.Snapshot`/rollback on the pool path** — add the role grant in host-prime before WSX-02 lands.
+4. **First-release tag-by-GITHUB_TOKEN may not re-trigger `release.yml`** (already flagged in `release-please.yml`) — verify on the first live release; re-run on the tag if needed (ACC-02).
+5. **harden-runner `egress-policy: audit` → `block` flip** uses the discovered allowlist — an on-runner ACC-02 step, not discoverable on the dev box.
 
 ## Sources
 
-- npm registry via `npm view <pkg> version|dist-tags|peerDependencies|time` (2026-06-09) — react 19.2.7, react-dom 19.2.7, react-mosaic-component 6.2.0/7.0.0-beta0 (peer `react >=16`), vite 8.0.16 (prev 6.4.3), typescript 6.0.3, tailwindcss 4.3.0, @tailwindcss/vite 4.3.0 (peer vite ^5.2||^6||^7||^8), @xterm/xterm 6.0.0, @xterm/addon-fit 0.11.0, @xterm/addon-web-links 0.12.0, @tanstack/react-query 5.101.0, zustand 5.0.14, @biomejs/biome 2.4.16, vitest 4.1.8, @vitejs/plugin-react 6.0.2 (peer vite ^8), @testing-library/react 16.3.2, msw 2.14.6, @playwright/test 1.60.0, @anthropic-ai/claude-code 2.1.170 (engines node >=18), react-dnd@16.0.1 (peer react >=16.14). HIGH.
-- npm deprecation flag: `xterm@5.3.0` "now deprecated. Move to @xterm/xterm instead." HIGH.
-- PyPI JSON API (`pypi.org/pypi/<pkg>/json`, 2026-06-09) — fastapi 0.136.3, uvicorn 0.49.0 (`[standard]` → websockets>=10.4), uv 0.11.19, ruff 0.15.16, mypy 2.1.0, proxmoxer 2.3.0, aiosqlite 0.22.1, httpx 0.28.1, pydantic 2.13.4, pydantic-settings 2.14.1, websockets 16.0 (requires_python >=3.10), pytest 9.0.3, pytest-asyncio 1.4.0, respx 0.23.1, responses 0.26.1, playwright 1.60.0, pip-audit 2.10.0, asyncpg 0.31.0, httpx-ws 0.9.0. HIGH.
-- tailwindcss.com/docs/installation/using-vite — v4 official setup uses `@tailwindcss/vite` plugin (not PostCSS); CSS-first config, no `tailwind.config.js`. HIGH.
-- websockets.readthedocs.io (asyncio client reference) — `websockets.asyncio.client.connect` is the current stable API; `websockets.legacy.*` deprecated. HIGH.
-- nodejs Release schedule.json — Node 22 Active LTS, end-of-life 2027-04-30; Node 24 newer LTS. HIGH.
+- ttyd repo + wiki (`tsl0922/ttyd`) — latest ttyd **1.7.7**; `--writable`/`--interface`/`--once` flags; **`ttyd tmux new -A -s ttyd`** persistent-session pattern. HIGH.
+- tmux upstream + Ubuntu Launchpad (noble) — tmux **3.4** is the 24.04 apt version; `history-limit`/`mouse`/`status`/`window-size latest`/`aggressive-resize` knobs; the `window-size`/smallest-client resize behavior (tmux/tmux#1591, #2594). HIGH.
+- zellij releases + Snapcraft + 24.04 install guides — zellij **0.41** (pre-1.0), **no apt package on 24.04**, snap/binary only; session-resurrection is opt-in serialization. MEDIUM (confirms the negative: not packaged).
+- Proxmox VE wiki "Unprivileged LXC containers" + Proxmox forum (suspend/CRIU threads) + checkpoint-restore/criu#1430 — **CT suspend/CRIU unreliable/unsupported for unprivileged LXC**. HIGH.
+- Proxmox forum + 4sysops + storage guides — LXC **snapshots require ZFS/LVM-thin/Ceph, NOT `dir` storage type**; `pct rollback` works the same for unprivileged. HIGH.
+- Proxmox API viewer pattern + proxmoxer docs/examples — `nodes/{node}/lxc/{vmid}/snapshot` (POST/GET), `.../snapshot/{name}/rollback` (POST), DELETE; **LXC snapshots are disk-only (no `vmstate`)**. MEDIUM-HIGH (path pattern confirmed across multiple sources; mirrors the qemu pattern proxmoxer documents — verify exact param names at the smoke).
+- sigstore/cosign + cosign-installer releases (GitHub) — cosign CLI **v3.1.1** latest; **cosign-installer v3.x installs cosign v2.x; installer v4 required for cosign v3** (default install v3.0.6 on installer v4). HIGH.
+- anchore/syft releases — syft CLI **v1.45.1** latest (the action bundles its own). HIGH.
+- aquasecurity/trivy releases + StepSecurity/Aqua incident advisories — trivy CLI **v0.71.2** latest; **2026 supply-chain compromises (Mar 19; v0.69.4/.5/.6)** → SHA-pin is the correct mitigation. HIGH.
+- googleapis/release-please-action — **v4** current; `release-type: simple` + manifest config (matches the repo); use `release_created` output. HIGH.
+- GitHub CLI manual `gh attestation verify` — `oci://…@sha256:<digest> --owner <owner>` syntax confirmed. HIGH.
+- Repo files read directly: `api/config.py`, `api/compute/provider.py`, `api/compute/proxmoxProvider.py`, `api/pyproject.toml`, `ui/package.json`, `.env.example`, `.github/workflows/release.yml` + `release-please.yml`, `release-please-config.json`, `cc-worker-config/lxc/worker-template/burrow-boot.sh` + `provision-template.sh`. HIGH (load-bearing integration points).
 
 ---
-*Stack research for: self-hosted Claude Code workspace manager (FastAPI control plane + React tiling terminal UI + Proxmox LXC workers)*
-*Researched: 2026-06-09*
+*Stack research for: Burrow v1.3 "Go Live" (setup wizard + real-boot persistence + first real-infra acceptance)*
+*Researched: 2026-06-24*

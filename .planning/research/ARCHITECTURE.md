@@ -3,562 +3,405 @@ SPDX-FileCopyrightText: 2026 Brave Bear Studios
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# Architecture Research
+# Architecture Research — v1.3 "Go Live" Integration
 
-**Domain:** Self-hosted control plane for ephemeral Claude Code worker LXCs (FastAPI + SQLite + Proxmox + WebSocket terminal proxy)
-**Researched:** 2026-06-09
-**Confidence:** HIGH (validated against tech-spec, CI/CD spec, PROJECT.md, and current Proxmox / proxmoxer / ttyd / FastAPI sources)
+**Domain:** Self-hosted control plane (FastAPI + Proxmox LXC) — SUBSEQUENT milestone, integrating three NEW capabilities into the shipped v1.2 architecture.
+**Researched:** 2026-06-24
+**Confidence:** HIGH (grounded in the actual `api/` source, ADR-0001..0010, and the worker boot script; no external library claims load-bearing here)
 
-> **Scope note.** This is a *validation and deepening* pass on `docs/tech-spec.md`, not a redesign.
-> The spec's component split, provider seams, and create-saga are sound. This document confirms
-> the boundaries, fills in the failure/compensation paths the spec leaves implicit, and flags
-> three places where the spec's happy-path pseudocode collides with how Proxmox LXC actually
-> behaves (cloud-init, DHCP IP discovery, ttyd subprotocol framing). Those are called out as
-> **SPEC GAP** and need an ADR or open-item resolution before the relevant phase.
+## Scope & Method
 
----
+This is integration research, not a redesign. The three v1.3 features (setup wizard, real-boot v2 persistence, real-infra acceptance) attach to an existing, well-factored control plane. Every recommendation below names the real file it touches and marks each piece **NEW** or **MODIFIED**. Everything stays behind the two existing seams (`ComputeProvider`, `DbProvider`) so it remains CI-provable over `FakeComputeProvider` (acceptance is the only human-UAT piece).
 
-## Standard Architecture
+The load-bearing facts the existing code establishes (all verified in source):
+
+- The create lifecycle is one saga in `api/services/workspaceService.py::createWorkspace` (8 steps; capacity+reserve under `self._create_lock`, then clone→persist-intent→start→getIp→wait_ttyd→running).
+- The state machine is a single explicit table in `api/lib/statemachine.py::TRANSITIONS` — adding a state means adding rows here and nothing else changes the policy authority.
+- The compute seam is `api/compute/provider.py::ComputeProvider` (ABC), with `FakeComputeProvider` (`api/compute/fakeProvider.py`) and `ProxmoxComputeProvider` (`api/compute/proxmoxProvider.py`). The seam-leakage test (`api/tests/unit/test_seam_leakage.py`) forbids `proxmoxer`/`aiosqlite` symbols outside the impl files.
+- The reconciler is one in-process pure pass (`api/services/reconciler.py::reconcile_once` → `_reap` + `_auto_stop`), spawned by `lifespan` in `api/main.py`. The reaper destroys row-less pool CTs and times-out `creating` rows; auto-stop calls the GUARDED `stopWorkspace(reason="idle")`. It NEVER destroys a `stopped` row.
+- Migrations are additive `migrations/NNN_*.sql` applied once via a `schema_migrations` ledger (`api/db/sqliteProvider.py::migrate`). Adding `003_*.sql` is the established, idempotent pattern.
+- ttyd already runs PERSISTENT (no `--once`, ADR-0006) and LAN-bound in `cc-worker-config/lxc/worker-template/burrow-boot.sh`. Tab close = detach, not terminate. Destroy is the only kill path.
+- Config/secrets live in `api/config.py::Settings` (pydantic-settings, reads gitignored `.env`); the Proxmox token is `proxmox_token_value`, the git-cred stopgap is `git_credential_token` + `mint_repo_credential` (a pluggable seam).
+
+## Standard Architecture (v1.3 target, NEW pieces marked ☆)
 
 ### System Overview
 
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│  Browser (any device on the LAN)                                          │
-│  React 19 UI · xterm.js · react-mosaic · TanStack Query · Zustand         │
-└───────────────┬──────────────────────────────────┬───────────────────────┘
-                │ HTTP /api, /                      │ WS /ws/.../terminal
-                ▼                                   ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│  nginx (control-plane host, :80)   — pure reverse proxy / static server   │
-│   /        → /opt/burrow/ui/dist (Vite static build, SPA fallback)        │
-│   /api/    → 127.0.0.1:8000  (FastAPI)                                     │
-│   /ws/     → 127.0.0.1:8000  (Upgrade + Connection:upgrade, 3600s timeout)│
-└───────────────┬──────────────────────────────────────────────────────────┘
-                ▼
-┌──────────────────────────────────────────────────────────────────────────┐
-│  FastAPI control plane (uvicorn :8000)                                    │
-│  ┌────────────────────────┐  ┌──────────────────────────────────────────┐ │
-│  │ routers/               │  │ services/                                 │ │
-│  │  workspaces.py (CRUD)  │─▶│  WorkspaceService  (saga orchestrator)    │ │
-│  │  terminal.py   (WS)    │  │     │  depends only on abstractions       │ │
-│  │  health.py             │  │     ├─▶ ComputeProvider (abstract)        │ │
-│  └────────────────────────┘  │     │     └─ ProxmoxComputeProvider       │ │
-│                              │     │         (proxmoxer)        ─────────┼─┼──▶ Proxmox API
-│                              │     └─▶ DbProvider (abstract)             │ │   (clone/start/
-│                              │           └─ SqliteProvider (aiosqlite) ─┼─┼──▶ SQLite /data/
-│                              │           └─ PostgresProvider (stub)      │ │    burrow.db
-│                              └──────────────────────────────────────────┘ │
-│   terminal.py WS proxy ───────────────────────────────────────────────────┼──▶ ttyd :7681
-└──────────────────────────────────────────────────────────────────────────┘    (per worker,
-                                                                                  bound to the
-                                                                                  worker's IP)
-                ┌──────────────────────────────────────────────┐
-                │  Worker LXCs (VMID pool, ephemeral)           │
-                │  cloned from golden template (e.g. VMID 9000) │
-                │   Ubuntu 24.04 · Node 22 · claude-code        │
-                │   burrow-worker.service → burrow-boot.sh      │
-                │   ttyd :7681  →  (rtk) claude                 │
-                └──────────────────────────────────────────────┘
+│  Browser UI (React 19, ui/src/)                                            │
+│  ┌────────────────┐  ┌──────────────┐  ┌──────────────────────────────┐   │
+│  │ SetupWizard ☆  │  │ Workspace    │  │ TerminalPanel (xterm)        │   │
+│  │ (first-run gate)│  │ List/Layout │  │  + reconnect/restore overlay │   │
+│  └───────┬────────┘  └──────┬───────┘  └──────────────┬───────────────┘   │
+│          │ /api/v1/setup/*  │ /api/v1/workspaces      │ /ws/.../terminal   │
+├──────────┴──────────────────┴─────────────────────────┴───────────────────┤
+│  FastAPI control plane (api/)                                              │
+│  ┌──────────────┐ ┌─────────────────────┐ ┌──────────────┐ ┌───────────┐  │
+│  │ setup ☆      │ │ workspaces / nodes  │ │ internal     │ │ terminal  │  │
+│  │ router       │ │ routers             │ │ (bootconfig) │ │ (WS relay)│  │
+│  └──────┬───────┘ └─────────┬───────────┘ └──────┬───────┘ └─────┬─────┘  │
+│         │                   │                    │               │         │
+│  ┌──────┴───────────────────┴────────────────────┴───────────────┴─────┐  │
+│  │ WorkspaceService (create/stop/start/destroy saga; persistent-aware ☆)│  │
+│  │ SetupService ☆   Reconciler (reap + auto-stop; persistent-safe ☆)    │  │
+│  └────────────┬─────────────────────────────────────────┬──────────────┘  │
+│               │ ComputeProvider ABC                      │ DbProvider ABC   │
+├───────────────┴──────────────────────────────────────────┴────────────────┤
+│  Fake / Proxmox compute                            SQLite (003 migration ☆) │
+│  + testConnection / verifyTemplate ☆               settings row ☆ +          │
+│  (+ suspend/resume ☆ only if Tier 2)               persistent column ☆       │
+└────────────────────────────────────────────────────────────────────────────┘
+              │ pull-at-boot bootconfig                  ▲ ttyd reattach ☆
+              ▼                                          │
+   Worker LXC: burrow-boot.sh → tmux session ☆ → ttyd (reattach) → claude
 ```
 
-The control plane is a **modular monolith**: one FastAPI process, clear internal seams, no
-network hops between layers except the two real external systems (Proxmox API, worker ttyd).
-For a single-operator homelab this is correct: KISS, no message bus, no extra services to run.
+### Component Responsibilities (v1.3 delta)
 
-### Component Responsibilities
+| Component | Responsibility | Status |
+|-----------|----------------|--------|
+| `SetupService` (`api/services/setupService.py`) | Test Proxmox connection, run preflight permission/template checks, report readiness, read/write the configured-state row | **NEW** |
+| `setup` router (`api/routers/setup.py`) | Thin envelope-wrapped surface for the wizard endpoints | **NEW** |
+| `SetupWizard` (`ui/src/components/SetupWizard.tsx`) | Multi-step browser flow; gates the app on "configured?" | **NEW** |
+| `ComputeProvider` ABC | Gains `testConnection`, `verifyTemplate` (+ optional `suspendCt`/`resumeCt` for Tier 2 persistence) | **MODIFIED** |
+| `FakeComputeProvider` | Implements the new capability methods deterministically (CI parity) | **MODIFIED** |
+| `ProxmoxComputeProvider` | Real impls of the new capability methods | **MODIFIED** |
+| `WorkspaceService` | Persists `persistent` flag at create; (Tier 2) suspend/resume actions | **MODIFIED** |
+| `lib/statemachine.py` | New `suspended` state + transitions (Tier 2 only) | **MODIFIED (Tier 2)** |
+| `Reconciler` | Proven to never reap a persistent stopped workspace; guards any new "stale stopped" rule | **MODIFIED (tests; code only if a new rule is added)** |
+| `migrations/003_*.sql` | `persistent` column on workspaces; singleton `settings` table | **NEW** |
+| `burrow-boot.sh` / `provision-template.sh` | Launch ttyd inside a tmux session; reattach on restart; install tmux | **MODIFIED** |
 
-| Component | Owns / Responsible for | May know about | Must NOT know about |
-|-----------|------------------------|----------------|---------------------|
-| **nginx** | TLS-less LAN entry, static UI, reverse-proxy `/api` + `/ws` (WS upgrade, long read timeout), security headers | Upstream is `127.0.0.1:8000`; the `/ws` upgrade dance | Workspaces, Proxmox, the DB — it is dumb plumbing |
-| **routers/workspaces.py** | HTTP shape: parse/validate `WorkspaceCreate`, wrap responses in `data`/`meta`/`error`, map exceptions → error codes/status | `WorkspaceService`, Pydantic models | Proxmox/proxmoxer, SQL, VMID math — never imports a provider impl |
-| **routers/terminal.py** | WS lifecycle, the browser↔ttyd bidirectional bridge, connect/disconnect events, error frames | `DbProvider` (lookup workspace + log events), `websockets` client | How the LXC was created; capacity logic |
-| **routers/health.py** | Liveness + dependency probe (`db: ok`, `proxmox: ok`) | Both providers' health calls | Business rules |
-| **WorkspaceService** | The **create/stop/start/destroy sagas**, state-machine enforcement, capacity guard, VMID allocation policy, userdata assembly, compensation/cleanup | `ComputeProvider` + `DbProvider` **abstractions only** | `proxmoxer` types, `aiosqlite`, SQL strings, ttyd framing |
-| **ComputeProvider** (abstract) | The compute contract: `clone / start / stop / destroy / status / getIp / nextVmId / nodeMemoryUsage / injectBootConfig` | Nothing above it | Workspaces, DB rows, HTTP |
-| **ProxmoxComputeProvider** | proxmoxer calls, **UPID task waiting**, IP discovery, capacity query, env injection mechanism | Proxmox cluster topology, proxmoxer | Workspace semantics, event log, HTTP envelope |
-| **DbProvider** (abstract) | Persistence contract: workspace CRUD, soft-delete, `logEvent` | Nothing above it | Proxmox, HTTP, compute |
-| **SqliteProvider** | `aiosqlite`, migrations, snake_case↔camelCase mapping, soft-delete filtering | SQLite/SQL | Proxmox, HTTP |
-| **templateService** | Read template registry (`templates` table), resolve `pluginSet`→template VMID | DbProvider, settings | Cloning mechanics (that's compute) |
+## Feature 1 — Setup Wizard
 
-**The load-bearing rule (from CLAUDE.md + PROJECT.md):** `WorkspaceService` imports *only*
-`ComputeProvider` and `DbProvider`. Grep test for the seam: `proxmoxer`, `aiosqlite`, `httpx`,
-and `ProxmoxAPI` must appear **only** under `api/db/` and `api/services/proxmox*` / the provider
-impls — never in `workspaceService.py`, routers, or models. See "Provider Seam Leakage Audit".
+### New `/api/v1` endpoints
 
----
+All thin, all under `/api/v1`, all returning the `data`/`meta`/`error` envelope (`lib/envelope.respond`). They delegate to a new `SetupService` so the router stays orchestration-free (mirrors `internal.py`/`nodes.py`).
 
-## Recommended Project Structure
+| Endpoint | Purpose | Backed by |
+|----------|---------|-----------|
+| `GET /api/v1/setup/status` | "Is Burrow configured yet?" — the gate the UI reads on load | settings row (DB read) |
+| `POST /api/v1/setup/test-connection` | Validate a provided Proxmox host + token reaches the API and authenticates | `testConnection()` (**NEW** capability) |
+| `POST /api/v1/setup/preflight` | Validate the token's permissions (clone, pool PUT, config PUT — ADR-0003 scope) and that the template VMID exists & is a template | `verifyTemplate()` + a permission probe (**NEW**) |
+| `GET /api/v1/setup/health` | Readiness — REUSE the existing `/api/v1/health` (db + compute reachable) | existing `healthcheck()` |
+| `POST /api/v1/setup/settings` | UPSERT the validated connection + worker pool/node settings; set `setupCompletedAt` | settings row (DB write) |
 
-The spec's §4.1 tree is good. One **adjustment for the seam** and the test seams:
+Recommendation: do NOT invent a new health endpoint — the existing `GET /api/v1/health` (`api/routers/health.py`) already aggregates `db.healthcheck()` + `compute.healthcheck()` with degrade-not-500; the wizard's health step calls it. `setup/preflight` is the genuinely new check (permissions + template existence), distinct from "reachable".
 
-```
-api/
-├── main.py                      # app factory: DI wiring, middleware, envelope, security headers
-├── config.py                    # pydantic-settings (env)
-├── routers/
-│   ├── workspaces.py            # /api/v1/workspaces CRUD  (HTTP only)
-│   ├── terminal.py              # /ws/workspaces/{id}/terminal  (WS bridge)
-│   └── health.py
-├── services/
-│   ├── workspaceService.py      # saga orchestrator — abstractions ONLY
-│   └── templateService.py       # template registry resolution
-├── compute/                     # NEW: lift compute behind a named seam (mirrors db/)
-│   ├── provider.py              # ComputeProvider ABC   (was implied by spec §3.2)
-│   ├── proxmoxProvider.py       # proxmoxer impl  (was services/proxmoxService.py)
-│   └── fakeProvider.py          # FakeComputeProvider — in-memory, for e2e (ci-cd §4.4)
-├── db/
-│   ├── provider.py              # DbProvider ABC
-│   ├── sqliteProvider.py
-│   ├── postgresProvider.py      # stub behind the seam
-│   └── migrations/001_init.sql
-├── models/                      # Pydantic: snake_case DB ↔ camelCase JSON
-│   ├── workspace.py
-│   └── event.py
-└── tests/
-    ├── unit/                    # Tier 1: service logic, doubles for both providers
-    └── integration/            # Tier 2: real SQLite, mocked Proxmox HTTP, stub ttyd
+The wizard does NOT create the PVE least-priv user/role/token — per PROJECT.md that stays operator-run (`cc-worker-config/lxc/host-prime/`). The wizard validates a token the operator pasted and guides the manual `host-prime` steps; it never silently works around them.
+
+### Where "configured?" state lives
+
+**Recommendation: a single-row settings/config table (NEW `003` migration), NOT a derived check.** Rationale:
+
+- A derived check ("any workspaces exist?" / "is `proxmox_token_value` non-empty?") conflates "operator finished the wizard" with incidental state. A token can be in `.env` without the template ever having been verified end-to-end; recording that the validated configuration exists is the wizard's whole point.
+- A `settings` row gives an explicit `setupCompletedAt` + the validated non-secret values, queryable through the `DbProvider` seam (Fake-provable, survives restart). Same additive-migration pattern as `002`.
+
+Schema sketch (`003_settings.sql`, singleton row enforced by a fixed PK):
+
+```sql
+CREATE TABLE settings (
+  id              INTEGER PRIMARY KEY CHECK (id = 1),  -- singleton row
+  setupCompletedAt TEXT,                                -- NULL until the wizard finishes
+  proxmoxHost     TEXT,
+  templateVmid    INTEGER,
+  workerNodes     TEXT DEFAULT '[]',                    -- JSON list
+  updatedAt       TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+INSERT INTO settings (id) VALUES (1);
 ```
 
-### Structure Rationale
+`GET /api/v1/setup/status` returns `{ configured: setupCompletedAt IS NOT NULL }`. The `DbProvider` ABC gains `getSettings()` / `updateSettings()` (snake_case↔camelCase mapped as elsewhere), implemented in `sqliteProvider.py` and the Postgres stub.
 
-- **`compute/` as a sibling of `db/`** (vs the spec's `services/proxmoxService.py`): the spec
-  *names* a `ComputeProvider` seam (§3.2) but its code sketch instantiates `ProxmoxService`
-  directly inside `WorkspaceService`. Promoting compute to a first-class provider package — ABC +
-  `proxmoxProvider` + `fakeProvider` — makes the seam symmetric with the DB seam and gives the
-  e2e tier its `FakeComputeProvider` a natural home. This is the single most important structural
-  change to keep the spec's own promise ("compute is the only swappable seam besides the DB").
-- **`fakeProvider.py` lives in app code, not tests**, because ci-cd §4.4 wires it into the
-  *shipped* app via `docker-compose.e2e.yml` (selected by env, e.g. `BURROW_COMPUTE=fake`). It is
-  a real implementation of the contract, just in-memory.
-- **routers thin, services thick**: routers do envelope/validation only so the state machine and
-  saga live in one testable place (Tier-1 covers it with no network).
+### Secret hygiene — where the Proxmox token is persisted and read
 
----
+**Recommendation: the token stays in the gitignored `.env` (read via `Settings.proxmox_token_value`); the settings TABLE stores only non-secret connection metadata (host, template VMID, node list, completed-at).** This is the established posture (PROJECT.md: ".env-only; a secrets manager is hosted-path scope") and the ADR-0002 "no secret in the DB / on the worker" lineage.
 
-## Architectural Patterns
+The friction: the wizard collects the token in the browser. Two honest options, both behind the seam:
 
-### Pattern 1: Orchestration Saga with Explicit Compensation
+- **Option A (recommended for v1):** the wizard validates the token in-memory — POST it to `test-connection`, the service uses it for a one-shot probe, never persists it — then instructs the operator to place it in `.env` and restart; `setup/status` then reads it back via `Settings`. Keeps the "no secret in the DB" rule absolute. Cost: a restart in the flow.
+- **Option B:** persist the token in the settings table. Plaintext-in-SQLite on a LAN single-user box is a real posture change and edges into secrets-manager scope. A clear ADR-requiring deviation — defer.
 
-**What:** `createWorkspace` is a multi-step distributed transaction across two external systems
-(Proxmox + DB) with no shared rollback. Model it as a saga: each forward step has a known
-compensating action, and a failure at step *N* runs compensations for steps *N..1* in reverse.
+Pick A. It is the smallest change that does not violate the existing secret-hygiene invariants. Flag Option B as the documented future path if the restart friction proves unacceptable at acceptance.
 
-**When to use:** Any time you mutate Proxmox state and DB state in the same operation. All four
-lifecycle operations (create/start/stop/destroy) are sagas; create is the dangerous one.
+### Staying behind the ComputeProvider seam (CI-provable)
 
-**Trade-offs:** More code than a happy-path `try/except`, but it is the difference between
-"failed create leaves an orphaned VMID burning RAM and a phantom DB row" and "failed create
-leaves the system exactly as it was." For a homelab with a finite VMID pool, leaks are fatal
-over time.
-
-**Canonical create saga (validated + corrected):**
-
-```
-STEP                              FORWARD                          COMPENSATION (on later failure)
-0  capacity guard      nodeMemoryUsage(node) ≤ 0.80          (none — read only)
-1  allocate VMID       nextVmId() → reserve                  release reservation
-2  DB pending row      createWorkspace(status=creating)      mark status=error (NOT delete — keep audit)
-3  clone template      clone(tmpl→vmid) + WAIT UPID OK       destroy(vmid)  [partial-clone teardown]
-4  inject boot env     injectBootConfig(vmid, userdata)      (covered by step-3 destroy)
-5  start LXC           start(vmid) + WAIT UPID OK            stop(vmid) then destroy(vmid)
-6  resolve IP          waitForIp(vmid) → lxcIp               stop+destroy(vmid)
-7  health: ttyd up     waitForTtyd(lxcIp:7681)               stop+destroy(vmid)
-8  mark running        updateWorkspace(status=running)       —
-```
-
-Two ordering corrections vs the spec's §6.2 sketch:
-
-1. **Write the DB `creating` row BEFORE the clone (step 2 before 3), and persist the VMID on it
-   immediately.** The spec clones first (step 3) then writes the row (step 5). If the process
-   crashes between clone and row-write, the VMID is orphaned with *no DB record to find it by* —
-   unrecoverable without a Proxmox-side sweep. Recording the reserved VMID first makes every
-   subsequent failure recoverable by a reaper that reads `status=creating/error` rows.
-2. **Every Proxmox mutation must wait on its UPID task** (`Tasks.blocking_status` /
-   `nodes(node).tasks(upid).status` until `status==stopped && exitstatus==OK`). The spec's
-   `cloneLxc`/`startLxc` return a task id but the saga treats them as synchronous. Clone of a 30 GB
-   rootfs is *not* instant; starting `start` or `getIp` before clone completes will fail. Wrap each
-   compute mutation so the provider blocks until the task resolves (with its own timeout) and
-   raises a typed error on non-OK exit. (HIGH confidence — `proxmoxer.tools.Tasks.blocking_status`.)
-
-### Pattern 2: Idempotency + Reservation for VMID Allocation
-
-**What:** `nextVmId()` scanning the pool for the first free id is a **TOCTOU race** under any
-concurrency (two creates pick the same id) and leaks ids on crash. Make allocation safe by:
-(a) a process-level `asyncio.Lock` around allocate+clone-submit so two in-flight creates can't pick
-the same id, and (b) treating the DB `creating` row as the reservation record so a crashed create
-is visible.
-
-**When to use:** Always — even single-operator UIs fire parallel creates (double-click, two tabs).
-
-**Idempotency key:** Accept an optional client-supplied `idempotencyKey` on `POST /workspaces`;
-if a row with that key exists, return it instead of cloning again. Cheap insurance against
-retried POSTs creating duplicate LXCs.
+Two NEW capability methods on the ABC, both implemented by Fake AND Proxmox:
 
 ```python
-async with self._allocLock:                  # serialize the racy window only
-    used = {w.vmid for w in await self.db.listWorkspaces()}      # DB-side reservations
-    used |= set(self.compute.usedVmIds())                       # Proxmox-side truth
-    vmid = next(i for i in range(POOL_START, POOL_END + 1) if i not in used)
-    ws = await self.db.createWorkspace({...vmid, "status": "creating"})  # reserve in DB
-# lock released — slow clone runs outside the critical section
+# api/compute/provider.py  (MODIFIED — add to ComputeProvider)
+@abstractmethod
+async def testConnection(self) -> bool: ...                       # reachable + authenticated
+@abstractmethod
+async def verifyTemplate(self, template_vmid: int) -> bool: ...   # template CT exists & is a template
 ```
 
-Union the DB's known VMIDs with Proxmox's actual VMIDs so a row the reaper hasn't cleaned yet
-*and* a Proxmox leak both count as "used." Single source of truth at allocation time = the
-intersection of both systems, biased toward "occupied."
+- `FakeComputeProvider.testConnection` returns `True` (or a constructor-injected value for negative-path tests, mirroring the existing `FakeFailures` pattern). `verifyTemplate` returns `True` when `template_vmid == settings.template_vmid`. The entire wizard happy-path AND failure-path is then testable with zero Proxmox.
+- `ProxmoxComputeProvider.testConnection` wraps `self._api.version.get()` (already used by `healthcheck`) plus a cheap authenticated read; `verifyTemplate` reads `nodes(node).lxc(vmid).config.get()` and asserts the `template` flag.
+- The permission preflight is the one judgment call: a real ACL probe (can I clone? PUT `/pool/burrow-workers`? — ADR-0003) is Proxmox-specific. Keep it behind a single ABC method returning a typed DTO from `models/compute.py` (e.g. `preflight() -> PreflightReport`), so the Fake returns a green report and no `proxmoxer` symbol leaks into the router. The seam-leakage test stays green.
 
-### Pattern 3: Provider Seam (Dependency Inversion) via FastAPI DI
+### Idempotency of provision/verify (safe to re-run)
 
-**What:** `WorkspaceService(compute: ComputeProvider, db: DbProvider)` — constructor injection of
-abstractions; concrete impls chosen once at app startup from env and provided via FastAPI
-`Depends`. Swapping SQLite→Postgres or Proxmox→Fake is a one-line wiring change, never a service
-edit.
+- `test-connection`, `preflight`, `verifyTemplate` are pure reads — inherently idempotent.
+- Template PROVISIONING itself (`provision-template.sh`) is operator-run on the host, not over the API (no `pct exec` over HTTPS, ADR-0002). The wizard VERIFIES + GUIDES; it never provisions over the API. The verify is re-runnable.
+- `setup/settings` is an UPSERT on the singleton row — re-running overwrites with the same validated values; `setupCompletedAt` is stable once set. Re-running the whole wizard (e.g. token rotation) is safe.
 
-**When to use:** This is the spec's central architectural promise (additive hosted path). It is
-also what makes CI hermetic — see "Integration Points."
+### UI first-run gating
 
-**Trade-offs:** Two extra ABCs and a DI module. Worth it: the e2e tier *depends* on being able to
-substitute `FakeComputeProvider`, and the whole "hosted path is additive not a rewrite" claim
-rests on nothing Proxmox/SQLite-specific leaking past these two interfaces.
+`ui/src/App.tsx` (MODIFIED) currently renders the workspace shell unconditionally (verified). Add a gate:
+
+- NEW hook `ui/src/hooks/useSetupStatus.ts` (TanStack Query, mirrors `useNodes.ts`) → `GET /api/v1/setup/status`.
+- In `App.tsx`: while loading, show a splash; if `!configured`, render `<SetupWizard />` instead of the `Navbar`/`WorkspaceList`/`WorkspaceLayout` shell; on completion, invalidate the query and fall through to the shell.
+- The wizard's final step ("land the first workspace") reuses the existing `NewWorkspaceModal` create path — no new create flow.
+
+## Feature 2 — Real-Boot v2 Persistence (WSX-02 + WSX-03)
+
+### Does ComputeProvider gain new capabilities?
+
+**WSX-02 (persistent workspaces) does NOT strictly need new compute methods if "persistent" means stop-without-destroy.** `stopCt`/`startCt` already preserve disk (Proxmox `lxc stop`/`start` keeps the rootfs; the tech-spec stop contract is "preserves disk state"). Only destroy frees the CT. So a persistent workspace is fundamentally *a stopped CT the reaper must not destroy* — mostly a flag + reconciler concern, not a new compute capability.
+
+**Recommendation — two tiers; default to the lower one for v1.3 unless acceptance demands snapshots:**
+
+- **Tier 1 (recommended, minimal):** "persistent" = stop/start without destroy + the reaper-survival guarantee. NO new ComputeProvider method, NO new state. Reuses `stopCt`/`startCt` and the existing `stopped` state verbatim. Smallest seam-preserving change; fully Fake-provable.
+- **Tier 2 (only if true suspend/resume or snapshot/rollback is required):** add capability methods to the ABC:
+
+  ```python
+  async def suspendCt(self, node, vmid) -> ComputeTask: ...   # freeze RAM state
+  async def resumeCt(self, node, vmid) -> ComputeTask: ...
+  # and/or snapshotCt / rollbackCt
+  ```
+
+  Each MUST land in BOTH Fake (model a `suspended` flag on `_FakeContainer`) and Proxmox (`nodes(node).lxc(vmid).status.suspend.post()` / `.resume.post()`, UPID-blocked via `_block`). Adding an ABC method is a documented ADR trigger.
+
+CAVEAT (MEDIUM confidence): LXC suspend/resume relies on kernel CRIU and is historically flaky for UNPRIVILEGED containers (the golden template is unprivileged, tech-spec §9.1). VERIFY at the dev-homelab smoke before committing Tier 2. If suspend is unreliable, snapshot/rollback (disk-level, reliable) or plain stop/start (Tier 1) are the fallbacks. This is exactly why Tier 1 is the default recommendation.
+
+### New state-machine states / transitions
+
+Tier 1 needs NO new state — a persistent workspace uses the existing `stopped` state; the difference is the `persistent` flag the reaper reads. The existing `("running","stop")→"stopped"` and `("stopped","start")→"running"` transitions already do the job.
+
+Tier 2 adds rows to `api/lib/statemachine.py::TRANSITIONS` (MODIFIED):
 
 ```python
-# main.py — wiring (the ONLY place impls are named)
-def getCompute() -> ComputeProvider:
-    return FakeComputeProvider() if settings.compute == "fake" else ProxmoxComputeProvider(settings)
-def getDb() -> DbProvider:
-    return PostgresProvider(settings) if settings.dbKind == "postgres" else SqliteProvider(settings)
+("running",  "suspend"): "suspended",
+("suspended","resume"):  "running",
+("suspended","destroy"): "destroyed",   # destroy MUST stay legal from the new state
 ```
 
-### Pattern 4: Bidirectional WebSocket Bridge with Subprotocol Pass-Through
+`suspended` becomes a new `WorkspaceStatus` literal (`api/models/workspace.py`, MODIFIED) and a new value in the UI status map (`ui/src/lib/status.ts`).
 
-**What:** `terminal.py` accepts the browser WS, dials the worker's ttyd WS, and pumps frames both
-ways with two coroutines under `asyncio.gather`, cancelling both when either side closes.
+**Critical (both tiers):** `destroy` MUST be legal from the persistent/new state, or an operator can never reclaim a persistent workspace.
 
-**Critical correction (SPEC GAP):** ttyd speaks a **custom `tty` WebSocket subprotocol**, not raw
-bytes. The client must offer `Sec-WebSocket-Protocol: tty`; the first client→server frame is a
-JSON `{"AuthToken": "..."}` (the browser's xterm sends this), and thereafter frames are
-**opcode-prefixed** (`'0'`=input, `'1'`/`'2'`=resize JSON, server→client `'0'`=output,
-`'1'`=set-title, `'2'`=set-prefs). The proxy must therefore:
+### Persistence as a per-workspace flag at create time
 
-- request the `tty` subprotocol on the upstream `websockets.connect(..., subprotocols=["tty"])`,
-- bridge frames **opaquely** (do not parse or re-encode opcodes — pass the raw frame through),
-- preserve **frame type** (binary stays binary, text stays text). The spec's `ttydToClient`
-  does `msg.encode()` on text frames, silently turning a ttyd text control frame into a binary
-  one. Bridge `str`→`send_text` and `bytes`→`send_bytes` to keep the subprotocol intact.
+**Yes — a `persistent` boolean chosen at create.** Add `persistent: bool = False` to `WorkspaceCreate` (`api/models/workspace.py`, MODIFIED) and a `persistent` column (`003` migration). Default `False` preserves the ephemeral-by-default principle (tech-spec §2.2). `NewWorkspaceModal.tsx` (MODIFIED) gets a checkbox. The saga persists the flag in `_reserve_vmid_and_row`'s `base` dict (MODIFIED).
 
-**Lifecycle + failure frames:**
+### Data-model changes (new columns)
 
-| Event | Action |
-|-------|--------|
-| workspace not found / not `running` | `close(1008)` before accept (policy violation) |
-| upstream ttyd unreachable | accept, then `send_json({"type":"error","code":"LXC_NOT_READY"})`, internal reconnect (3× / 2s) per spec §5.2, then `close` |
-| browser closes | cancel ttyd→client pump, close upstream, `logEvent(terminal.disconnected)` |
-| ttyd closes (e.g. `--once` after detach) | cancel client→ttyd pump, `logEvent(terminal.disconnected)`, close browser WS with normal code |
-| mid-stream upstream drop | attempt internal reconnect; on exhaustion emit error frame + close |
+`003_persistence.sql` (NEW) — additive, idempotent under the ledger:
 
-```python
-async with websockets.connect(ttydUrl, subprotocols=["tty"]) as ttyd:
-    await db.logEvent(workspaceId, "terminal.connected", {})
-    async def up():    # browser → ttyd
-        async for m in ws.iter_bytes(): await ttyd.send(m)
-    async def down():  # ttyd → browser, preserve frame type
-        async for m in ttyd:
-            await (ws.send_text(m) if isinstance(m, str) else ws.send_bytes(m))
-    done, pending = await asyncio.wait(
-        {asyncio.create_task(up()), asyncio.create_task(down())},
-        return_when=asyncio.FIRST_COMPLETED)
-    for t in pending: t.cancel()      # one side closed → tear the other down
+```sql
+ALTER TABLE workspaces ADD COLUMN persistent INTEGER NOT NULL DEFAULT 0;
+-- Tier 2 only: 'suspended' joins the documented status enum (comment; status is TEXT, no constraint to alter)
 ```
 
-`asyncio.wait(FIRST_COMPLETED)` + cancel is safer than the spec's bare `gather`: `gather`
-keeps both coroutines alive until *both* finish, so a dead browser leaves the ttyd pump hanging.
+Plus `_WORKSPACE_COLUMNS` in `sqliteProvider.py` (MODIFIED) gains `persistent`, the `Workspace` DTO gains the field, and the Postgres stub schema (tech-spec §7.2) gets the same column for parity.
 
----
+### Reconciler / reaper / auto-stop interaction with persistent workspaces
 
-## Data Flow
+Highest-risk integration point. Three findings, all about `api/services/reconciler.py` (MODIFIED):
 
-### Create-Workspace Flow (happy path)
+1. **Reaper orphan branch (`_reap` case A):** SAFE AS-IS. A row-less pool CT is an orphan regardless of persistence — there is no row to carry the flag. A persistent workspace always has a live row (its VMID is in `live_vmids`), so the existing `if vmid in live_vmids ... continue` guard already protects it. No code change; assert with a test.
+2. **Reaper `creating`-timeout branch (`_reap` case B):** UNCHANGED — persistence has no bearing on a stuck `creating` row.
+3. **Idle auto-stop (`_auto_stop`):** the only real interaction, and it is SUBTLE. Auto-stop SHOULD still stop an idle RUNNING persistent workspace — stop preserves state, so auto-stop and persistence are complementary, not conflicting. So `_auto_stop` does NOT skip persistent running workspaces.
 
-```
-NewWorkspaceModal ──POST /api/v1/workspaces──▶ workspaces.py ──▶ WorkspaceService.create
-                                                                        │
-   capacity guard ─▶ allocate VMID (locked) ─▶ DB row(creating) ◀───────┘
-        │                                           │
-   clone(WAIT UPID) ─▶ injectBootConfig ─▶ start(WAIT UPID) ─▶ waitForIp ─▶ waitForTtyd
-        │                                                                        │
-        └──────────────────────────────── DB row(running) ◀─────────────────────┘
-                                                │
-UI: TanStack Query poll list  ◀── status: creating → running
-   then layoutStore.openPanel(id) ─▶ TerminalPanel ─▶ WS /ws/workspaces/{id}/terminal
-```
+   The "must not reap a persistent STOPPED workspace" requirement is ALREADY satisfied: the current reaper NEVER destroys a `stopped`-with-a-live-row workspace (it only destroys row-less orphans and times-out `creating` rows). The integration work is therefore: **add a regression test asserting a persistent (and an ephemeral) stopped workspace survives a reconcile pass, and document that any FUTURE "reap stale stopped" rule MUST exclude `persistent=True`.**
 
-The create POST is **long-running** (clone + boot + health can be 30–90 s). Two valid shapes:
-- **Synchronous POST** (spec's choice): the request blocks until `running`/`error`. Simple; the
-  modal shows progress text. Needs an nginx/uvicorn read timeout > worst-case boot and a server
-  timeout that triggers compensation. Acceptable for single-operator.
-- **Async POST + poll** (recommended if boot times grow): POST returns `202` with the `creating`
-  row immediately; the saga runs in a background task; the UI polls `GET /workspaces/{id}` for
-  status. Decouples HTTP timeout from boot time and survives a closed modal. Either works behind
-  the same envelope; pick synchronous for v1, note the migration path.
+   IF v1.3 adds a "destroy ephemeral workspaces stopped longer than N" reaper rule (a plausible companion to persistence), THAT new rule must read `row.persistent` and skip persistent rows — the ONLY place the flag changes reaper behavior. Decide this explicitly (see Gaps).
 
-### Terminal Stream Flow
+### Scrollback restore — end-to-end flow (WSX-03)
 
 ```
-xterm.js ─bytes─▶ browser WS ─▶ nginx (/ws upgrade) ─▶ terminal.py ─frame─▶ ttyd:7681 ─▶ (rtk) claude
-   ▲                                                        │
-   └──────────────── output frames (preserve text/binary) ◀─┘
+worker boot (burrow-boot.sh, MODIFIED)
+  └─ start/attach a named tmux session  ── NEW (tmux new-session -A -s burrow ...)
+        └─ ttyd attaches to THAT session (not `bash -lc "exec claude"` directly)  ── MODIFIED exec line
+              │  scrollback lives in the multiplexer, survives ttyd client churn AND a stop/start
+              ▼
+control plane (terminal.py, UNCHANGED — opaque relay)
+  └─ /ws/workspaces/{id}/terminal bridges browser ↔ ttyd verbatim (SC-7 frame-type preserved)
+        ▼
+browser (TerminalPanel.tsx + useTerminal.ts; reconnect overlay UNCHANGED, verify)
+  └─ on reconnect, ttyd replays the multiplexer's scrollback buffer
+        ▲
+  server-truth poll (useWorkspaces.ts, UNCHANGED): the ~3s status poll + onTerminalEvent
+  invalidate already drives "is it running?"; reattach proceeds only when status==running
+  (the terminal router's access gate enforces it).
 ```
 
-### State Management (UI)
+Key design points:
 
+- The multiplexer is the source of scrollback truth, NOT the control plane. Keep `terminal.py` a dumb opaque bridge (SC-7). Do NOT add server-side scrollback buffering — it breaks frame-type preservation and adds state the seam design avoids.
+- `burrow-boot.sh` change is surgical: replace the final `exec ttyd ... bash -lc "cd '${START_DIR}' && exec ${CLAUDE_CMD}"` with an invocation that wraps the command in `tmux new-session -A -s burrow ...` (`-A` = attach-if-exists, create-otherwise → idempotent reattach across stop/start). This COMPOSES with ADR-0006 (persistent ttyd): now BOTH ttyd AND the session survive, so on a worker restart (start after stop) the boot script reattaches the same tmux session and scrollback survives the stop/start cycle, not just tab-close.
+- Hermetic test home exists: the boot-harness tests (`api/tests/boot/test_burrow_boot.py`) prove boot-script behavior with no real infra. Add a case asserting the `tmux new-session -A` invocation is present. Real reattach is a homelab-smoke line.
+- Choose tmux over zellij for v1.3: tmux is in Ubuntu base repos (one `apt-get install` line in `provision-template.sh`, MODIFIED), battle-tested for detach/reattach, and `new-session -A` gives idempotent reattach in one flag. zellij is heavier and faster-moving. KISS → tmux.
+
+## Feature 3 — First Real-Infra Acceptance (ACC-01/02/03)
+
+Mostly NO new code (PROJECT.md). Human UAT against real Proxmox + GHCR:
+
+- **ACC-01:** real create→terminal→stop→start→destroy + reaper/auto-stop/capacity on real CTs, real multi-node `selectNode`. Exercises the EXISTING saga/reconciler/selection against real Proxmox. Code impact: only fixes the smoke surfaces (the `[ASSUMED]` hostname→VMID parse in `burrow-boot.sh`, the `mint_repo_credential` A3 issuer stopgap, suspend reliability if Tier 2). Capture as `*-HUMAN-UAT.md` items.
+- **ACC-02:** first live release-please PR + harden-runner `egress-policy: block` flip + real GHCR publish + cosign/attestation verify. CI/CD only; no `api/` code.
+- **ACC-03:** the per-phase `*-HUMAN-UAT.md` checklists flipped to passed.
+
+Acceptance depends on the wizard (to get a real connection configured) and persistence (to exercise stop/start with state), so it sequences LAST.
+
+## Architectural Patterns (reused, not invented)
+
+### Pattern 1: New capability on the ComputeProvider ABC, with Fake parity
+**What:** every new compute behavior (testConnection, verifyTemplate, optional suspend/resume) is an `@abstractmethod` on `ComputeProvider`, implemented by BOTH `FakeComputeProvider` (deterministic, injectable failures) and `ProxmoxComputeProvider` (UPID-blocked via `_block`).
+**When:** any time the wizard or persistence needs a real Proxmox operation.
+**Trade-offs:** extending the (deliberately frozen) contract is an ADR-worthy change — but it is the ONLY way to keep services seam-pure and CI-provable. The Fake masks real-infra failure modes (e.g. CRIU suspend), so each new method needs a homelab-smoke acceptance line.
+
+### Pattern 2: Additive `003` migration under the ledger
+**What:** all schema change is a new `migrations/003_*.sql`, applied once by `schema_migrations`. Never edit `001`/`002`.
+**When:** the `persistent` column and the `settings` table.
+**Trade-offs:** SQLite `ALTER TABLE ADD COLUMN` is cheap and online; `DEFAULT 0` needs no backfill.
+
+### Pattern 3: Thin router → service, envelope-wrapped
+**What:** the `setup` router validates, calls `SetupService`, and `respond(...)`s — exactly like `internal.py`/`nodes.py`. No orchestration or driver symbol in the router.
+**When:** all five setup endpoints.
+
+### Pattern 4: State change is a TRANSITIONS-table edit
+**What:** any new lifecycle state (Tier-2 `suspended`) is rows added to `lib/statemachine.py::TRANSITIONS`; `assert_transition` enforces it centrally, so services/routers need no new branching.
+
+## Data Flow — the two changed flows
+
+### Setup / first-run
 ```
-TanStack Query (server state: workspace list/status, events)   ── polling, cache, mutations
-Zustand layoutStore (client state: mosaic tree, activeWorkspaceId)  ── panel layout only
+UI load → useSetupStatus → GET /api/v1/setup/status → SetupService.isConfigured (settings row)
+   ↓ not configured
+SetupWizard → POST test-connection → ComputeProvider.testConnection (Fake:True / Proxmox:version+auth)
+   → POST preflight → verifyTemplate + permission probe
+   → GET health (existing) → POST settings (UPSERT singleton, set setupCompletedAt)
+   → invalidate useSetupStatus → app shell renders → NewWorkspaceModal (first workspace)
 ```
 
-Keep server truth in TanStack Query, view-only layout in Zustand. Do not mirror workspace status
-into Zustand — it drifts.
+### Persistence + scrollback restore
+```
+create(persistent=true) → _reserve_vmid_and_row persists `persistent` → saga otherwise unchanged
+stop  → stopWorkspace → assert_transition(running,stop) → compute.stopCt (disk preserved)
+start → startWorkspace → compute.startCt → burrow-boot.sh tmux new-session -A (reattach) → ttyd
+   → _wait_ttyd → running → terminal relay reconnects → ttyd replays tmux scrollback
+reconcile pass: reaper skips (live row) ; auto-stop may stop an idle RUNNING persistent ws (OK)
+```
 
-### Boot-Config Injection (SPEC GAP — mechanism must change for LXC)
+## Anti-Patterns to avoid
 
-The spec's `setCloudInitUserdata` assumes cloud-init userdata injection. **Proxmox LXC has no
-native cloud-init** (`cicustom` is QEMU/VM-only; PVE cloud-init manipulation is unavailable for
-containers — HIGH confidence). The env vars `burrow-boot.sh` reads (`CONFIG_REPO`, `PROJECT_REPO`,
-etc.) must reach the worker by a container-valid mechanism. Options, recommendation first:
+### Anti-Pattern 1: Server-side scrollback buffering in the relay
+**What people do:** add a ring buffer in `terminal.py` to replay history on reconnect.
+**Why it's wrong:** breaks the SC-7 opaque-relay invariant (frame-type preservation), adds per-workspace server state the seam design avoids, and duplicates what the multiplexer already does.
+**Do this instead:** scrollback lives in tmux on the worker (WSX-03 as specified). The relay stays dumb.
 
-1. **`pct exec` to write `/etc/burrow/worker.env` after clone, before start** (or write to the
-   container rootfs path on the host while stopped). `burrow-worker.service` does
-   `EnvironmentFile=/etc/burrow/worker.env`. Simple, no template surgery. *Recommended.*
-2. **`pct push` a generated env file** into the stopped container's filesystem.
-3. **Per-VMID hookscript** (`pct set --hookscript`) that materializes env at `pre-start`.
+### Anti-Pattern 2: Persisting the Proxmox token in the DB to "complete" the wizard
+**What people do:** store the pasted token in the settings table so the API can use it without a restart.
+**Why it's wrong:** violates the `.env`-only secret posture (PROJECT.md, ADR-0002 lineage) and edges into secrets-manager scope (out of v1).
+**Do this instead:** validate in-memory, write the token to `.env`, restart (Option A). If unacceptable, that is a documented ADR and likely a milestone boundary.
 
-The `ComputeProvider` contract should expose `injectBootConfig(vmid, env: dict)` and hide which
-mechanism is used. This keeps `WorkspaceService` honest (it just calls `injectBootConfig`) and
-lets the Fake provider no-op it. **Action: resolve with an ADR before Phase 1; it changes the
-`ProxmoxComputeProvider` surface, not the saga.**
+### Anti-Pattern 3: A derived "is it configured?" heuristic
+**What people do:** infer setup completion from "token present" or "≥1 workspace exists".
+**Why it's wrong:** conflates incidental state with operator intent; fragile across token rotation and workspace deletion.
+**Do this instead:** an explicit `setupCompletedAt` on the singleton settings row.
 
----
+### Anti-Pattern 4: Making the reaper "persistence-aware" where it is already safe
+**What people do:** add `if row.persistent: continue` to the orphan or `creating`-timeout branch.
+**Why it's wrong:** the orphan branch operates on row-LESS CTs (no flag exists); the `creating`-timeout branch is unrelated to persistence. Such guards are dead code implying protection the branch never threatened.
+**Do this instead:** add the survival regression test; guard ONLY a NEW "reap stale stopped ephemerals" rule, if one is added.
+
+## Suggested Build Order (dependency-respecting)
+
+Phase numbering continues from v1.2 (last phase 9) → v1.3 resumes at 10.
+
+1. **Phase 10 — Persistence data model + state machine (foundation).**
+   - `003_persistence.sql` (NEW: `persistent` column), `Workspace`/`WorkspaceCreate` field (MODIFIED), `_WORKSPACE_COLUMNS` (MODIFIED), `_reserve_vmid_and_row` persists the flag (MODIFIED).
+   - Tier decision: stop/start (Tier 1, no ABC change) vs suspend/resume (Tier 2, ABC + statemachine change). Recommend Tier 1 unless acceptance demands snapshots.
+   - Reconciler regression tests: persistent + ephemeral stopped workspaces survive a reconcile pass (MODIFIED tests; reconciler code UNCHANGED for Tier 1).
+   - Touches: `migrations/`, `models/workspace.py`, `services/workspaceService.py`, `services/reconciler.py` (tests), `lib/statemachine.py` (Tier 2 only). CI-provable over Fake. **Build first** — the flag underpins later phases.
+
+2. **Phase 11 — Scrollback restore (WSX-03, worker-side).**
+   - `burrow-boot.sh` tmux `new-session -A` (MODIFIED), `provision-template.sh` installs tmux (MODIFIED), boot-harness test asserts the invocation (MODIFIED tests).
+   - UI: confirm `TerminalPanel`/reconnect overlay reattaches cleanly (likely UNCHANGED; verify).
+   - Code-independent of Phase 10 but conceptually pairs with it. Buildable/CI-provable via the boot harness; real reattach is a homelab-smoke line. Can parallelize with Phase 12.
+
+3. **Phase 12 — Setup wizard backend (SetupService + endpoints + capability methods).**
+   - `ComputeProvider` gains `testConnection`/`verifyTemplate` (+ preflight) (MODIFIED ABC), Fake + Proxmox impls (MODIFIED), `setupService.py` (NEW), `routers/setup.py` (NEW), `DbProvider.getSettings/updateSettings` (MODIFIED) over the `003` settings table, `main.py` router include + `get_setup_service` DI (MODIFIED).
+   - Fully CI-provable over Fake (happy + failure paths).
+
+4. **Phase 13 — Setup wizard UI + first-run gate.**
+   - `useSetupStatus.ts` (NEW), `SetupWizard.tsx` (NEW), `App.tsx` gate (MODIFIED), `NewWorkspaceModal` persistent checkbox (MODIFIED). Wizard's final step reuses the create path. vitest + Playwright over Fake.
+
+5. **Phase 14 — First real-infra acceptance (ACC-01/02/03) + 07r e2e nit.**
+   - Human UAT against real Proxmox + GHCR; flips the ★ items and `*-HUMAN-UAT.md` checklists. Code only as smoke-surfaced fixes (hostname→VMID parse, A3 credential issuer, suspend reliability if Tier 2). The 07r stop/start e2e cleanup robustness ride-along lands here.
+   - **Build last** — depends on a configurable connection (wizard) and stop/start state (persistence).
+
+Rationale: the data model is the shared foundation; the worker-side scrollback change is independent and low-risk so it can parallelize with the wizard backend; wizard backend precedes wizard UI (UI consumes the endpoints); acceptance is last because it exercises everything end-to-end on real hardware.
+
+## ADR triggers (Burrow requires an ADR for any baseline deviation)
+
+Match the existing Nygard style (Status / Context / Decision / Consequences / Revisit trigger), HTML-comment SPDX header line 1, numbered `ADR-0011+`.
+
+| Likely ADR | Trigger | Why it deviates from baseline |
+|------------|---------|-------------------------------|
+| **ADR-0011 — Setup-state / config store + first-run gate** | NEW singleton `settings` table + a "configured?" control-flow + new DbProvider methods | Introduces a new persisted store and a first-run flow that did not exist; extends the DbProvider contract. |
+| **ADR-0012 — New ComputeProvider capabilities (testConnection / verifyTemplate / preflight)** | New `@abstractmethod`s on the ABC | The ComputeProvider contract is frozen-by-design (provider.py docstring); extending it is a deliberate seam change requiring Fake+Proxmox parity. |
+| **ADR-0013 — Persistence model: per-workspace `persistent` flag + stop/start (Tier 1) OR suspend/resume state (Tier 2)** | `persistent` column + (Tier 2) a new `suspended` state and ABC suspend/resume methods; the reaper-exclusion rule | Adds a lifecycle dimension and (Tier 2) a new state + new compute capabilities; records the reaper-survival guarantee. |
+| **ADR-0014 — Worker scrollback via tmux multiplexer** | `burrow-boot.sh` launches ttyd inside tmux; tmux added to the golden template | Changes the worker boot contract and adds a runtime dependency; COMPOSES with (does not replace) ADR-0006. |
+| **(only if Option B chosen) — Proxmox token at rest in the DB** | persisting the token in SQLite | Direct deviation from `.env`-only secrets; arguably out-of-scope (secrets manager). Prefer Option A and skip this ADR. |
+
+Minimum ADR set if Tier 1 + Option A is chosen: ADR-0011, ADR-0012, ADR-0013, ADR-0014. The token-at-rest ADR is avoided by design.
+
+## Integration Points (named, new-vs-modified)
+
+### Internal boundaries touched
+
+| Boundary | File | Change |
+|----------|------|--------|
+| Setup endpoints ↔ service | `api/routers/setup.py`, `api/services/setupService.py` | **NEW** both |
+| Service ↔ compute (connection/template/preflight) | `api/compute/provider.py` + `fakeProvider.py` + `proxmoxProvider.py` | **MODIFIED** (new methods, Fake+Proxmox parity) |
+| Service ↔ settings persistence | `api/db/provider.py`, `api/db/sqliteProvider.py`, `api/db/postgresProvider.py` | **MODIFIED** (`getSettings`/`updateSettings`) |
+| Schema | `api/db/migrations/003_*.sql` | **NEW** |
+| Workspace model | `api/models/workspace.py` | **MODIFIED** (`persistent`; Tier-2 `suspended` literal) |
+| Create saga | `api/services/workspaceService.py` (`_reserve_vmid_and_row`, `createWorkspace`) | **MODIFIED** (persist flag; Tier-2 suspend/resume actions) |
+| State machine | `api/lib/statemachine.py::TRANSITIONS` | **MODIFIED (Tier 2 only)** |
+| Reconciler | `api/services/reconciler.py` | **MODIFIED** (survival tests; new code only if a "reap stale stopped" rule is added) |
+| App wiring / DI | `api/main.py` (`get_setup_service`, router include) | **MODIFIED** |
+| Worker boot | `cc-worker-config/lxc/worker-template/burrow-boot.sh`, `provision-template.sh` | **MODIFIED** |
+| First-run gate | `ui/src/App.tsx`, `ui/src/hooks/useSetupStatus.ts`, `ui/src/components/SetupWizard.tsx` | `App.tsx` **MODIFIED**; hooks/component **NEW** |
+| Create-with-persistence UI | `ui/src/components/NewWorkspaceModal.tsx`, `ui/src/lib/status.ts`, `ui/src/types/workspace.ts` | **MODIFIED** |
+
+### External services
+
+| Service | Integration pattern | Notes |
+|---------|---------------------|-------|
+| Proxmox VE | Behind `ProxmoxComputeProvider` only (proxmoxer, UPID-blocked) | New testConnection/verifyTemplate/[suspend] here; CA-pinned TLS unchanged; CRIU suspend reliability is the homelab-smoke unknown. |
+| GHCR + release-please + cosign | CI/CD only (ACC-02) | No `api/` code; egress-policy block flip + first live release PR. |
+| cc-worker-config repo | pulled at boot (ADR-0002) | tmux session added in `burrow-boot.sh`; manifest/CLAUDE.md flow unchanged. |
 
 ## Scaling Considerations
 
-This is a single-operator homelab tool; "scale" = concurrent workspaces on finite homelab RAM,
-not user count.
+Out of scope for v1.3 (LAN single-operator, `--workers 1` per ADR-0010). Persistence raises ONE finite-resource consideration: persistent stopped workspaces hold a VMID and disk indefinitely (by design — destroy is the reclamation action). The node-RAM capacity guard bounds RUNNING concurrency; persistent STOPPED workspaces consume disk + a VMID-pool slot, so the worker pool range (`worker_pool_start..end`, default 200-299 = 100 slots) is the real ceiling. If persistent workspaces accumulate, pool exhaustion surfaces as `NoFreeVmidError` at create — acceptable and visible for a single operator; revisit the pool size, not the architecture.
 
-| Scale | Architecture posture |
-|-------|----------------------|
-| 1–10 workspaces (target) | Monolith FastAPI, SQLite, sync POST. No changes needed. The capacity guard (node RAM > 80% → refuse) is the real limiter, not software. |
-| 10–30 workspaces | Move create to async POST + background task (timeouts decouple from boot). Add a periodic **reaper** for orphaned `creating`/`error` rows and Proxmox VMIDs with no DB row. Watch SQLite write contention on the event log (batch / WAL mode). |
-| Multi-node / multi-user (hosted path) | The provider seams pay off: Postgres `DbProvider` + RLS, `ComputeProvider` for containers/serverless, auth middleware. Additive per spec §13 — no v1 rewrite. |
+## Confidence & Gaps
 
-### Scaling Priorities
-
-1. **First bottleneck: host RAM, not code.** Each worker reserves ~4 GB. The capacity guard is
-   load-bearing; make it per-target-node and honest (read live `nodeMemoryUsage`).
-2. **Second: orphaned-resource accumulation.** Without a reaper, every failed/crashed create
-   slowly exhausts the VMID pool and RAM. The reaper (Phase 4 / hardening) is not optional at
-   any real usage.
-3. **Third: SQLite event-log writes** under many simultaneous terminals logging connect/disconnect
-   churn. Enable WAL, keep events append-only, index `workspaceId`.
-
----
-
-## Anti-Patterns
-
-### Anti-Pattern 1: Leaking proxmoxer/aiosqlite types past the seam
-
-**What people do:** Return raw proxmoxer dicts or `aiosqlite.Row` objects up into
-`WorkspaceService`/routers; pass a `ProxmoxAPI` handle around.
-**Why it's wrong:** It silently couples business logic to Proxmox/SQLite and breaks the "hosted
-path is additive" promise — the Fake/Postgres providers can't satisfy a leaked concrete type, so
-e2e and the hosted path both die.
-**Do this instead:** Providers return **Pydantic models / plain typed dataclasses only**. The grep
-audit below is a CI-able guard.
-
-### Anti-Pattern 2: Happy-path saga with a bare try/except
-
-**What people do:** Clone → start → poll, wrapped in one `try`, and on error just set
-`status=error` and return.
-**Why it's wrong:** The half-built LXC keeps running, holding RAM and a VMID forever. Over a week
-of homelab use the pool fills and creates start failing with "no free VMID" for no visible reason.
-**Do this instead:** Per-step compensation (Pattern 1). On any failure after clone, run
-stop+destroy for the VMID; mark the row `error` (keep it for audit), never silently drop it.
-
-### Anti-Pattern 3: Treating Proxmox mutations as synchronous
-
-**What people do:** Call `clone` then immediately `start`/`getIp`.
-**Why it's wrong:** Clone/start return a UPID *task*; the operation is still running. The next call
-races a not-yet-cloned container and fails intermittently — the worst kind of bug.
-**Do this instead:** Block on the UPID (`Tasks.blocking_status`, `exitstatus==OK`) inside the
-provider before returning. Surface task failure as a typed `ComputeError`.
-
-### Anti-Pattern 4: Parsing/normalizing ttyd frames in the proxy
-
-**What people do:** Decode ttyd opcodes, re-encode, or coerce text→bytes in the bridge.
-**Why it's wrong:** ttyd's `tty` subprotocol is opcode-framed; re-encoding corrupts resize/title
-control frames and can desync the terminal. The spec's `msg.encode()` on text frames is exactly
-this bug.
-**Do this instead:** Negotiate `subprotocols=["tty"]` upstream and pass frames through opaquely,
-preserving text-vs-binary type.
-
-### Anti-Pattern 5: DHCP + API IP discovery for unprivileged LXC
-
-**What people do:** Boot the worker on DHCP and poll `GET /nodes/{node}/lxc/{vmid}/interfaces`
-for the address (the spec's `getLxcIp`).
-**Why it's wrong:** Unprivileged LXC has no guest agent, and the interfaces endpoint is
-unreliable/empty for DHCP-assigned addresses (well-documented limitation). `getLxcIp` can hang or
-return nothing, stalling the saga at step 6.
-**Do this instead (recommended, matches spec Appendix B.1):** **Static IP pool aligned to the VMID
-range** (VMID 2xx → `10.a.b.2xx`). The control plane *computes* the IP from the VMID — no polling,
-no agent, deterministic, and the nginx/WS upstream is known before the container even boots. Set
-the static address at clone via `pct set net0 ip=.../...,gw=...`. Promote this from "open question"
-to a decided ADR.
-
----
-
-## Integration Points
-
-### External Services
-
-| Service | Integration Pattern | Gotchas (verified) |
-|---------|---------------------|--------------------|
-| **Proxmox API** | `proxmoxer` (HTTPS, API token `burrow@pve`, least-priv, `verify_ssl` per env) behind `ProxmoxComputeProvider` | Mutations are async UPID tasks — must wait. No LXC cloud-init. DHCP IP discovery unreliable. CT-template clone defaults to *linked* clone (shares base disk) — for ephemeral independent workers use `--full` so destroy fully frees space. |
-| **Worker ttyd** | `websockets` client WS, `subprotocol=tty`, bound to worker IP:7681 | Opcode-framed subprotocol; first client frame is `{AuthToken}`; preserve frame types. `--once` exits ttyd on client disconnect → "close tab kills session" (open question §B.2: decide detach vs terminate). |
-| **cc-worker-config repo** | git clone at worker boot (`burrow-boot.sh`), not a control-plane dependency | Needs git auth in the worker (deploy key/token via injected env). Boot-time pull = always-latest but non-reproducible (open question §B.4). |
-
-### Internal Boundaries
-
-| Boundary | Communication | Notes |
-|----------|---------------|-------|
-| router ↔ WorkspaceService | direct async calls, Pydantic in/out | routers never touch providers |
-| WorkspaceService ↔ ComputeProvider | abstract method calls | the swap seam; Fake plugs in here for e2e |
-| WorkspaceService ↔ DbProvider | abstract method calls | the swap seam; SQLite now, Postgres later |
-| terminal.py ↔ DbProvider | lookup + `logEvent` | WS router reads workspace.lxcIp/status, logs events |
-| terminal.py ↔ ttyd | `websockets` client | the only place that knows the ttyd wire format |
-
-### Provider Seam Leakage Audit (CI-able)
-
-A passing seam means these symbols appear **only** in the listed files:
-
-| Symbol | Allowed ONLY in | Red flag if found in |
-|--------|-----------------|----------------------|
-| `proxmoxer`, `ProxmoxAPI`, `Tasks.blocking_status` | `api/compute/proxmoxProvider.py` | `workspaceService.py`, any router, `models/` |
-| `aiosqlite`, raw SQL strings | `api/db/sqliteProvider.py`, `migrations/` | services, routers, models |
-| `websockets`, ttyd opcodes | `api/routers/terminal.py` | services |
-| `httpx` (ttyd health) | provider impls only | `workspaceService.py` business logic |
-
-Add a lint/test that greps for these (cheap, deterministic, catches the most likely regression).
-
----
-
-## Build Order / Dependency Graph
-
-The spec's Phase 0–4 ordering is sound. This refines it into a dependency-aware build order with
-the **seams that unblock hermetic CI** called out. The key insight: **build both provider
-abstractions and the Fake/stub seams first**, so every later layer is testable without Proxmox.
-
-```
-                    ┌──────────────────────────────────────────────┐
-                    │ 0. Contracts + seams (UNBLOCKS EVERYTHING)    │
-                    │   models (Workspace/Event), DbProvider ABC,   │
-                    │   ComputeProvider ABC, FakeComputeProvider,   │
-                    │   response envelope, config, app factory      │
-                    └───────────────┬──────────────────────────────┘
-            ┌───────────────────────┼───────────────────────────────┐
-            ▼                       ▼                                ▼
-  ┌───────────────────┐   ┌──────────────────────┐      ┌────────────────────────┐
-  │ 1. DB layer       │   │ 2. WorkspaceService   │      │ 3. WS terminal proxy   │
-  │  SqliteProvider   │   │  saga + state machine │      │  bridge + stub ttyd    │
-  │  migrations       │──▶│  capacity, VMID alloc │      │  (echo WS) for tests   │
-  │  (real, Tier-2)   │   │  compensation paths   │      │                        │
-  └───────────────────┘   │  (Fake compute → Tier1│      └───────────┬────────────┘
-                          │   + Tier2, NO Proxmox)│                  │
-                          └───────────┬───────────┘                  │
-                                      ▼                              │
-                          ┌───────────────────────┐                 │
-                          │ 4. HTTP routers + envelope, /health     │
-                          │    full /api/v1 CRUD over Fake compute  │◀┘
-                          └───────────┬───────────┘
-                                      ▼
-                          ┌───────────────────────┐    ── everything above is HERMETIC ──
-                          │ 5. ProxmoxComputeProvider (real proxmoxer)             │
-                          │    UPID waits, static-IP set, injectBootConfig,        │
-                          │    capacity query  — validated in DEV env, mocked in CI│
-                          └───────────┬───────────┘
-                                      ▼
-                          ┌───────────────────────┐
-                          │ 6. React UI: layoutStore → WorkspaceList → TerminalPanel
-                          │    → WorkspaceLayout → NewWorkspaceModal → StatusBar    │
-                          │    (MSW-mocked API in Tier-2; Playwright e2e in Tier-3) │
-                          └───────────┬───────────┘
-                                      ▼
-                          ┌───────────────────────┐
-                          │ 7. Golden template + burrow-boot.sh (cc-worker-config) │
-                          │    + real Proxmox end-to-end (DEV only, never CI)      │
-                          └───────────┬───────────┘
-                                      ▼
-                          ┌───────────────────────┐
-                          │ 8. Hardening: reaper, auto-stop idle, restore/reconnect,│
-                          │    structured logging, capacity tuning                  │
-                          └───────────────────────┘
-```
-
-**Where the hermetic-CI seams plug in (ci-cd §4.3–4.4):**
-- **`FakeComputeProvider`** substitutes for `ProxmoxComputeProvider` at the `ComputeProvider`
-  seam — selected by env (`BURROW_COMPUTE=fake`). It lets steps 2, 4, and the whole e2e tier run
-  with **zero Proxmox**. Build it in step 0 alongside the ABC, not later.
-- **Stub ttyd** (tiny local WS echo honoring the `tty` subprotocol) substitutes for the worker's
-  ttyd at the `terminal.py ↔ ttyd` boundary. It powers Tier-2 WS-proxy tests and the Tier-3 e2e
-  "echo terminal." Build it in step 3.
-- **Real SQLite** is used as-is in Tier-2 (no stub) — it exercises `DbProvider` + migrations for
-  real (ci-cd §4.3).
-- **Mocked Proxmox HTTP** (`respx`/`responses`) covers the `ProxmoxComputeProvider` in Tier-2
-  without a node; the **real** provider is only exercised in the dev environment (step 7).
-
-**Ordering rationale:**
-- **Seams before consumers (0 first):** the entire backend can be built and CI-green before a
-  single real Proxmox call exists. This is what makes the "infra dependency" constraint
-  (PROJECT.md: control plane can't be booted from a dev workstation) survivable.
-- **Service before routers (2 before 4):** the saga/state-machine is the risk; isolate and unit
-  test it over the Fake provider before HTTP shape is added.
-- **Backend before UI (≤5 before 6):** UI needs the `/api/v1` contract + envelope to mock against
-  (MSW) and to e2e against (real api + Fake compute).
-- **Real Proxmox + template last (5, 7):** these are the only steps that *need* the homelab and
-  can't be CI-verified; defer them so they don't block the testable 80%.
-
----
-
-## SPEC GAPS — resolve before the relevant phase (surface, don't implement around)
-
-| # | Gap | Spec says | Reality (confidence) | Resolution |
-|---|-----|-----------|----------------------|------------|
-| 1 | **LXC has no cloud-init** | `setCloudInitUserdata(...)` injects env | `cicustom`/cloud-init is QEMU-only; unavailable for LXC (HIGH) | ADR: `injectBootConfig` via `pct exec`/`pct push` to `/etc/burrow/worker.env`; hide behind ComputeProvider. Phase 1. |
-| 2 | **DHCP IP discovery unreliable** | `getLxcIp` polls interfaces API | Unprivileged LXC has no agent; interfaces endpoint flaky for DHCP (HIGH) | ADR: static IP pool computed from VMID, set at clone via `pct set net0`. Promotes Appendix B.1. Phase 1. |
-| 3 | **ttyd subprotocol framing** | bridge raw bytes, `msg.encode()` on text | ttyd uses `tty` subprotocol, opcode frames, `{AuthToken}` first frame (HIGH) | Negotiate `subprotocols=["tty"]`, pass frames opaquely, preserve text/binary. Phase 1 (WS proxy). |
-| 4 | **Saga ordering + UPID waits** | clone before DB row; mutations treated sync | clone is async UPID task; row-first is recoverable (HIGH) | Write `creating` row + VMID before clone; block on UPID per mutation; per-step compensation. Phase 1. |
-| 5 | **Linked vs full clone** | "clone template LXC" (unspecified) | CT-template clone defaults to *linked* (shares base disk) (MEDIUM) | Use `--full` for independent ephemeral workers so destroy frees space; or accept linked + document. Phase 0/1. |
-| 6 | **`--once` UX** | ttyd `--once` exits on disconnect | Closing a tab kills the Claude session (HIGH) | Decide detach-vs-terminate (open question §B.2). Affects WS proxy + state machine. Phase 2/4. |
-| 7 | **No reaper in v1 phases** | implied by "ephemeral" | Orphaned VMIDs/rows accumulate without one (HIGH) | Add orphan reaper (creating/error rows + Proxmox VMIDs w/o row). Phase 4 hardening. |
-
----
+- **HIGH** on the wizard integration shape, the settings-table recommendation, the seam-method + Fake-parity pattern, the reaper-already-safe finding, the tmux scrollback flow, and the build order — all grounded directly in the read source.
+- **MEDIUM** on Tier-2 suspend/resume viability: CRIU suspend for unprivileged LXC is the documented risk; the recommendation defaults to Tier 1 (stop/start) to avoid betting on it. Resolve at the dev-homelab smoke before committing to a `suspended` state.
+- **GAP for the roadmapper to flag:** whether v1.3 adds a "reap stale stopped EPHEMERAL workspaces" reaper rule. If yes, that is the concrete consumer of `persistent` in the reaper and needs its own design line; if no, the flag only gates the create UI + future cleanup, and the reaper change is just a regression test. A product decision, not a research one.
+- **GAP:** the `mint_repo_credential` A3 real-issuer and the `[ASSUMED]` hostname→VMID parse in `burrow-boot.sh` are pre-existing stopgaps that ACC-01 will stress on real infra — surface them as acceptance-phase risks, not new v1.3 design.
 
 ## Sources
 
-- Burrow `docs/tech-spec.md` (§3 architecture, §5 API, §6 backend, §7 data model, §9 template, §10 control plane, Appendix B) — authoritative internal spec.
-- Burrow `docs/ci-cd-and-testing.md` (§4.3–4.4 test tiers, FakeComputeProvider + stub-ttyd seams) — authoritative internal spec.
-- Burrow `.planning/PROJECT.md` (provider-seam decisions, constraints, open questions).
-- [proxmoxer Tasks tools — `Tasks.blocking_status` (UPID polling, `exitstatus==OK`)](https://proxmoxer.github.io/docs/latest/tools/tasks/) — HIGH.
-- [proxmoxer basic usage](https://proxmoxer.github.io/docs/latest/basic_usage/) — HIGH.
-- [Proxmox `pct(1)` — clone, `--full`, linked-clone default for CT templates](https://pve.proxmox.com/pve-docs/pct.1.html) — HIGH.
-- [Proxmox Cloud-Init Support wiki (cloud-init is QEMU/`qm`-only; not LXC)](https://pve.proxmox.com/wiki/Cloud-Init_Support) — HIGH.
-- [Proxmox forum — cloud-init + LXC limitations / workarounds](https://forum.proxmox.com/threads/q-how-best-to-work-with-cloud-init-and-lxc.119126/) — MEDIUM.
-- [Telmate proxmox provider issue #1453 — LXC DHCP IP not exposed via interfaces API](https://github.com/Telmate/terraform-provider-proxmox/issues/1453) — MEDIUM (multiple corroborating forum threads).
-- [Proxmox forum — access LXC IP programmatically (`pct exec hostname -I` workaround)](https://forum.proxmox.com/threads/access-lxc-ip-programmatically.38050/) — MEDIUM.
-- [ttyd protocol.c (opcode framing: input `'0'`, resize, set-title/prefs)](https://github.com/tsl0922/ttyd/blob/main/src/protocol.c) — HIGH.
-- [ttyd terminal client (first frame `{AuthToken}`, `tty` subprotocol)](https://github.com/tsl0922/ttyd/blob/main/html/src/components/terminal/index.tsx) — HIGH.
-- [ttyd project / docs (Libwebsockets, WS server)](https://github.com/tsl0922/ttyd) — HIGH.
-- [FastAPI WebSockets reference (`iter_bytes`/`send_bytes`/`send_text`)](https://fastapi.tiangolo.com/reference/websockets/) — HIGH.
+- Repo source (authoritative, read directly): `api/services/workspaceService.py`, `api/services/reconciler.py`, `api/compute/provider.py`, `api/compute/fakeProvider.py`, `api/compute/proxmoxProvider.py`, `api/lib/statemachine.py`, `api/config.py`, `api/main.py`, `api/routers/{health,internal,nodes,terminal}.py`, `api/db/{provider,sqliteProvider}.py`, `api/db/migrations/00{1,2}_*.sql`, `api/models/workspace.py`, `cc-worker-config/lxc/worker-template/burrow-boot.sh`, `ui/src/App.tsx`.
+- Decisions (authoritative): `docs/adr/ADR-0001..0010` (esp. ADR-0002 pull-at-boot/secret hygiene, ADR-0006 persistent ttyd, ADR-0010 reconciler + capacity lock), `.planning/PROJECT.md`, `docs/tech-spec.md`.
 
 ---
-*Architecture research for: self-hosted ephemeral Claude Code worker manager (Burrow control plane)*
-*Researched: 2026-06-09*
+*Architecture research for: Burrow v1.3 "Go Live" — setup wizard, persistence (WSX-02/03), real-infra acceptance*
+*Researched: 2026-06-24*
