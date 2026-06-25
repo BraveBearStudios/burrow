@@ -11,7 +11,7 @@ Security note: never disable TLS verification. The Proxmox client validates the
 node CA cert at ``proxmox_ca_cert_path`` instead (see ``.env.example``).
 """
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -34,7 +34,10 @@ class Settings(BaseSettings):
     proxmox_host: str = "pve1.local"
     proxmox_user: str = "burrow@pve"
     proxmox_token_name: str = "burrow"
-    proxmox_token_value: str = ""
+    # SETUP-07: SecretStr so `__repr__`/`__str__` and any 422/validation error render
+    # the mask, never the raw token. The real value is read ONLY at the proxmoxer
+    # boundary via `.get_secret_value()` (proxmoxProvider.__init__ / testConnection).
+    proxmox_token_value: SecretStr = SecretStr("")
     proxmox_ca_cert_path: str = "/etc/burrow/pve-ca.pem"  # validate TLS via CA, never disable it
 
     # ── Worker config distribution ────────────────────────────────────────

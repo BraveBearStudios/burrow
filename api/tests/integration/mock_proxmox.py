@@ -97,3 +97,54 @@ def resource_exception(
     ("running" / "is locked") inspectors read.
     """
     return ResourceException(status_code, message, content)
+
+
+def register_permissions(
+    host: str, privileges: list[str], *, status: int = 200
+) -> None:
+    """Register the read-only ``GET /access/permissions`` setup probe (SETUP-01).
+
+    On ``status==200`` the body is the real-shaped ``{"data": {"/": {priv: 1, ...}}}``
+    effective-permission map ``testConnection`` flattens. On a non-200 the GET raises
+    a factory-built ``ResourceException`` (e.g. ``401`` for the auth-fail path), which
+    the real provider maps to a token-free ``SetupAuthError``.
+    """
+    url = f"https://{host}:8006/api2/json/access/permissions"
+    if status == 200:
+        responses.add(
+            responses.GET,
+            url,
+            json={"data": {"/": {priv: 1 for priv in privileges}}},
+            status=200,
+        )
+    else:
+        responses.add(
+            responses.GET,
+            url,
+            body=resource_exception(status, "authentication failure"),
+        )
+
+
+def register_template_config(
+    host: str, node: str, vmid: int, *, is_template: bool, found: bool = True
+) -> None:
+    """Register the read-only template config GET for ``verifyTemplate`` (SETUP-02).
+
+    ``found=True`` returns ``{"data": {"template": 1|0, ...}}`` so the provider reports
+    ``usable`` from the ``template`` flag; ``found=False`` raises a 404-shaped
+    ``ResourceException`` so the not-found branch returns ``exists=usable=False``.
+    """
+    url = f"https://{host}:8006/api2/json/nodes/{node}/lxc/{vmid}/config"
+    if found:
+        responses.add(
+            responses.GET,
+            url,
+            json={"data": {"template": 1 if is_template else 0}},
+            status=200,
+        )
+    else:
+        responses.add(
+            responses.GET,
+            url,
+            body=resource_exception(404, f"CT {vmid} does not exist"),
+        )

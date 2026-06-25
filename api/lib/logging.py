@@ -115,5 +115,12 @@ def setup_logging(level: int = logging.INFO) -> None:
         uvicorn_logger.handlers = []
         uvicorn_logger.propagate = True
 
+    # SETUP-07 (token-in-logs defense): pin the synchronous proxmoxer driver and its
+    # requests/urllib3 transport to WARNING so they cannot echo the Authorization
+    # header / token at DEBUG. Idempotent — re-running setup_logging re-applies the
+    # levels (it never stacks handlers).
+    for name in ("proxmoxer", "urllib3", "requests"):
+        logging.getLogger(name).setLevel(logging.WARNING)
+
 
 __all__ = ["JsonFormatter", "setup_logging"]
