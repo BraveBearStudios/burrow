@@ -33,19 +33,44 @@ from typing import Any
 import proxmoxer
 from proxmoxer.tools import Tasks
 
-from models.compute import BootConfig, ComputeStatus, ComputeTask
+from models.compute import (
+    BootConfig,
+    ComputeStatus,
+    ComputeTask,
+    ConnectionResult,
+    TemplateResult,
+)
 
 from compute.provider import (
     CloneError,
     ComputeProvider,
     LxcNotReadyError,
     NoFreeVmidError,
+    SetupAuthError,
+    SetupUnreachableError,
     TaskFailedError,
 )
 
 # The resource pool every worker clone is added to so the pool-scoped token keeps
 # rights over its own clone (ADR-0003).
 _WORKER_POOL = "burrow-workers"
+
+# The documented BurrowProvisioner privilege set host-prime's `00-api-user-role.sh`
+# grants (SETUP-01). testConnection asserts these are present in the privsep token's
+# EFFECTIVE permissions and reports any missing — it creates none.
+REQUIRED_PRIVS: frozenset[str] = frozenset(
+    {
+        "VM.Audit",
+        "VM.Clone",
+        "VM.Allocate",
+        "VM.Config.Network",
+        "VM.Config.Options",
+        "VM.PowerMgmt",
+        "Datastore.AllocateSpace",
+        "Datastore.Audit",
+        "Sys.Audit",
+    }
+)
 
 
 class ProxmoxComputeProvider(ComputeProvider):
@@ -59,7 +84,9 @@ class ProxmoxComputeProvider(ComputeProvider):
             settings.proxmox_host,
             user=settings.proxmox_user,
             token_name=settings.proxmox_token_name,
-            token_value=settings.proxmox_token_value,
+            # SETUP-07: `proxmox_token_value` is a SecretStr; the real value is read
+            # ONLY here, at the proxmoxer boundary, via .get_secret_value().
+            token_value=settings.proxmox_token_value.get_secret_value(),
             verify_ssl=settings.proxmox_ca_cert_path,
         )
 
@@ -332,6 +359,90 @@ class ProxmoxComputeProvider(ComputeProvider):
             return True
         except Exception:
             return False
+
+    # ── setup validation (read-only, ephemeral client) ────────────────────────
+    async def testConnection(
+        self, host: str, user: str, token_name: str, token_value: str
+    ) -> ConnectionResult:
+        # SETUP-07: validate the operator-TYPED token (not yet in `.env`) with an
+        # EPHEMERAL throwaway client built from the passed creds — NEVER self._api.
+        # The client goes out of scope at method end; the token is never stored,
+        # returned, or logged. CA-pinned TLS still applies (never disabled).
+        eph = proxmoxer.ProxmoxAPI(
+            host,
+            user=user,
+            token_name=token_name,
+            token_value=token_value,
+            verify_ssl=self._settings.proxmox_ca_cert_path,
+        )
+        try:
+            # The ONLY call: a read-only GET /access/permissions returning the
+            # privsep token's EFFECTIVE (user ∩ token) permission map. Creates
+            # zero resources (SETUP-01).
+            perms = await asyncio.to_thread(lambda: eph.access.permissions.get())
+        except Exception as exc:
+            # FIXED token-free messages — the raw proxmoxer exception string is
+            # never interpolated (it can embed auth context; SETUP-07).
+            if _is_auth_error(exc):
+                raise SetupAuthError("proxmox token was rejected (auth failed)") from None
+            raise SetupUnreachableError("proxmox host was unreachable") from None
+        present = _flatten_privileges(perms)
+        missing = REQUIRED_PRIVS - present
+        return ConnectionResult(success=not missing, missing_privileges=sorted(missing))
+
+    async def verifyTemplate(self, template_vmid: int, node: str) -> TemplateResult:
+        # SETUP-02: read-only template GET on the runtime client. exists = the GET
+        # resolved a config; usable = it exists AND is a template (the `template`
+        # flag is truthy). Not found → exists/usable False. Mutates nothing.
+        try:
+            config = await asyncio.to_thread(
+                lambda: self._api.nodes(node).lxc(template_vmid).config.get()
+            )
+        except Exception as exc:
+            if _is_not_found(exc):
+                return TemplateResult(
+                    exists=False, usable=False, vmid=template_vmid, node=node
+                )
+            raise SetupUnreachableError("proxmox host was unreachable") from None
+        usable = bool(config.get("template"))
+        return TemplateResult(exists=True, usable=usable, vmid=template_vmid, node=node)
+
+
+def _flatten_privileges(perms: Any) -> set[str]:
+    """Flatten a proxmoxer ``/access/permissions`` map into the set of priv names.
+
+    The response is a ``path -> {priv: 1}`` map (effective permissions across all
+    paths the token has rights on). We union the privilege names whose value is
+    truthy across every path — the BurrowProvisioner privs are granted at the
+    pool/storage/node paths, so a present priv at ANY relevant path counts.
+    """
+    present: set[str] = set()
+    if isinstance(perms, dict):
+        for privs in perms.values():
+            if isinstance(privs, dict):
+                present.update(name for name, granted in privs.items() if granted)
+    return present
+
+
+def _is_auth_error(exc: Exception) -> bool:
+    """True when a proxmoxer error indicates the token was rejected (401/403).
+
+    Inspected defensively by status code / message (like ``_is_not_found``) so no
+    driver exception type crosses the seam. Distinguishes an auth rejection (→
+    SetupAuthError) from a transport/connect failure (→ SetupUnreachableError).
+    """
+    status_code = getattr(exc, "status_code", None)
+    if status_code in (401, 403):
+        return True
+    text = str(exc).lower()
+    return (
+        "401" in text
+        or "403" in text
+        or "authentication failure" in text
+        or "permission denied" in text
+        or "no ticket" in text
+        or "invalid token" in text
+    )
 
 
 def _is_not_found(exc: Exception) -> bool:

@@ -366,3 +366,17 @@ class SqliteProvider(DbProvider):
             row = await cursor.fetchone()
             await cursor.close()
         return row is not None and row[0] == 1
+
+    async def getSetupState(self) -> dict[str, Any]:
+        # ADR-0011: read the singleton settings row (id=1; seeded NULL by the 003
+        # migration). READ-ONLY this phase — no INSERT/UPDATE; the setter is
+        # deferred to Phase 13. Returns the setup-state shape the wizard consumes.
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT setupCompletedAt AS setup_completed_at FROM settings WHERE id = 1"
+            )
+            row = await cursor.fetchone()
+            await cursor.close()
+        return {"setupCompletedAt": row["setup_completed_at"] if row is not None else None}

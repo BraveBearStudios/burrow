@@ -24,13 +24,20 @@ Nth call. The shape is fixed now so Phase 1 does not refactor the constructor.
 
 from dataclasses import dataclass, field
 
-from models.compute import BootConfig, ComputeStatus, ComputeTask
+from models.compute import (
+    BootConfig,
+    ComputeStatus,
+    ComputeTask,
+    ConnectionResult,
+    TemplateResult,
+)
 
 from compute.provider import (
     CloneError,
     ComputeProvider,
     LxcNotReadyError,
     NoFreeVmidError,
+    SetupAuthError,
 )
 
 # Memory the Fake reports per node: low enough to stay under any capacity guard.
@@ -56,9 +63,21 @@ class FakeFailures:
     matches the method's documented failure mode (``CloneError`` for clone,
     ``LxcNotReadyError`` otherwise). Calls are counted per method name across the
     provider's lifetime.
+
+    Setup negative paths (SETUP-01/02, Phase 12) are toggled declaratively so
+    BOTH a missing-privileges result and an auth-fail are reachable for the
+    wizard's negative tests, plus a template-not-found:
+
+    - ``setup_missing_privileges``: testConnection returns ``success=False`` with
+      these missing privilege names.
+    - ``setup_auth_fails``: testConnection raises :class:`SetupAuthError`.
+    - ``setup_template_missing``: verifyTemplate returns ``exists=usable=False``.
     """
 
     raise_on_nth_call: dict[str, int] = field(default_factory=dict)
+    setup_missing_privileges: list[str] | None = None
+    setup_auth_fails: bool = False
+    setup_template_missing: bool = False
 
 
 class FakeComputeProvider(ComputeProvider):
@@ -215,3 +234,26 @@ class FakeComputeProvider(ComputeProvider):
 
     async def healthcheck(self) -> bool:
         return True
+
+    # ── setup validation (deterministic parity, injectable negative) ───────
+    async def testConnection(
+        self, host: str, user: str, token_name: str, token_value: str
+    ) -> ConnectionResult:
+        # Deterministic success by default (parity with the Proxmox read-only
+        # probe); FakeFailures toggles the two negative paths Plan 02 asserts.
+        # The token is never stored/returned/logged (SETUP-07) — same as real.
+        self._maybe_fail("testConnection")
+        if self._failures.setup_auth_fails:
+            raise SetupAuthError("proxmox token was rejected (auth failed)")
+        missing = self._failures.setup_missing_privileges
+        if missing:
+            return ConnectionResult(success=False, missing_privileges=sorted(missing))
+        return ConnectionResult(success=True, missing_privileges=[])
+
+    async def verifyTemplate(self, template_vmid: int, node: str) -> TemplateResult:
+        self._maybe_fail("verifyTemplate")
+        if self._failures.setup_template_missing:
+            return TemplateResult(
+                exists=False, usable=False, vmid=template_vmid, node=node
+            )
+        return TemplateResult(exists=True, usable=True, vmid=template_vmid, node=node)

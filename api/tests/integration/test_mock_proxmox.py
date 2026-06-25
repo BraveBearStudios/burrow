@@ -19,6 +19,7 @@ from dataclasses import dataclass
 
 import pytest
 import responses
+from pydantic import SecretStr
 
 from compute.provider import TaskFailedError
 from compute.proxmoxProvider import ProxmoxComputeProvider
@@ -42,7 +43,9 @@ class _Settings:
     proxmox_host: str = "pve1.local"
     proxmox_user: str = "burrow@pve"
     proxmox_token_name: str = "burrow"
-    proxmox_token_value: str = "test-token"  # noqa: S105  # placeholder, not a real secret
+    # SecretStr (SETUP-07): the provider reads it via .get_secret_value() at the
+    # proxmoxer boundary, so the stub must match the real Settings field type.
+    proxmox_token_value: SecretStr = SecretStr("test-token")
     proxmox_ca_cert_path: str = "/etc/burrow/pve-ca.pem"
     worker_pool_start: int = 200
     worker_pool_end: int = 299
