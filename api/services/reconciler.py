@@ -104,6 +104,19 @@ class Reconciler:
         # the wrong node, which the real provider 404s and swallows as idempotent
         # success — leaking the CT + VMID while logging a false `reaper.destroyed`.
         # `listManagedCts()` carries the real node, so the destroy now targets it.
+        # WSX-04 carve-out (the persistence safety bound): this orphan predicate
+        # keys ONLY on ownership (`vmid in live_vmids`), NEVER on `stopped` state.
+        # A persistent workspace that is STOPPED keeps a live DB row (listWorkspaces
+        # filters `WHERE deletedAt IS NULL`, sqliteProvider.py:192), so its vmid stays
+        # in `live_vmids` and the reaper SPARES it — persistence survives stop->start
+        # via this existing live-row bound, with zero state-based logic. Conversely, an
+        # explicit operator delete soft-deletes the row, which drops out of
+        # listWorkspaces(), so the vmid leaves `live_vmids` and the CT becomes
+        # orphan-eligible: delete is NOT a persistence shield. DO NOT add a
+        # `status == "stopped"` check, a `persistent` exclusion, or any state-based
+        # branch here — that is the exact regression the negative-control tests
+        # (test_persistent_stopped_workspace_is_never_reaped /
+        # test_soft_deleted_persistent_workspace_becomes_orphan_eligible) guard against.
         for node, vmid in sorted(managed, key=lambda nv: nv[1]):
             if vmid in live_vmids or vmid not in pool:
                 continue  # SAFETY BOUND: never touch a live-owned or out-of-pool CT (V4).
