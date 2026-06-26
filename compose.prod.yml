@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Burrow control plane — production container stack (self-host, real Proxmox).
+#
+# Two services on the dedicated Ubuntu tool server (which sits on the worker LAN):
+#   burrow-api : FastAPI/uvicorn over the REAL Proxmox provider. Reads its config
+#                from /opt/burrow/.env (assembled by 40-control-plane.sh with the
+#                token at a hidden prompt). BURROW_COMPUTE=proxmox is set HERE, not
+#                in .env, because config.py defaults compute to "fake" (a BURROW_*
+#                switch, not a bare key). Persists SQLite under /data.
+#   burrow-web : the SPA image with deploy/nginx/burrow.web.conf mounted so it also
+#                proxies /api + /ws to burrow-api (same-origin). Published on :80.
+#
+# Images are BUILT LOCALLY from the committed Dockerfiles — no GHCR release exists
+# yet. After a signed release (ACC-02/03), swap each `build:` for
+# `image: ghcr.io/bravebearstudios/burrow-<api|ui>@sha256:<digest>` (pin by digest).
+#
+# Bring up:  docker compose -f compose.prod.yml up -d --build
+# Logs:      docker compose -f compose.prod.yml logs -f burrow-api
+# Health:    curl http://127.0.0.1/api/v1/health   -> expect db: ok, compute: ok
+#
+# PRE-REQS on the host (see the deploy walkthrough):
+#   - /opt/burrow/.env exists (0600), NO inline `# comments` after values —
+#     docker compose env_file passes everything after `=` literally.
+#   - /data exists and is writable by uid 10001 (the in-image burrow user):
+#       sudo chown -R 10001:10001 /data
+#   - the Proxmox node CA cert is at /etc/burrow/pve-ca.pem on the host.
+
+name: burrow
+
+services:
+  burrow-api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    image: burrow-api:local
+    container_name: burrow-api
+    restart: unless-stopped
+    env_file:
+      - /opt/burrow/.env
+    environment:
+      # Real infrastructure. Without this, compute defaults to the Fake provider
+      # (config.py:30) and NO real worker is ever cloned.
+      BURROW_COMPUTE: proxmox
+      BURROW_DB: sqlite
+      DATABASE_PATH: /data/burrow.db
+    volumes:
+      - /data:/data
+      # TLS verification against the node CA (never verify_ssl=False). Path must
+      # match PROXMOX_CA_CERT_PATH in .env (default /etc/burrow/pve-ca.pem).
+      - /etc/burrow/pve-ca.pem:/etc/burrow/pve-ca.pem:ro
+    expose:
+      - "8000"
+    networks:
+      - burrow
+
+  burrow-web:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    image: burrow-ui:local
+    container_name: burrow-web
+    restart: unless-stopped
+    depends_on:
+      burrow-api:
+        condition: service_healthy
+    volumes:
+      # Override the SPA-only baked config with the same-origin proxy variant.
+      - ./deploy/nginx/burrow.web.conf:/etc/nginx/nginx.conf:ro
+    ports:
+      # host:80 -> the unprivileged in-container nginx on :8080. Change the host
+      # side to 8080:8080 if something already binds :80 on the tool server.
+      - "80:8080"
+    networks:
+      - burrow
+
+networks:
+  # User-defined bridge: burrow-web reaches burrow-api by service name; burrow-api
+  # reaches the Proxmox API and ws://<worker-ip>:7681 outbound over the LAN via NAT
+  # (the tool server is on the worker LAN, so the host can route to the workers).
+  burrow:
+    driver: bridge
