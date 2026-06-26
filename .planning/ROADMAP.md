@@ -117,7 +117,7 @@ Proxmox token is validate-in-memory, `.env`-only (no secret-at-rest).
 - [x] **Phase 11: Scrollback Restore** — worker-side tmux `new-session -A` in `burrow-boot.sh` + baked `/etc/tmux.conf` so scrollback survives stop→start (worker-side, CI-provable via the boot harness) (completed 2026-06-25)
 - [x] **Phase 12: Setup Wizard Backend** — `testConnection`/`verifyTemplate` on both providers, `routers/setup.py` + `SetupService`, token hygiene (CI-provable) (completed 2026-06-26)
 - [x] **Phase 13: Setup Wizard UI + First-Run Gate** — `SetupWizard.tsx`, `App.tsx` first-run gate off `setupCompletedAt`, `persistent` checkbox in `NewWorkspaceModal` (CI-provable) (completed 2026-06-26)
-- [ ] **Phase 14: First Real-Infra Acceptance** — operator-run human UAT on real Proxmox + first live GHCR/cosign release (human UAT, not CI)
+- [x] **Phase 14: First Real-Infra Acceptance** — operator-run human UAT on real Proxmox + first live GHCR/cosign release (human UAT, not CI) (completed 2026-06-26)
 
 **Anticipated ADRs** (Nygard style, authored within their phase, `docs/adr/`): ADR-0011 setup-state
 store (`settings` singleton + `setupCompletedAt`) · ADR-0012 new `ComputeProvider` capabilities
@@ -250,4 +250,4 @@ Plans:
 | 11. Scrollback Restore | v1.3 | 2/2 | Complete    | 2026-06-25 |
 | 12. Setup Wizard Backend | v1.3 | 2/2 | Complete    | 2026-06-26 |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 4/4 | Complete    | 2026-06-26 |
-| 14. First Real-Infra Acceptance | v1.3 | 1/2 | In Progress|  |
+| 14. First Real-Infra Acceptance | v1.3 | 2/2 | Complete   | 2026-06-26 |
