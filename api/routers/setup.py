@@ -1,15 +1,21 @@
 # SPDX-FileCopyrightText: 2026 Brave Bear Studios
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Setup router — ``/api/v1/setup/*`` guided-setup validation (SETUP-01/02/03).
+"""Setup router — ``/api/v1/setup/*`` guided-setup validation (SETUP-01..05).
 
 Thin surface over the :class:`compute.provider.ComputeProvider` seam (the
-``get_compute`` DI). Two endpoints validate a Proxmox host/token and the golden
-template strictly READ-ONLY, returning the standard envelope:
+``get_compute`` DI) and the :class:`db.provider.DbProvider` seam (the ``get_db``
+DI). The compute endpoints validate a Proxmox host/token and the golden template
+strictly READ-ONLY; the DB endpoints back the first-run gate. All return the
+standard envelope:
 
 - ``POST /setup/test-connection`` (SETUP-01) → ``ConnectionResult`` (success +
   missingPrivileges); creates zero resources.
 - ``POST /setup/verify-template`` (SETUP-02) → ``TemplateResult`` (exists/usable);
   mutates nothing.
+- ``GET /setup/state`` (SETUP-04) → ``{setupCompletedAt}`` for the wizard gate;
+  reads the singleton settings row, mutates nothing.
+- ``POST /setup/complete`` (SETUP-05) → ``{setupCompletedAt}`` after stamping the
+  singleton; no body, no token, idempotent (a second call just re-stamps).
 
 SETUP-03 readiness reuses the existing ``GET /api/v1/health`` (degrade-not-500);
 no readiness route is added here.
@@ -33,10 +39,11 @@ from fastapi import APIRouter, Depends
 from pydantic import SecretStr
 
 from compute.provider import ComputeProvider
+from db.provider import DbProvider
 from lib.envelope import respond
 from models.base import CamelModel
 
-from main import get_compute
+from main import get_compute, get_db
 
 router = APIRouter(prefix="/api/v1")
 
@@ -89,3 +96,20 @@ async def verify_template(
         template_vmid=body.template_vmid, node=body.node
     )
     return respond(result.model_dump(by_alias=True))
+
+
+@router.get("/setup/state")
+async def get_setup_state(db: DbProvider = Depends(get_db)) -> dict[str, object]:
+    """Return the first-run gate state ``{setupCompletedAt}`` READ-ONLY (SETUP-04)."""
+    return respond(await db.getSetupState())
+
+
+@router.post("/setup/complete")
+async def complete_setup(db: DbProvider = Depends(get_db)) -> dict[str, object]:
+    """Stamp setup complete and return ``{setupCompletedAt}``; idempotent (SETUP-05).
+
+    No request body and no token: the setter only writes a timestamp onto the
+    singleton settings row, so it cannot fail on a valid singleton and re-calling
+    it simply re-stamps. No new error code is needed.
+    """
+    return respond(await db.setSetupCompleted())
