@@ -230,7 +230,7 @@ Plans:
   3. The first live release-please PR merges to produce a version bump + changelog + `v*` tag; harden-runner egress is flipped `audit`→`block` with the discovered allowlist; `actionlint` passes.
   4. A real GHCR image publish succeeds and `cosign verify` + `gh attestation verify` pass against the published `@sha256:` digest (verified by digest, not tag).
 
-**Plans**: TBD (human-UAT checklist / runbook, not feature plans)
+**Plans**: 2 (14-01 CI hardening: actionlint + harden-runner allowlist-prep; 14-02 acceptance runbook + consolidated HUMAN-UAT). ACC-01/02/03 are operator-run human UAT (verification lands human_needed).
 
 ## Progress
 
