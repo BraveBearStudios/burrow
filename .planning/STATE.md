@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Go Live
 status: verifying
-stopped_at: Completed 14-01-PLAN.md
-last_updated: "2026-06-26T09:46:20.349Z"
+stopped_at: v1.3 Phase 14 automatable slice complete; ACC-01/02/03 human_needed (operator real-infra UAT + live release)
+last_updated: "2026-06-26T09:50:48.412Z"
 last_activity: 2026-06-26
 progress:
   total_phases: 5
@@ -223,9 +223,9 @@ real-boot-v2 rows are now CLAIMED by v1.3.
 
 ## Session Continuity
 
-Last session: 2026-06-26T09:44:26.193Z
-Stopped at: Completed 14-01-PLAN.md
-Resume file: None
+Last session: 2026-06-26T09:50:48.399Z
+Stopped at: v1.3 Phase 14 automatable slice complete; ACC-01/02/03 human_needed (operator real-infra UAT + live release)
+Resume file: .planning/phases/14-first-real-infra-acceptance/14-HUMAN-UAT.md
 Next plan: Plan Phase 10 with `/gsd:plan-phase 10` (Persistence Data Model + Reaper Carve-out — the v1.3 foundation: `003` migration + reaper negative-control test + mocked-proxmoxer integration tier). Phase 11 (scrollback, worker-side) and Phase 12 (wizard backend) parallelize off Phase 10.
 
 ## Operator Next Steps
