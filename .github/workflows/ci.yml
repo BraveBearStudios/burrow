@@ -34,6 +34,23 @@ jobs:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
+      # ── Workflow schema/expression lint (ACC-02) ───────────────────────
+      # actionlint validates the GitHub Actions workflow files themselves
+      # (schema, ${{ }} expressions, shell snippets, runner labels). It runs
+      # EARLY here so a workflow misconfiguration fails fast, before the
+      # slower uv/npm install gates. actionlint is the rhysd/actionlint
+      # binary; it is unavailable on the Windows dev box (Phase 8 RELX-02),
+      # so this gate's RUN is proven by the live Linux runner only; local
+      # verification is structural (parse + SHA-pin). reviewdog/action-actionlint
+      # is actionlint's upstream-documented Actions integration; reporter is
+      # github-check (works on push and PR) and fail_level error makes it a
+      # hard, fail-fast gate (not advisory PR annotations).
+      - name: actionlint · workflow schema/expression lint
+        uses: reviewdog/action-actionlint@6fb7acc99f4a1008869fa8a0f09cfca740837d9d # v1.72.0
+        with:
+          reporter: github-check
+          fail_level: error
+
       - name: Install uv
         uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
 
