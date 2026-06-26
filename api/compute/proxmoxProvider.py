@@ -399,10 +399,19 @@ class ProxmoxComputeProvider(ComputeProvider):
                 lambda: self._api.nodes(node).lxc(template_vmid).config.get()
             )
         except Exception as exc:
+            # FIXED token-free messages: the raw proxmoxer exception string is
+            # never interpolated (it can embed auth context; SETUP-07). Mirrors
+            # testConnection's triage: a 404 is "not found" (200 with exists=False),
+            # a 401/403 is an auth rejection (SetupAuthError), and only a genuine
+            # transport/connect failure is SetupUnreachableError (WR-01). Without the
+            # _is_auth_error branch a rejected runtime token surfaced as "host
+            # unreachable", sending the operator chasing a network problem.
             if _is_not_found(exc):
                 return TemplateResult(
                     exists=False, usable=False, vmid=template_vmid, node=node
                 )
+            if _is_auth_error(exc):
+                raise SetupAuthError("proxmox token was rejected (auth failed)") from None
             raise SetupUnreachableError("proxmox host was unreachable") from None
         usable = bool(config.get("template"))
         return TemplateResult(exists=True, usable=usable, vmid=template_vmid, node=node)

@@ -37,6 +37,7 @@ from compute.proxmoxProvider import REQUIRED_PRIVS, ProxmoxComputeProvider
 from tests.integration.mock_proxmox import (
     register_permissions,
     register_template_config,
+    resource_exception,
 )
 
 _HOST = "pve1.local"
@@ -146,6 +147,32 @@ async def test_verify_template_not_found_reports_absent() -> None:
 
     assert result.exists is False
     assert result.usable is False
+
+
+@responses.activate
+async def test_verify_template_auth_failure_raises_setup_auth_error() -> None:
+    """A 401 on the template config GET -> SetupAuthError, NOT SetupUnreachableError (WR-01).
+
+    The runtime token losing template-read rights (401/403) is an auth problem, not a
+    connectivity one. verifyTemplate must mirror testConnection's triage so the wizard
+    reports "token rejected", not "host unreachable", and the fixed message stays
+    token-free (the sentinel never reaches it; SETUP-07).
+    """
+    from compute.provider import SetupUnreachableError
+
+    url = f"https://{_HOST}:8006/api2/json/nodes/pve1/lxc/9000/config"
+    responses.add(
+        responses.GET,
+        url,
+        body=resource_exception(401, "authentication failure"),
+    )
+
+    with pytest.raises(SetupAuthError) as exc_info:
+        await _provider().verifyTemplate(9000, "pve1")
+
+    # A 401 must NOT be misclassified as the connectivity error.
+    assert not isinstance(exc_info.value, SetupUnreachableError)
+    assert _SENTINEL not in str(exc_info.value)
 
 
 # ── Fake parity ──────────────────────────────────────────────────────────────
