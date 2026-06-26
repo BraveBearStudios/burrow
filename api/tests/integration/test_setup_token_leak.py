@@ -143,6 +143,32 @@ async def test_sentinel_token_never_leaks_to_db_envelope_or_logs(
     assert SENTINEL not in log_output, "token reached a log line/event"
 
 
+async def test_sentinel_absent_from_422_validation_body(
+    integration_client: httpx.AsyncClient, captured_logs: StringIO
+) -> None:
+    """RED-IF-REGRESSED: a 422 setup body carrying the sentinel token never echoes it.
+
+    WR-05: the 422 handler's leak protection rests on two layers -- (1) the
+    RequestValidationError handler drops the raw ``input``/``ctx``, keeping only
+    ``loc``/``msg``/``type``; and (2) ``token_value`` is a ``SecretStr`` so the value
+    is masked even if a future validator interpolated it into ``msg``. POST a body
+    that triggers a 422 (a sibling required field -- ``host`` -- omitted) WITH the
+    sentinel as ``tokenValue`` and assert the sentinel is absent from the 422 body
+    and the logs. Reverting the handler's input-strip OR the SecretStr field flips
+    this RED, locking both backstops together.
+    """
+    bad_body = {**_CONNECT_BODY}
+    del bad_body["host"]  # omit a sibling required field -> 422, sentinel still present
+
+    response = await integration_client.post(
+        "/api/v1/setup/test-connection", json=bad_body
+    )
+
+    assert response.status_code == 422, response.text
+    assert SENTINEL not in response.text, "token leaked into the 422 validation body"
+    assert SENTINEL not in captured_logs.getvalue(), "token reached a log line on 422"
+
+
 async def test_sentinel_absent_even_on_auth_failure_envelope(
     integration_client: httpx.AsyncClient, captured_logs: StringIO
 ) -> None:
