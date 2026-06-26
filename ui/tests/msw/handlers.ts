@@ -260,4 +260,12 @@ export const handlers = [
 
 	// GET /api/v1/nodes — per-node capacity (Plan 02-01 backend; UI-04)
 	http.get("/api/v1/nodes", () => HttpResponse.json(envelope(seedNodes))),
+
+	// GET /api/v1/setup/state — the first-run gate signal (SETUP-06). The default
+	// double reports a CONFIGURED Burrow (a non-null setupCompletedAt) so the App
+	// shell tests render the normal surface; SetupWizard tests that need the gate
+	// override this with server.use(...) per case.
+	http.get("/api/v1/setup/state", () =>
+		HttpResponse.json(envelope({ setupCompletedAt: "2026-06-10T00:00:00Z" })),
+	),
 ];

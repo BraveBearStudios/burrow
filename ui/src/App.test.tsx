@@ -7,6 +7,11 @@
 // `+ New workspace` opens the modal, and a theme swatch switches the `data-theme`
 // root across all four themes (criterion 1). The terminal grid empty-state is the
 // default (no persisted layout).
+//
+// The first-run gate (SETUP-06) sits in front of the shell: App reads useSetupState
+// and renders a themed-blank loading root until the gate resolves. The default MSW
+// /setup/state double reports a CONFIGURED Burrow (non-null setupCompletedAt) so the
+// normal shell renders; each test first awaits the shell landmark before asserting.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -47,8 +52,8 @@ afterEach(() => {
 describe("App shell — assembly (UI-01/03/04)", () => {
 	it("renders the four surfaces: navbar brand, sidebar rows, grid empty-state, status counts", async () => {
 		renderApp();
-		// Navbar brand.
-		expect(screen.getByText("Burrow")).toBeInTheDocument();
+		// Navbar brand (await the gate resolving to the configured shell first).
+		expect(await screen.findByText("Burrow")).toBeInTheDocument();
 		// Sidebar rows (live list).
 		await waitFor(() =>
 			expect(screen.getByText("project-eta")).toBeInTheDocument(),
@@ -61,10 +66,11 @@ describe("App shell — assembly (UI-01/03/04)", () => {
 		);
 	});
 
-	it("the app root carries the landmark + default dark theme", () => {
+	it("the app root carries the landmark + default dark theme", async () => {
 		renderApp();
+		// The gate resolves to the configured shell, then the landmark is present.
 		expect(
-			screen.getByRole("main", { name: "Burrow workspace manager" }),
+			await screen.findByRole("main", { name: "Burrow workspace manager" }),
 		).toBeInTheDocument();
 		const root = screen
 			.getByRole("main", { name: "Burrow workspace manager" })
@@ -76,18 +82,23 @@ describe("App shell — assembly (UI-01/03/04)", () => {
 describe("App shell — interactions (UI-03, criterion 1)", () => {
 	it("`+ New workspace` opens the modal", async () => {
 		renderApp();
+		// Await the configured shell, then assert no dialog before opening one.
+		const newWorkspace = await screen.findByRole("button", {
+			name: /New workspace/,
+		});
 		expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-		fireEvent.click(screen.getByRole("button", { name: /New workspace/ }));
+		fireEvent.click(newWorkspace);
 		const dialog = await screen.findByRole("dialog");
 		// The dialog is titled "New workspace" (its aria-label/title).
 		expect(dialog).toHaveAccessibleName("New workspace");
 	});
 
-	it("a theme swatch switches the data-theme root (criterion 1)", () => {
+	it("a theme swatch switches the data-theme root (criterion 1)", async () => {
 		renderApp();
-		const root = screen
-			.getByRole("main", { name: "Burrow workspace manager" })
-			.closest("[data-theme]") as HTMLElement;
+		// Await the configured shell so the landmark (and theme swatches) are present.
+		const root = (
+			await screen.findByRole("main", { name: "Burrow workspace manager" })
+		).closest("[data-theme]") as HTMLElement;
 		expect(root).toHaveAttribute("data-theme", "dark");
 		fireEvent.click(screen.getByRole("button", { name: "Light theme" }));
 		expect(root).toHaveAttribute("data-theme", "light");
