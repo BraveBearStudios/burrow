@@ -18,9 +18,11 @@
 import { useState } from "react";
 import { Navbar } from "./components/Navbar";
 import { NewWorkspaceModal } from "./components/NewWorkspaceModal";
+import { SetupWizard } from "./components/SetupWizard";
 import { StatusBar } from "./components/StatusBar";
 import { WorkspaceLayout } from "./components/WorkspaceLayout";
 import { WorkspaceList } from "./components/WorkspaceList";
+import { useSetupState } from "./hooks/useSetup";
 import { DEFAULT_THEME, type ThemeName } from "./lib/themes";
 
 const rootStyle: React.CSSProperties = {
@@ -42,7 +44,28 @@ const middleRowStyle: React.CSSProperties = {
 export function App() {
 	const [theme, setTheme] = useState<ThemeName>(DEFAULT_THEME);
 	const [isModalOpen, setModalOpen] = useState(false);
+	// The first-run gate signal (SETUP-06): read on mount + invalidated by
+	// useCompleteSetup. While loading, render only the themed --bg root (no flash of
+	// the workspace list). When setupCompletedAt is null the gate renders ONLY the
+	// wizard; the gate flips off automatically once useCompleteSetup invalidates
+	// ["setupState"] and the refetch returns a non-null timestamp.
+	const { data: setupState, isLoading } = useSetupState();
 
+	// Loading: themed blank root only — no Navbar/list flash before the gate decision.
+	if (isLoading) {
+		return <div data-theme={theme} style={rootStyle} />;
+	}
+
+	// Unconfigured (null timestamp): the hard gate renders ONLY the wizard.
+	if (setupState?.setupCompletedAt == null) {
+		return (
+			<div data-theme={theme} style={rootStyle}>
+				<SetupWizard />
+			</div>
+		);
+	}
+
+	// Configured: the normal app shell (unchanged).
 	return (
 		<div data-theme={theme} style={rootStyle}>
 			<main
