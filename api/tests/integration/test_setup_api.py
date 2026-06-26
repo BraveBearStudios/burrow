@@ -265,13 +265,20 @@ async def test_real_provider_auth_fail_raises_setup_auth_error(
     host = "pve1.local"
     register_permissions(host, [], status=401)
 
+    # WR-03/IN-02: a distinctive multi-char sentinel (not a substring of the fixed
+    # message) so the leak assertion below can actually fail if the rejected token
+    # were ever interpolated. The old 1-char "t" token made the assertion vacuous.
+    sentinel = "SENTINEL-TOKEN-DO-NOT-LEAK"
     provider = ProxmoxComputeProvider(settings)
     with pytest.raises(SetupAuthError) as exc_info:
         await provider.testConnection(
-            host=host, user="burrow@pve", token_name="burrow", token_value="t"
+            host=host, user="burrow@pve", token_name="burrow", token_value=sentinel
         )
-    # The rejected token is never interpolated into the typed error message.
-    assert "t" not in str(exc_info.value) or "token" in str(exc_info.value)
+    # Behavioral assertion (WR-03): the typed error carries the FIXED token-free
+    # message, AND the rejected token VALUE never reaches it. Both clauses can fail.
+    message = str(exc_info.value)
+    assert message == "proxmox token was rejected (auth failed)"
+    assert sentinel not in message
     assert all(c.request.method == "GET" for c in responses.calls)
 
 
