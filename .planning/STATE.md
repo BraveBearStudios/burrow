@@ -4,13 +4,13 @@ milestone: v1.3
 milestone_name: Go Live
 status: executing
 stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-06-26T02:55:09.671Z"
+last_updated: "2026-06-26T03:19:32.393Z"
 last_activity: 2026-06-26
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 12
-  completed_plans: 10
+  completed_plans: 11
   percent: 60
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-06-24)
 ## Current Position
 
 Phase: 13 (setup-wizard-ui-first-run-gate) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-06-26
 
@@ -112,6 +112,7 @@ Last activity: 2026-06-26
 | Phase 12 P02 | 28min | 3 tasks | 6 files |
 | Phase 13 P01 | 18 | 3 tasks | 5 files |
 | Phase 13 P02 | 7min | 3 tasks | 5 files |
+| Phase 13 P03 | 17 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -171,6 +172,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 12-02: SETUP-07 sentinel-token leak hard gate locked RED-if-regressed across DB + envelope + logs (proven by a log-the-token regression, then reverted)
 - [Phase 13]: [Plan 13-01]: SETUP-04/05 backend landed. DbProvider.setSetupCompleted() (ABC @abstractmethod + SQLite impl: UPDATE settings SET setupCompletedAt = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=1 + commit, returns the value via a getSetupState read-back so the envelope matches the row) + GET /api/v1/setup/state (read) + POST /api/v1/setup/complete (get_db + respond envelope, no body/token, idempotent, NO new error code). Idempotency is a plain WHERE id=1 UPDATE (no INSERT, no uniqueness to violate). Reused the existing deletedAt/migrate strftime timestamp shape (no new format). PostgresProvider gained BOTH getSetupState (missing since Phase 12 added it to the ABC) + setSetupCompleted NotImplementedError overrides for ABC parity (Rule 2 — restored hosted-path stub concreteness). 4 integration tests lock state-null -> complete-sets -> state-returns-it -> idempotent over the real-temp-SQLite + Fake app; setup -k 20 passed, full api suite 250 passed; ruff + mypy clean. Unblocks the Phase 13 UI gate (useSetupState/useCompleteSetup, App.tsx first-run gate).
 - [Phase ?]: [Plan 13-02]: Setup hooks + persistent checkbox UI landed. useSetup.ts mirrors useWorkspaces.ts (useQuery/useMutation + api() envelope unwrap): useSetupState (queryKey setupState, NO refetchInterval - read on mount + invalidated, not polled), useTestConnection/useVerifyTemplate (mutations to Phase 12 /setup/test-connection + /verify-template), useCompleteSetup (POST /setup/complete, invalidates setupState onSuccess so the gate flips off). The Proxmox token (TestConnectionBody.tokenValue) is a TRANSIENT mutation arg ONLY - never written to query cache/Zustand/localStorage, never logged (T-13-04/T-13-05). setup.ts types the 5 wizard contracts; WorkspaceCreate gained optional persistent?:boolean (mirrors Phase 10 backend). NewWorkspaceModal: native persistent checkbox (default UNCHECKED=ephemeral) after the Node selector, accentColor:var(--accent) green not browser-blue, verbatim copy, wired into createWorkspace.mutateAsync persistent; resets via parent-unmount remount. vitest proves checked->persistent:true + default->not-true (MSW capture). tsc 0, biome clean, full UI suite 119/119. Unblocks 13-03 (App.tsx gate reads useSetupState) + 13-04 (wizard wires the 3 mutations).
+- [Phase ?]: [Plan 13-03]: First-run gate landed. SetupWizard.tsx is the full-page hard gate (role=dialog, aria-modal, aria-label=Set up Burrow, focus-on-mount, Escape-DOES-NOTHING, Enter-submits via an ActiveSubmitContext ref) with 4 auto-advancing steps - connection(useTestConnection)/template(useVerifyTemplate)/health(GET /health both db+compute ok)/create(useCreateWorkspace then useCompleteSetup = complete-AFTER-create). Re-probe derives step from live state via setStep only - NO persisted checkpoint. Mapped token-free errors (setup_unreachable/auth_failed/template_not_found); success=false renders the mono missing-priv list not an err strip. Tokens-only (no hex); gold reserved to StepSpinner; token lives ONLY in step-1 useState, never stored/logged (T-13-07). App.tsx gates on useSetupState: loading-blank / setupCompletedAt==null -> ONLY SetupWizard / set -> normal shell; gate flips off when useCompleteSetup invalidates [setupState]. Rule 1: added a default MSW /setup/state handler (configured Burrow) + awaited the gate in the 4 App-shell tests so the existing <App /> harness stays green. tsc 0, biome clean, full UI suite 125/125.
 
 ### Pending Todos
 
@@ -212,7 +214,7 @@ real-boot-v2 rows are now CLAIMED by v1.3.
 
 ## Session Continuity
 
-Last session: 2026-06-26T02:55:09.659Z
+Last session: 2026-06-26T03:18:45.029Z
 Stopped at: Completed 13-01-PLAN.md
 Resume file: None
 Next plan: Plan Phase 10 with `/gsd:plan-phase 10` (Persistence Data Model + Reaper Carve-out — the v1.3 foundation: `003` migration + reaper negative-control test + mocked-proxmoxer integration tier). Phase 11 (scrollback, worker-side) and Phase 12 (wizard backend) parallelize off Phase 10.

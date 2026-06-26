@@ -29,7 +29,7 @@ the ACC items are operator-run human UAT on real infrastructure.
 - [x] **SETUP-03**: The wizard runs a control-plane health/readiness check (reusing `/api/v1/health`) confirming the API can reach Proxmox.
 - [x] **SETUP-04**: As its final step, the wizard creates the operator's first workspace.
 - [x] **SETUP-05**: When Burrow is unconfigured (`settings.setupCompletedAt` unset) the UI presents the wizard as a first-run gate before the workspace list; once configured the wizard does not reappear.
-- [ ] **SETUP-06**: Wizard steps are idempotent and re-enterable — re-opening re-probes current state and lands on the first failing step (no persisted checkpoint machine).
+- [x] **SETUP-06**: Wizard steps are idempotent and re-enterable — re-opening re-probes current state and lands on the first failing step (no persisted checkpoint machine).
 - [x] **SETUP-07**: The operator's Proxmox token is written only to the gitignored `.env`, validated in-memory, and is never persisted to the database, returned in an API response, or written to logs.
 
 ### Workspace Persistence (WSX)
@@ -97,7 +97,7 @@ Finalized by the roadmapper (2026-06-25). Each requirement maps to exactly one p
 | SETUP-07 | Phase 12 | Complete |
 | SETUP-04 | Phase 13 | Complete |
 | SETUP-05 | Phase 13 | Complete |
-| SETUP-06 | Phase 13 | Pending |
+| SETUP-06 | Phase 13 | Complete |
 | ACC-01  | Phase 14 | Pending |
 | ACC-02  | Phase 14 | Pending |
 | ACC-03  | Phase 14 | Pending |
