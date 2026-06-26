@@ -20,12 +20,12 @@ source "${HERE}/lib/common.sh"
 # ---------------------------------------------------------------------------
 # Configuration (placeholders).
 # ---------------------------------------------------------------------------
-NODE_NAME="<node>"                 # the node this runs on
-TMPL_STORAGE="<tmpl-storage>"      # a dir-type storage that carries vztmpl content
+NODE_NAME="${NODE_NAME:-<node>}"                 # node this runs on (env-overridable)
+TMPL_STORAGE="${TMPL_STORAGE:-<tmpl-storage>}"   # dir-type storage that carries vztmpl content
 # Pin the EXACT build string. Discover the current one with:
 #   pveam available --section system | grep ubuntu-24.04-standard
 # then paste the full filename here so a re-run is reproducible.
-TMPL="ubuntu-24.04-standard_<ver>_amd64.tar.zst"
+TMPL="${TMPL:-ubuntu-24.04-standard_<ver>_amd64.tar.zst}"
 
 # ---------------------------------------------------------------------------
 # Preflight.
