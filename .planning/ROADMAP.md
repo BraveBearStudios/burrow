@@ -115,7 +115,7 @@ Proxmox token is validate-in-memory, `.env`-only (no secret-at-rest).
 
 - [x] **Phase 10: Persistence Data Model + Reaper Carve-out** — `003` migration (`settings` singleton + `persistent` column), reaper-never-reaps-a-persistent-stopped-workspace negative-control test, mocked-proxmoxer integration tier (CI-provable) (completed 2026-06-25)
 - [x] **Phase 11: Scrollback Restore** — worker-side tmux `new-session -A` in `burrow-boot.sh` + baked `/etc/tmux.conf` so scrollback survives stop→start (worker-side, CI-provable via the boot harness) (completed 2026-06-25)
-- [ ] **Phase 12: Setup Wizard Backend** — `testConnection`/`verifyTemplate` on both providers, `routers/setup.py` + `SetupService`, token hygiene (CI-provable)
+- [x] **Phase 12: Setup Wizard Backend** — `testConnection`/`verifyTemplate` on both providers, `routers/setup.py` + `SetupService`, token hygiene (CI-provable) (completed 2026-06-26)
 - [ ] **Phase 13: Setup Wizard UI + First-Run Gate** — `SetupWizard.tsx`, `App.tsx` first-run gate off `setupCompletedAt`, `persistent` checkbox in `NewWorkspaceModal` (CI-provable)
 - [ ] **Phase 14: First Real-Infra Acceptance** — operator-run human UAT on real Proxmox + first live GHCR/cosign release (human UAT, not CI)
 
@@ -190,7 +190,7 @@ Plans:
 Plans:
 
 - [x] 12-01-PLAN.md - Compute-seam foundation: testConnection/verifyTemplate ABC + DTOs + Proxmox (ephemeral read-only client, 9-priv assertion) + Fake parity + SecretStr/logger token hardening + read-only getSetupState()
-- [ ] 12-02-PLAN.md - Setup API surface: POST /api/v1/setup/{test-connection,verify-template} + token-free error codes + SETUP-03 /api/v1/health reuse + the sentinel-token leak hard gate (SETUP-07) + read-only/zero-resource assertion + ADR-0012
+- [x] 12-02-PLAN.md - Setup API surface: POST /api/v1/setup/{test-connection,verify-template} + token-free error codes + SETUP-03 /api/v1/health reuse + the sentinel-token leak hard gate (SETUP-07) + read-only/zero-resource assertion + ADR-0012
 
 **ADR**: ADR-0012 (new `ComputeProvider` capabilities — `testConnection`/`verifyTemplate`, Fake parity); ADR-0011 (setup-state store, if not already landed in Phase 10). *Token-at-rest ADR avoided by design.*
 
@@ -241,6 +241,6 @@ Plans:
 | 9. Auto Node Selection | v1.2 | 3/3 | Complete | 2026-06-16 |
 | 10. Persistence Data Model + Reaper Carve-out | v1.3 | 4/4 | Complete    | 2026-06-25 |
 | 11. Scrollback Restore | v1.3 | 2/2 | Complete    | 2026-06-25 |
-| 12. Setup Wizard Backend | v1.3 | 1/2 | In Progress|  |
+| 12. Setup Wizard Backend | v1.3 | 2/2 | Complete   | 2026-06-26 |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 0/? | Not started | - |
 | 14. First Real-Infra Acceptance | v1.3 | 0/? | Not started | - |
