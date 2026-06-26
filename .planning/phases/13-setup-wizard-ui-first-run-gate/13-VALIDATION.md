@@ -41,7 +41,7 @@ created: 2026-06-25
 | 13-01-xx | backend-setter | 1 | SETUP-04 | — | setSetupCompleted + GET /setup/state + POST /setup/complete (idempotent) | integration (pytest) | `cd api && uv run pytest tests/integration -k setup -q` | ❌ W0 | ⬜ pending |
 | 13-02-xx | hooks+checkbox | 1 | WSX-02 | — | useSetupState/useCompleteSetup hooks; persistent checkbox → body.persistent | unit (vitest) | `cd ui && npm run test -- NewWorkspaceModal` | ❌ W0 | ⬜ pending |
 | 13-03-xx | wizard+gate | 2 | SETUP-04/05/06 | — | SetupWizard gate; 4 auto-advance steps; re-probe→first-failing; complete-after-create | unit (vitest) | `cd ui && npm run test -- SetupWizard` | ❌ W0 | ⬜ pending |
-| 13-04-xx | e2e | 2 | SETUP-04/05/06 | — | unconfigured shows gate→walk→complete→gate vanishes; configured skips gate | e2e (playwright) | `cd ui && npm run test:e2e -- setup-wizard` | ❌ W0 | ⬜ pending |
+| 13-04-xx | e2e | 3 | SETUP-04/05/06 | — | unconfigured shows gate→walk→complete→gate vanishes; configured skips gate | e2e (playwright) | `cd ui && npm run test:e2e -- setup-wizard` | ❌ W0 | ⬜ pending |
 
 *Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
 
