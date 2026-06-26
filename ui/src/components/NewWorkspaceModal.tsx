@@ -184,6 +184,9 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 	// backend as node: null so the service auto-selects. A non-empty value is an
 	// explicit manual node pick (the unchanged path).
 	const [node, setNode] = useState("");
+	// Opt-in persistence (WSX-02): default UNCHECKED = ephemeral. Resets to false on
+	// close because the parent unmounts the modal (fresh useState on remount).
+	const [persistent, setPersistent] = useState(false);
 	const [touched, setTouched] = useState<Record<string, boolean>>({});
 
 	const [phase, setPhase] = useState<Phase>("form");
@@ -242,6 +245,8 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 				// Auto sentinel ("") → node: null so the backend auto-selects the
 				// least-loaded node; a manual pick sends the chosen node string.
 				node: node || null,
+				// WSX-02: default false = ephemeral; checked keeps the workspace disk.
+				persistent,
 			});
 			if (intervalRef.current) {
 				clearInterval(intervalRef.current);
@@ -430,6 +435,29 @@ export function NewWorkspaceModal({ onClose }: NewWorkspaceModalProps) {
 									))}
 								</select>
 							</div>
+						</div>
+
+						{/* WSX-02 persistent checkbox: native input styled with the green
+						    accent token (not browser blue); default unchecked = ephemeral. */}
+						<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+							<input
+								id="ws-persistent"
+								type="checkbox"
+								checked={persistent}
+								onChange={(e) => setPersistent(e.target.checked)}
+								style={{ accentColor: "var(--accent)" }}
+							/>
+							<label
+								htmlFor="ws-persistent"
+								style={{
+									fontFamily: "var(--font-sans)",
+									fontSize: "13px",
+									fontWeight: 400,
+									color: "var(--text)",
+								}}
+							>
+								Persistent (keep workspace after session ends)
+							</label>
 						</div>
 
 						<footer
