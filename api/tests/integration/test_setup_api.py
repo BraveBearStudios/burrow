@@ -1,6 +1,6 @@
 # SPDX-FileCopyrightText: 2026 Brave Bear Studios
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Integration: the guided-setup API surface (SETUP-01/02/03).
+"""Integration: the guided-setup API surface (SETUP-01..05).
 
 Drives the real app over temp SQLite + the Fake compute provider (the
 ``integration_client`` fixture) for the endpoint happy/negative paths, and the
@@ -19,6 +19,9 @@ Covers:
   POST/PUT/DELETE) over the mocked tier (SETUP-01 "creates zero resources").
 - SETUP-03 readiness reuses ``GET /api/v1/health`` (degrade-not-500); no new
   readiness endpoint is added.
+- ``GET /api/v1/setup/state`` returns ``{setupCompletedAt: null}`` on a fresh DB
+  (SETUP-04); ``POST /api/v1/setup/complete`` stamps it to a timestamp readable
+  by a follow-up state GET, and is idempotent across two calls (SETUP-05).
 """
 
 import httpx
@@ -204,6 +207,68 @@ def test_no_parallel_readiness_endpoint_added() -> None:
     assert "/api/v1/setup/verify-template" in paths
     # No parallel readiness route was introduced under /setup.
     assert not any("readiness" in p for p in paths)
+
+
+# ── first-run gate: state read + idempotent complete (over the Fake) ──────────
+async def test_setup_state_starts_null(
+    integration_client: httpx.AsyncClient,
+) -> None:
+    """A fresh per-test DB seeds NULL (migration 003) → state has setupCompletedAt=None."""
+    response = await integration_client.get("/api/v1/setup/state")
+    assert response.status_code == 200, response.text
+    payload = response.json()
+    _assert_envelope(payload)
+    assert payload["data"] == {"setupCompletedAt": None}
+
+
+async def test_complete_then_state_returns_timestamp(
+    integration_client: httpx.AsyncClient,
+) -> None:
+    """POST /complete stamps a non-null timestamp that a follow-up state GET returns."""
+    complete = await integration_client.post("/api/v1/setup/complete")
+    assert complete.status_code == 200, complete.text
+    complete_payload = complete.json()
+    _assert_envelope(complete_payload)
+    stamped = complete_payload["data"]["setupCompletedAt"]
+    assert isinstance(stamped, str) and stamped
+
+    state = await integration_client.get("/api/v1/setup/state")
+    assert state.status_code == 200, state.text
+    state_payload = state.json()
+    _assert_envelope(state_payload)
+    # The state read returns exactly the timestamp the complete call wrote.
+    assert state_payload["data"] == {"setupCompletedAt": stamped}
+
+
+async def test_complete_is_idempotent(
+    integration_client: httpx.AsyncClient,
+) -> None:
+    """Two POST /complete calls both 200 with a non-null timestamp; the row stays set."""
+    first = await integration_client.post("/api/v1/setup/complete")
+    assert first.status_code == 200, first.text
+    first_stamp = first.json()["data"]["setupCompletedAt"]
+    assert isinstance(first_stamp, str) and first_stamp
+
+    # The second call must not error — re-stamping the singleton is a plain UPDATE.
+    second = await integration_client.post("/api/v1/setup/complete")
+    assert second.status_code == 200, second.text
+    second_stamp = second.json()["data"]["setupCompletedAt"]
+    assert isinstance(second_stamp, str) and second_stamp
+
+    # The row stays set after both calls (state still reports a non-null timestamp).
+    state = await integration_client.get("/api/v1/setup/state")
+    assert state.status_code == 200, state.text
+    assert state.json()["data"]["setupCompletedAt"] is not None
+
+
+def test_setup_state_and_complete_routes_registered() -> None:
+    """The two gate routes are live on the app (SETUP-04/05)."""
+    from main import create_app
+
+    app = create_app()
+    paths = {getattr(route, "path", "") for route in app.routes}
+    assert "/api/v1/setup/state" in paths
+    assert "/api/v1/setup/complete" in paths
 
 
 # ── read-only / zero-resource proof over the REAL provider (mocked tier) ──────
