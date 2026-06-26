@@ -44,6 +44,19 @@ jobs:
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
+          # allowlist-prep (ACC-02): stays a COMMENT; egress stays audit.
+          # When flipping egress-policy to block, populate allowed-endpoints
+          # with the endpoints discovered from the first live audit run's Step
+          # Security insights. The cosign/OIDC/GHCR publish path needs:
+          # allowed-endpoints: |
+          #   fulcio.sigstore.dev:443
+          #   rekor.sigstore.dev:443
+          #   tuf.sigstore.dev:443
+          #   token.actions.githubusercontent.com:443
+          #   ghcr.io:443
+          #   github.com:443
+          #   objects.githubusercontent.com:443
+          # Flip procedure (audit -> block) is in 14-ACCEPTANCE.md.
 
       - name: Run release-please
         uses: googleapis/release-please-action@5c625bfb5d1ff62eadeeb3772007f7f66fdcf071 # v4.4.1

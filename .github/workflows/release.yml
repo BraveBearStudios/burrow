@@ -59,6 +59,20 @@ jobs:
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
+          # allowlist-prep (ACC-02): stays a COMMENT; egress stays audit.
+          # This is the publish path: fulcio/rekor/tuf are the keyless-signing-
+          # critical endpoints (a missing one silently breaks cosign). When the
+          # block flip happens, populate allowed-endpoints from the first live
+          # audit run's Step Security insights:
+          # allowed-endpoints: |
+          #   fulcio.sigstore.dev:443
+          #   rekor.sigstore.dev:443
+          #   tuf.sigstore.dev:443
+          #   token.actions.githubusercontent.com:443
+          #   ghcr.io:443
+          #   github.com:443
+          #   objects.githubusercontent.com:443
+          # Flip procedure (audit -> block) is in 14-ACCEPTANCE.md.
 
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1

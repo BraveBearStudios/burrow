@@ -30,6 +30,19 @@ jobs:
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
+          # allowlist-prep (ACC-02): stays a COMMENT; egress stays audit.
+          # When flipping egress-policy to block, populate allowed-endpoints
+          # with the endpoints discovered from the first live audit run's Step
+          # Security insights. The cosign/OIDC/GHCR publish path needs:
+          # allowed-endpoints: |
+          #   fulcio.sigstore.dev:443
+          #   rekor.sigstore.dev:443
+          #   tuf.sigstore.dev:443
+          #   token.actions.githubusercontent.com:443
+          #   ghcr.io:443
+          #   github.com:443
+          #   objects.githubusercontent.com:443
+          # Flip procedure (audit -> block) is in 14-ACCEPTANCE.md.
 
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
@@ -138,6 +151,19 @@ jobs:
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
+          # allowlist-prep (ACC-02): stays a COMMENT; egress stays audit.
+          # When flipping egress-policy to block, populate allowed-endpoints
+          # with the endpoints discovered from the first live audit run's Step
+          # Security insights. The cosign/OIDC/GHCR publish path needs:
+          # allowed-endpoints: |
+          #   fulcio.sigstore.dev:443
+          #   rekor.sigstore.dev:443
+          #   tuf.sigstore.dev:443
+          #   token.actions.githubusercontent.com:443
+          #   ghcr.io:443
+          #   github.com:443
+          #   objects.githubusercontent.com:443
+          # Flip procedure (audit -> block) is in 14-ACCEPTANCE.md.
 
       - name: Validate PR title (semantic / conventional-commit)
         uses: amannn/action-semantic-pull-request@0723387faaf9b38adef4775cd42cfd5155ed6017 # v5.5.3
@@ -172,6 +198,19 @@ jobs:
         uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
         with:
           egress-policy: audit
+          # allowlist-prep (ACC-02): stays a COMMENT; egress stays audit.
+          # When flipping egress-policy to block, populate allowed-endpoints
+          # with the endpoints discovered from the first live audit run's Step
+          # Security insights. The cosign/OIDC/GHCR publish path needs:
+          # allowed-endpoints: |
+          #   fulcio.sigstore.dev:443
+          #   rekor.sigstore.dev:443
+          #   tuf.sigstore.dev:443
+          #   token.actions.githubusercontent.com:443
+          #   ghcr.io:443
+          #   github.com:443
+          #   objects.githubusercontent.com:443
+          # Flip procedure (audit -> block) is in 14-ACCEPTANCE.md.
 
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
