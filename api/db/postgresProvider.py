@@ -53,3 +53,9 @@ class PostgresProvider(DbProvider):
 
     async def healthcheck(self) -> bool:
         raise NotImplementedError("PostgresProvider.healthcheck — hosted path")
+
+    async def getSetupState(self) -> dict[str, Any]:
+        raise NotImplementedError("PostgresProvider.getSetupState — hosted path")
+
+    async def setSetupCompleted(self) -> dict[str, Any]:
+        raise NotImplementedError("PostgresProvider.setSetupCompleted — hosted path")

@@ -380,3 +380,21 @@ class SqliteProvider(DbProvider):
             row = await cursor.fetchone()
             await cursor.close()
         return {"setupCompletedAt": row["setup_completed_at"] if row is not None else None}
+
+    async def setSetupCompleted(self) -> dict[str, Any]:
+        # ADR-0011: stamp the singleton settings row (id=1; seeded by the 003
+        # migration) with the current ISO-8601 UTC time, reusing the SAME
+        # strftime('%Y-%m-%dT%H:%M:%fZ', 'now') format softDeleteWorkspace/migrate
+        # write (do NOT invent a new timestamp shape). Idempotent in effect: a
+        # plain UPDATE WHERE id = 1 re-stamps the existing row — no INSERT, no
+        # uniqueness to violate — so a second call cannot fail. Read the value back
+        # via getSetupState so the returned timestamp is exactly what was written.
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            await conn.execute(
+                "UPDATE settings "
+                "SET setupCompletedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') "
+                "WHERE id = 1"
+            )
+            await conn.commit()
+        return await self.getSetupState()

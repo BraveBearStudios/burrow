@@ -100,11 +100,22 @@ class DbProvider(ABC):
 
     @abstractmethod
     async def getSetupState(self) -> dict[str, Any]:
-        """Return the singleton setup-state row (``id=1``), READ-ONLY this phase.
+        """Return the singleton setup-state row (``id=1``), READ-ONLY.
 
         Reads ``settings.setupCompletedAt`` (``003`` migration; seeded ``NULL``)
-        as ``{"setupCompletedAt": <iso str | None>}``. The setter
-        (``setSetupCompleted``) is DEFERRED to Phase 13 — Phase 12 only reads, it
-        mutates nothing (ADR-0011).
+        as ``{"setupCompletedAt": <iso str | None>}``. The setter is
+        :meth:`setSetupCompleted` (Phase 13).
+        """
+        ...
+
+    @abstractmethod
+    async def setSetupCompleted(self) -> dict[str, Any]:
+        """Stamp the singleton settings row's ``setupCompletedAt`` to now (SETUP-05).
+
+        Writes the current ISO-8601 UTC time onto the ``id=1`` settings row and
+        returns the same ``{"setupCompletedAt": <iso str>}`` shape
+        :meth:`getSetupState` returns. Idempotent in effect: re-stamping a valid
+        singleton never fails (no INSERT, no uniqueness to violate), so a second
+        call simply re-writes the timestamp on the existing row (ADR-0011).
         """
         ...
