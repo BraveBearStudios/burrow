@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Go Live
-status: verifying
-stopped_at: Completed 11-01-PLAN.md (WSX-03 tmux scrollback reattach)
-last_updated: "2026-06-26T00:58:34.138Z"
+status: executing
+stopped_at: Completed 13-01-PLAN.md
+last_updated: "2026-06-26T02:39:56.623Z"
 last_activity: 2026-06-26
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 8
-  completed_plans: 8
+  total_plans: 12
+  completed_plans: 9
   percent: 60
 ---
 
@@ -26,13 +26,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-24)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 12 — setup-wizard-backend
+**Current focus:** Phase 13 — setup-wizard-ui-first-run-gate
 
 ## Current Position
 
-Phase: 13
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 13 (setup-wizard-ui-first-run-gate) — EXECUTING
+Plan: 2 of 4
+Status: Ready to execute
 Last activity: 2026-06-26
 
 ## Performance Metrics
@@ -110,6 +110,7 @@ Last activity: 2026-06-26
 | Phase 11 P02 | 4 | 2 tasks | 1 files |
 | Phase 12 P01 | 22 | 3 tasks | 11 files |
 | Phase 12 P02 | 28min | 3 tasks | 6 files |
+| Phase 13 P01 | 18 | 3 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -167,6 +168,7 @@ Recent decisions affecting current work:
 - [Phase ?]: Phase 12-02: missing-privileges/template-not-found are the cap SUCCESS path (200, success/exists=False); setup error codes reserved for hard failures (unreachable, rejected token)
 - [Phase ?]: Phase 12-02: added a leak-free RequestValidationError handler (Rule 2 security) because FastAPI default 422 echoes raw input, leaking the SecretStr token (T-12-04)
 - [Phase ?]: Phase 12-02: SETUP-07 sentinel-token leak hard gate locked RED-if-regressed across DB + envelope + logs (proven by a log-the-token regression, then reverted)
+- [Phase 13]: [Plan 13-01]: SETUP-04/05 backend landed. DbProvider.setSetupCompleted() (ABC @abstractmethod + SQLite impl: UPDATE settings SET setupCompletedAt = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=1 + commit, returns the value via a getSetupState read-back so the envelope matches the row) + GET /api/v1/setup/state (read) + POST /api/v1/setup/complete (get_db + respond envelope, no body/token, idempotent, NO new error code). Idempotency is a plain WHERE id=1 UPDATE (no INSERT, no uniqueness to violate). Reused the existing deletedAt/migrate strftime timestamp shape (no new format). PostgresProvider gained BOTH getSetupState (missing since Phase 12 added it to the ABC) + setSetupCompleted NotImplementedError overrides for ABC parity (Rule 2 — restored hosted-path stub concreteness). 4 integration tests lock state-null -> complete-sets -> state-returns-it -> idempotent over the real-temp-SQLite + Fake app; setup -k 20 passed, full api suite 250 passed; ruff + mypy clean. Unblocks the Phase 13 UI gate (useSetupState/useCompleteSetup, App.tsx first-run gate).
 
 ### Pending Todos
 
@@ -208,8 +210,8 @@ real-boot-v2 rows are now CLAIMED by v1.3.
 
 ## Session Continuity
 
-Last session: 2026-06-26T00:08:55.232Z
-Stopped at: Completed 11-01-PLAN.md (WSX-03 tmux scrollback reattach)
+Last session: 2026-06-26T02:39:56.613Z
+Stopped at: Completed 13-01-PLAN.md
 Resume file: None
 Next plan: Plan Phase 10 with `/gsd:plan-phase 10` (Persistence Data Model + Reaper Carve-out — the v1.3 foundation: `003` migration + reaper negative-control test + mocked-proxmoxer integration tier). Phase 11 (scrollback, worker-side) and Phase 12 (wizard backend) parallelize off Phase 10.
 
