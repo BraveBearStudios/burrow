@@ -116,7 +116,7 @@ Proxmox token is validate-in-memory, `.env`-only (no secret-at-rest).
 - [x] **Phase 10: Persistence Data Model + Reaper Carve-out** — `003` migration (`settings` singleton + `persistent` column), reaper-never-reaps-a-persistent-stopped-workspace negative-control test, mocked-proxmoxer integration tier (CI-provable) (completed 2026-06-25)
 - [x] **Phase 11: Scrollback Restore** — worker-side tmux `new-session -A` in `burrow-boot.sh` + baked `/etc/tmux.conf` so scrollback survives stop→start (worker-side, CI-provable via the boot harness) (completed 2026-06-25)
 - [x] **Phase 12: Setup Wizard Backend** — `testConnection`/`verifyTemplate` on both providers, `routers/setup.py` + `SetupService`, token hygiene (CI-provable) (completed 2026-06-26)
-- [ ] **Phase 13: Setup Wizard UI + First-Run Gate** — `SetupWizard.tsx`, `App.tsx` first-run gate off `setupCompletedAt`, `persistent` checkbox in `NewWorkspaceModal` (CI-provable)
+- [x] **Phase 13: Setup Wizard UI + First-Run Gate** — `SetupWizard.tsx`, `App.tsx` first-run gate off `setupCompletedAt`, `persistent` checkbox in `NewWorkspaceModal` (CI-provable) (completed 2026-06-26)
 - [ ] **Phase 14: First Real-Infra Acceptance** — operator-run human UAT on real Proxmox + first live GHCR/cosign release (human UAT, not CI)
 
 **Anticipated ADRs** (Nygard style, authored within their phase, `docs/adr/`): ADR-0011 setup-state
@@ -213,7 +213,7 @@ Plans:
 - [x] 13-01-PLAN.md — Backend setter + gate endpoints (SETUP-04/05): `DbProvider.setSetupCompleted()` (ABC + SQLite + Postgres stub) + `GET /api/v1/setup/state` + `POST /api/v1/setup/complete` (idempotent), integration-tested over the Fake-backed app
 - [x] 13-02-PLAN.md — Setup hooks + persistent checkbox (SETUP-04/05, WSX-02 UI half): `useSetupState`/`useTestConnection`/`useVerifyTemplate`/`useCompleteSetup` hooks + the `persistent` checkbox on `NewWorkspaceModal`
 - [x] 13-03-PLAN.md — SetupWizard + first-run gate (SETUP-04/06): `SetupWizard.tsx` (4 auto-advancing steps, re-probe, complete-after-create, hard-gate a11y per 13-UI-SPEC) + the `App.tsx` gate, vitest-proven
-- [ ] 13-04-PLAN.md — Gate e2e (SETUP-06): Playwright `setup-wizard.spec.ts` — unconfigured shows the gate → walk → complete → gate vanishes; configured skips it, over the Fake
+- [x] 13-04-PLAN.md — Gate e2e (SETUP-06): Playwright `setup-wizard.spec.ts` — unconfigured shows the gate → walk → complete → gate vanishes; configured skips it, over the Fake
 
 **UI hint**: yes
 
@@ -249,5 +249,5 @@ Plans:
 | 10. Persistence Data Model + Reaper Carve-out | v1.3 | 4/4 | Complete    | 2026-06-25 |
 | 11. Scrollback Restore | v1.3 | 2/2 | Complete    | 2026-06-25 |
 | 12. Setup Wizard Backend | v1.3 | 2/2 | Complete    | 2026-06-26 |
-| 13. Setup Wizard UI + First-Run Gate | v1.3 | 3/4 | In Progress|  |
+| 13. Setup Wizard UI + First-Run Gate | v1.3 | 4/4 | Complete   | 2026-06-26 |
 | 14. First Real-Infra Acceptance | v1.3 | 0/? | Not started | - |
