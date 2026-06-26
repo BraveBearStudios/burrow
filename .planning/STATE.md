@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.3
 milestone_name: Go Live
-status: verifying
-stopped_at: Completed 13-01-PLAN.md
-last_updated: "2026-06-26T04:24:27.873Z"
+status: executing
+stopped_at: Completed 14-01-PLAN.md
+last_updated: "2026-06-26T09:29:18.009Z"
 last_activity: 2026-06-26
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 12
-  completed_plans: 12
+  total_plans: 14
+  completed_plans: 13
   percent: 80
 ---
 
@@ -26,13 +26,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-06-24)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 13 — setup-wizard-ui-first-run-gate
+**Current focus:** Phase 14 — first-real-infra-acceptance
 
 ## Current Position
 
-Phase: 14
-Plan: Not started
-Status: Phase complete — ready for verification
+Phase: 14 (first-real-infra-acceptance) — EXECUTING
+Plan: 2 of 2
+Status: Ready to execute
 Last activity: 2026-06-26
 
 ## Performance Metrics
@@ -115,6 +115,7 @@ Last activity: 2026-06-26
 | Phase 13 P02 | 7min | 3 tasks | 5 files |
 | Phase 13 P03 | 17 | 3 tasks | 5 files |
 | Phase 13 P04 | 14 | 1 tasks | 1 files |
+| Phase 14 P01 | 18 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -177,6 +178,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 13-03]: First-run gate landed. SetupWizard.tsx is the full-page hard gate (role=dialog, aria-modal, aria-label=Set up Burrow, focus-on-mount, Escape-DOES-NOTHING, Enter-submits via an ActiveSubmitContext ref) with 4 auto-advancing steps - connection(useTestConnection)/template(useVerifyTemplate)/health(GET /health both db+compute ok)/create(useCreateWorkspace then useCompleteSetup = complete-AFTER-create). Re-probe derives step from live state via setStep only - NO persisted checkpoint. Mapped token-free errors (setup_unreachable/auth_failed/template_not_found); success=false renders the mono missing-priv list not an err strip. Tokens-only (no hex); gold reserved to StepSpinner; token lives ONLY in step-1 useState, never stored/logged (T-13-07). App.tsx gates on useSetupState: loading-blank / setupCompletedAt==null -> ONLY SetupWizard / set -> normal shell; gate flips off when useCompleteSetup invalidates [setupState]. Rule 1: added a default MSW /setup/state handler (configured Burrow) + awaited the gate in the 4 App-shell tests so the existing <App /> harness stays green. tsc 0, biome clean, full UI suite 125/125.
 - [Phase ?]: 13-04: First-run gate e2e uses walkthrough-first ordering under mode:serial (gate-walk test runs before any test marks the shared setup row complete; configured-skip test runs second and leaves setup complete for sibling suites)
 - [Phase ?]: 13-04: Shared-DB e2e determinism via a live-state-guarded gate-visible branch (test.skip when /setup/state already complete, no setup-reset endpoint exists) so the suite is green on a fresh CI DB and a persisted local DB
+- [Phase ?]: [Plan 14-01]: ACC-02 automatable slice landed. ci.yml static-gates gains a SHA-pinned fail-fast actionlint gate, but rhysd/actionlint ships NO action.yml (CLI binary repo, verified via API) so a bare uses: rhysd/actionlint@<sha> would fail at runtime; substituted reviewdog/action-actionlint@6fb7acc99f4a1008869fa8a0f09cfca740837d9d (v1.72.0), actionlint's upstream-documented Actions integration, with reporter github-check + fail_level error to make it a real fail-fast gate (its defaults github-pr-check + fail_level none are advisory-only). actionlint RUN deferred to the live Linux runner (unavailable on the Windows dev box, RELX-02); local proof is STRUCTURAL only (parse + SHA-pin + reuse lint clean), NOT a claim it passed locally. All 5 harden-runner steps keep egress-policy: audit with a commented Fulcio/Rekor/TUF/OIDC/GHCR allowlist-prep block pointing at 14-ACCEPTANCE.md audit->block flip. release.yml publish path (4 perms, by-digest, cosign keyless + SLSA attest) byte-unchanged; every uses: across all 3 workflows is a full 40-hex SHA. Phase 14 verification stays human_needed (ACC-01/02/03 real-infra).
 
 ### Pending Todos
 
@@ -218,8 +220,8 @@ real-boot-v2 rows are now CLAIMED by v1.3.
 
 ## Session Continuity
 
-Last session: 2026-06-26T03:46:44.604Z
-Stopped at: Completed 13-01-PLAN.md
+Last session: 2026-06-26T09:28:05.942Z
+Stopped at: Completed 14-01-PLAN.md
 Resume file: None
 Next plan: Plan Phase 10 with `/gsd:plan-phase 10` (Persistence Data Model + Reaper Carve-out — the v1.3 foundation: `003` migration + reaper negative-control test + mocked-proxmoxer integration tier). Phase 11 (scrollback, worker-side) and Phase 12 (wizard backend) parallelize off Phase 10.
 

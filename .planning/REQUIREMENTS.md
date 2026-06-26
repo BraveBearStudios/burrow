@@ -46,7 +46,7 @@ the ACC items are operator-run human UAT on real infrastructure.
 ### Real-Infra Acceptance (ACC) — operator-run human UAT on real hardware
 
 - [ ] **ACC-01**: On the dev homelab, real create→terminal→stop→start→destroy passes (the H9 gate), along with reaper / auto-stop / capacity on real CTs, real auto node selection, and **real persistent stop/start + scrollback restore**.
-- [ ] **ACC-02**: The first live release-please PR merges to produce a version bump + changelog + `v*` tag; harden-runner egress is flipped `audit`→`block` with the discovered allowlist; `actionlint` passes.
+- [x] **ACC-02**: The first live release-please PR merges to produce a version bump + changelog + `v*` tag; harden-runner egress is flipped `audit`→`block` with the discovered allowlist; `actionlint` passes.
 - [ ] **ACC-03**: A real GHCR image publish succeeds and `cosign verify` + `gh attestation verify` pass against the published `@sha256:` digest.
 
 ## Future Requirements
@@ -99,7 +99,7 @@ Finalized by the roadmapper (2026-06-25). Each requirement maps to exactly one p
 | SETUP-05 | Phase 13 | Complete |
 | SETUP-06 | Phase 13 | Complete |
 | ACC-01  | Phase 14 | Pending |
-| ACC-02  | Phase 14 | Pending |
+| ACC-02  | Phase 14 | Complete |
 | ACC-03  | Phase 14 | Pending |
 
 **Coverage:**

@@ -250,4 +250,4 @@ Plans:
 | 11. Scrollback Restore | v1.3 | 2/2 | Complete    | 2026-06-25 |
 | 12. Setup Wizard Backend | v1.3 | 2/2 | Complete    | 2026-06-26 |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 4/4 | Complete    | 2026-06-26 |
-| 14. First Real-Infra Acceptance | v1.3 | 0/? | Not started | - |
+| 14. First Real-Infra Acceptance | v1.3 | 1/2 | In Progress|  |
