@@ -39,6 +39,10 @@ export interface WorkspaceCreate {
 	// Optional, mirroring the backend `node: str | None = None`: null/omitted means
 	// "auto-select the least-loaded node"; a node string is an explicit manual pick.
 	node?: string | null;
+	// Opt-in persistence (WSX-02), mirroring the backend `persistent: bool = False`
+	// (Phase 10). Omitted/false = ephemeral (gone on destroy); true keeps the
+	// workspace disk across stop/start.
+	persistent?: boolean;
 }
 
 /** Per-node capacity from GET /api/v1/nodes (Plan 02-01 backend). */
