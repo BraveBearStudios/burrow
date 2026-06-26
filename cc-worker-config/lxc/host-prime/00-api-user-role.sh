@@ -26,12 +26,12 @@ source "${HERE}/lib/common.sh"
 # ---------------------------------------------------------------------------
 USER="burrow@pve"
 TOKEN="burrow"
-NODE_NAME="<node>"                     # e.g. the node this runs on
+NODE_NAME="${NODE_NAME:-<node>}"       # node this runs on (env-overridable)
 POOL_NAME="burrow-workers"
 POOL="/pool/${POOL_NAME}"
-STORAGE="/storage/<rootfs-storage>"    # the thin rootfs storage for worker clones
-NODE="/nodes/<node>"                   # repeat the ACL loop per scheduling node
-TMPL="/vms/<template-vmid>"            # the golden template VMID
+STORAGE="/storage/${ROOTFS_STORAGE:-<rootfs-storage>}"   # thin rootfs storage for worker clones
+NODE="/nodes/${NODE_NAME}"             # repeat the ACL loop per scheduling node
+TMPL="/vms/${TEMPLATE_VMID:-<template-vmid>}"            # the golden template VMID
 
 # The authoritative minimal role: exactly 9 privileges. Do NOT add or remove.
 # (Conditional SDN.Use on the <bridge> is handled separately, see below.)

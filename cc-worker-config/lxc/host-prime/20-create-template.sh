@@ -30,13 +30,13 @@ source "${HERE}/lib/common.sh"
 # ---------------------------------------------------------------------------
 # Configuration (placeholders).
 # ---------------------------------------------------------------------------
-NODE_NAME="<node>"
-TEMPLATE_VMID="<template-vmid>"           # OUTSIDE the worker VMID range (see 30-network-notes.md)
-TMPL_STORAGE="<tmpl-storage>"             # dir storage holding the vztmpl from step 10
-ROOTFS_STORAGE="<rootfs-storage>"         # THIN storage (lvmthin/zfspool) — NOT thick LVM
-ROOTFS_SIZE="8"                           # GiB; thin so unwritten blocks cost nothing
-BRIDGE="<bridge>"                         # the LAN bridge
-TMPL="ubuntu-24.04-standard_<ver>_amd64.tar.zst"   # match step 10's pin
+NODE_NAME="${NODE_NAME:-<node>}"
+TEMPLATE_VMID="${TEMPLATE_VMID:-<template-vmid>}"           # OUTSIDE the worker VMID range (see 30-network-notes.md)
+TMPL_STORAGE="${TMPL_STORAGE:-<tmpl-storage>}"             # dir storage holding the vztmpl from step 10
+ROOTFS_STORAGE="${ROOTFS_STORAGE:-<rootfs-storage>}"       # THIN storage (lvmthin/zfspool) — NOT thick LVM
+ROOTFS_SIZE="${ROOTFS_SIZE:-8}"                            # GiB; thin so unwritten blocks cost nothing
+BRIDGE="${BRIDGE:-<bridge>}"                               # the LAN bridge
+TMPL="${TMPL:-ubuntu-24.04-standard_<ver>_amd64.tar.zst}"   # match step 10's pin
 
 # Worker-template payload authored in Plan 07. Adjust if your layout differs.
 WT_DIR="${HERE}/../worker-template"
