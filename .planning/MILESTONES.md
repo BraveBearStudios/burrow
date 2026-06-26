@@ -1,5 +1,28 @@
 # Milestones
 
+## v1.3 v1.3 (Shipped: 2026-06-26)
+
+**Phases completed:** 5 phases, 14 plans, 37 tasks
+
+**Key accomplishments:**
+
+- A `responses`-backed factory module + self-tests that drive the REAL `ProxmoxComputeProvider` through running->stopped UPID polling and `proxmoxer.core.ResourceException` 404/500 branches — the exact paths the in-memory Fake never triggers.
+- Hardened the stop/start Playwright suite — the afterEach cleanup DELETE is now asserted ([200,404]) and a stopped panel must expose BOTH Start affordances (header icon + placeholder CTA, toHaveCount(2)) — closing the last two 07r gaps with the suite staying order-independent.
+- A `003` migration adds an opt-in `workspaces.persistent` flag (DEFAULT 0 backfill) and a singleton `settings` table through the existing ledger; `persistent` threads through both DTOs, the provider SELECT/INSERT, and the create saga, with ADR-0013 and ADR-0011 recording the locked persistence + setup-state decisions.
+- Locked the safety-critical reaper carve-out (WSX-04) with a comment-only edit and two RED-if-regressed negative-control tests, plus three WSX-02 persistence round-trip proofs — the v1.3 hard gate against irreversible persistent-workspace data loss, with the orphan predicate left byte-for-byte unchanged.
+- Worker shell wrapped in `tmux new-session -A -s burrow` so a ttyd/web-client reconnect to a still-running worker reattaches to the live session and its scrollback, proven hermetically by the boot harness, with ADR-0014 recording the honest reattach-on-reconnect contract.
+- Bakes tmux 3.4 into the Ubuntu 24.04 golden worker template and writes a minimal `/etc/tmux.conf` (history-limit 50000 + window-size latest) at provision time, so every clone has the tmux binary and scrollback config the Plan 11-01 reattach wrap depends on.
+- Two read-only ComputeProvider setup caps (testConnection over an ephemeral GET /access/permissions 9-priv probe + verifyTemplate) with Fake parity, SecretStr token hardening, driver-logger suppression, and a read-only getSetupState seam.
+- 1. [Rule 2 - Missing Critical Security] Added a leak-free RequestValidationError handler
+- The deferred Phase-12 setter lands: `DbProvider.setSetupCompleted()` (idempotent singleton stamp) plus `GET /api/v1/setup/state` and `POST /api/v1/setup/complete` over the standard envelope, proven by 4 integration tests.
+- TanStack Query setup hooks (useSetupState/useTestConnection/useVerifyTemplate/useCompleteSetup) typed to the Phase 12 contract, plus the WSX-02 persistent checkbox on NewWorkspaceModal wired into the create body and proven by vitest.
+- The full-page first-run GATE: `SetupWizard.tsx` (four auto-advancing steps — token validation → template verify → health → create first workspace, re-probe-to-first-failing, complete-after-create, hard-gate a11y) wired into `App.tsx` as a hard block on `useSetupState().setupCompletedAt === null`, proven by a vitest suite over MSW.
+- `ui/tests/e2e/setup-wizard.spec.ts` — the Tier-3 Playwright journey proving SETUP-06 in real Chromium: an unconfigured Burrow shows the `Set up Burrow` gate, walking the four steps over the Fake (connection → template → health → create) fires the real create→complete flow that marks setup complete and the gate vanishes to the workspace list; a configured Burrow skips the gate. Both tests pass on a fresh CI DB and a persisted local DB.
+- SHA-pinned fail-fast actionlint static gate added to ci.yml plus inert Fulcio/Rekor/TUF/OIDC/GHCR allowlist-prep comments on all 5 harden-runner steps; egress stays audit, publish path untouched.
+- Authored the operator-run acceptance slice of ACC-01/02/03: a trap-aware release/verify runbook (14-ACCEPTANCE.md), a single consolidated 16-item human-UAT checklist (14-HUMAN-UAT.md) all pending, and additive superseded markers on the rolled-up Phase 03/04 HUMAN-UAT files. No em dashes anywhere.
+
+---
+
 ## v1.2 Backlog Fixes + Release Automation (Shipped: 2026-06-16)
 
 **Phases completed:** 3 phases, 6 plans, 14 tasks
