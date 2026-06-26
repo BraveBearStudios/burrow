@@ -207,7 +207,14 @@ Plans:
   3. Re-opening the wizard re-probes current state and lands on the first failing step (idempotent, re-enterable; no persisted checkpoint machine).
   4. `NewWorkspaceModal` exposes a persistent checkbox (default unchecked = ephemeral) that submits the `persistent` flag, completing the UI half of WSX-02 against the Phase 10 backend.
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+
+- [ ] 13-01-PLAN.md — Backend setter + gate endpoints (SETUP-04/05): `DbProvider.setSetupCompleted()` (ABC + SQLite + Postgres stub) + `GET /api/v1/setup/state` + `POST /api/v1/setup/complete` (idempotent), integration-tested over the Fake-backed app
+- [ ] 13-02-PLAN.md — Setup hooks + persistent checkbox (SETUP-04/05, WSX-02 UI half): `useSetupState`/`useTestConnection`/`useVerifyTemplate`/`useCompleteSetup` hooks + the `persistent` checkbox on `NewWorkspaceModal`
+- [ ] 13-03-PLAN.md — SetupWizard + first-run gate (SETUP-04/06): `SetupWizard.tsx` (4 auto-advancing steps, re-probe, complete-after-create, hard-gate a11y per 13-UI-SPEC) + the `App.tsx` gate, vitest-proven
+- [ ] 13-04-PLAN.md — Gate e2e (SETUP-06): Playwright `setup-wizard.spec.ts` — unconfigured shows the gate → walk → complete → gate vanishes; configured skips it, over the Fake
+
 **UI hint**: yes
 
 ### Phase 14: First Real-Infra Acceptance
