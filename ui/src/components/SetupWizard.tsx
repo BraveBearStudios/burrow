@@ -248,6 +248,26 @@ function ErrorStrip({
 	);
 }
 
+/**
+ * A per-step status region (UI-SPEC §241) so success/error transitions are
+ * announced to assistive tech. `assertive` for errors (interrupt), `polite` for
+ * informational readouts (health, missing-privilege). Always mounted (even when
+ * empty) so the live region is established before its content changes.
+ */
+function StatusRegion({
+	tone,
+	children,
+}: {
+	tone: "assertive" | "polite";
+	children: React.ReactNode;
+}) {
+	return (
+		<div role="status" aria-live={tone}>
+			{children}
+		</div>
+	);
+}
+
 /** Map an unknown error to the fixed copy (coded → mapped, else generic fallback). */
 function mapError(err: unknown): { message: string; guidance?: string } {
 	if (err instanceof ApiError && ERROR_COPY[err.code]) {
@@ -391,48 +411,52 @@ function StepConnection({ onAdvance }: { onAdvance: () => void }) {
 				.env.
 			</span>
 
-			{missingPrivileges ? (
-				<div
-					style={{
-						padding: "10px 12px",
-						background: "var(--bg-panel-alt)",
-						border: "0.5px solid var(--border)",
-						borderRadius: "var(--radius-control)",
-						fontFamily: "var(--font-sans)",
-						fontSize: "12px",
-						color: "var(--text)",
-					}}
-				>
-					<span style={{ display: "block", marginBottom: "6px" }}>
-						Token is valid but missing privileges:
-					</span>
-					<ul
+			<StatusRegion tone="polite">
+				{missingPrivileges ? (
+					<div
 						style={{
-							margin: 0,
-							paddingLeft: "18px",
-							fontFamily: "var(--font-mono)",
-							fontSize: "12.5px",
+							padding: "10px 12px",
+							background: "var(--bg-panel-alt)",
+							border: "0.5px solid var(--border)",
+							borderRadius: "var(--radius-control)",
+							fontFamily: "var(--font-sans)",
+							fontSize: "12px",
+							color: "var(--text)",
 						}}
 					>
-						{missingPrivileges.map((priv) => (
-							<li key={priv}>{priv}</li>
-						))}
-					</ul>
-					<span
-						style={{
-							display: "block",
-							marginTop: "6px",
-							color: "var(--text-sub)",
-						}}
-					>
-						Grant these on the Burrow privsep token, then re-validate.
-					</span>
-				</div>
-			) : null}
+						<span style={{ display: "block", marginBottom: "6px" }}>
+							Token is valid but missing privileges:
+						</span>
+						<ul
+							style={{
+								margin: 0,
+								paddingLeft: "18px",
+								fontFamily: "var(--font-mono)",
+								fontSize: "12.5px",
+							}}
+						>
+							{missingPrivileges.map((priv) => (
+								<li key={priv}>{priv}</li>
+							))}
+						</ul>
+						<span
+							style={{
+								display: "block",
+								marginTop: "6px",
+								color: "var(--text-sub)",
+							}}
+						>
+							Grant these on the Burrow privsep token, then re-validate.
+						</span>
+					</div>
+				) : null}
+			</StatusRegion>
 
-			{error ? (
-				<ErrorStrip message={error.message} guidance={error.guidance} />
-			) : null}
+			<StatusRegion tone="assertive">
+				{error ? (
+					<ErrorStrip message={error.message} guidance={error.guidance} />
+				) : null}
+			</StatusRegion>
 
 			<StepFooter
 				label="Validate connection"
@@ -502,16 +526,18 @@ function StepTemplate({ onAdvance }: { onAdvance: () => void }) {
 				placeholder="pve"
 			/>
 
-			{notUsable ? (
-				<ErrorStrip
-					message={`VMID ${notUsable.vmid} exists on ${notUsable.node} but is not a template.`}
-					guidance="Convert it to a template (or check the VMID), then re-verify."
-				/>
-			) : null}
+			<StatusRegion tone="assertive">
+				{notUsable ? (
+					<ErrorStrip
+						message={`VMID ${notUsable.vmid} exists on ${notUsable.node} but is not a template.`}
+						guidance="Convert it to a template (or check the VMID), then re-verify."
+					/>
+				) : null}
 
-			{error ? (
-				<ErrorStrip message={error.message} guidance={error.guidance} />
-			) : null}
+				{error ? (
+					<ErrorStrip message={error.message} guidance={error.guidance} />
+				) : null}
+			</StatusRegion>
 
 			<StepFooter
 				label="Verify template"
@@ -537,6 +563,9 @@ function StepHealth({ onAdvance }: { onAdvance: () => void }) {
 
 	const probe = () => {
 		setIsLoading(true);
+		// Clear the prior readout so the in-flight probe reads "checking", not a
+		// stale (or false-negative) result, for BOTH the mount probe and Re-check.
+		setResult(null);
 		api<HealthResult>("/health")
 			.then((data) => {
 				setResult(data);
@@ -564,33 +593,56 @@ function StepHealth({ onAdvance }: { onAdvance: () => void }) {
 	return (
 		<>
 			<StepHeading title="Check control-plane health" />
-			<div
-				style={{
-					display: "flex",
-					flexDirection: "column",
-					gap: "8px",
-					fontFamily: "var(--font-sans)",
-					fontSize: "13px",
-				}}
-			>
-				<HealthRow label="Database" ok={result?.db === "ok"} />
-				<HealthRow label="Compute" ok={result?.compute === "ok"} />
-			</div>
+			<StatusRegion tone="polite">
+				<div
+					style={{
+						display: "flex",
+						flexDirection: "column",
+						gap: "8px",
+						fontFamily: "var(--font-sans)",
+						fontSize: "13px",
+					}}
+				>
+					<HealthRow label="Database" state={healthRowState(result?.db)} />
+					<HealthRow label="Compute" state={healthRowState(result?.compute)} />
+				</div>
+			</StatusRegion>
 
-			{degraded ? (
-				<ErrorStrip
-					message="Burrow can start, but cannot reach Proxmox yet."
-					guidance="Fix the connection above, then Re-check."
-				/>
-			) : null}
+			<StatusRegion tone="assertive">
+				{degraded ? (
+					<ErrorStrip
+						message="Burrow can start, but cannot reach Proxmox yet."
+						guidance="Fix the connection above, then Re-check."
+					/>
+				) : null}
+			</StatusRegion>
 
 			<StepFooter label="Re-check" onSubmit={probe} enabled={!isLoading} />
 		</>
 	);
 }
 
-/** One health row: a status dot + the literal ok/unreachable text (never color-only). */
-function HealthRow({ label, ok }: { label: string; ok: boolean }) {
+/** A health row reads one of three states; "checking" is the in-flight probe. */
+type HealthState = "checking" | "ok" | "down";
+
+/** Map a probe field to a row state: undefined (not yet probed) reads "checking". */
+function healthRowState(field: string | undefined): HealthState {
+	if (field === undefined) {
+		return "checking";
+	}
+	return field === "ok" ? "ok" : "down";
+}
+
+/** The dot + text color for a row state (checking is muted, never red). */
+const HEALTH_ROW_STYLE: Record<HealthState, { color: string; text: string }> = {
+	checking: { color: "var(--text-muted)", text: "checking…" },
+	ok: { color: "var(--ok)", text: "ok" },
+	down: { color: "var(--err)", text: "unreachable" },
+};
+
+/** One health row: a status dot + the literal state text (never color-only). */
+function HealthRow({ label, state }: { label: string; state: HealthState }) {
+	const { color, text } = HEALTH_ROW_STYLE[state];
 	return (
 		<div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
 			<span style={{ width: "70px", color: "var(--text-sub)" }}>{label}</span>
@@ -600,12 +652,10 @@ function HealthRow({ label, ok }: { label: string; ok: boolean }) {
 					width: "var(--sz-status-dot)",
 					height: "var(--sz-status-dot)",
 					borderRadius: "var(--radius-full)",
-					background: ok ? "var(--ok)" : "var(--err)",
+					background: color,
 				}}
 			/>
-			<span style={{ color: ok ? "var(--ok)" : "var(--err)" }}>
-				{ok ? "ok" : "unreachable"}
-			</span>
+			<span style={{ color }}>{text}</span>
 		</div>
 	);
 }
@@ -620,16 +670,37 @@ function StepCreate() {
 	const [node, setNode] = useState("");
 	const [persistent, setPersistent] = useState(false);
 	const [error, setError] = useState<string | null>(null);
+	// Latch: once the workspace is created we MUST NOT re-create it. A failed
+	// /setup/complete strands the created workspace, so we switch the CTA to retry
+	// ONLY /setup/complete (idempotent) rather than re-POST /workspaces (WR-01).
+	const [workspaceCreated, setWorkspaceCreated] = useState(false);
 
 	const isValid = name.trim() !== "" && projectRepo.trim() !== "";
 	const isLoading = createWorkspace.isPending || completeSetup.isPending;
-	const canSubmit = isValid && !isLoading;
+	// Pre-create the CTA needs valid fields; post-create (retry) it only needs to
+	// not be in flight — the inputs are no longer relevant to finishing setup.
+	const canSubmit = (workspaceCreated || isValid) && !isLoading;
+
+	// Mark setup complete; on failure surface a token-free message and leave the
+	// created-workspace latch set so the next submit retries complete, not create.
+	const finishSetup = () => {
+		completeSetup.mutate(undefined, {
+			onError: () =>
+				setError("Workspace created, but finishing setup failed. Retry."),
+		});
+	};
 
 	const submit = () => {
 		if (!canSubmit) {
 			return;
 		}
 		setError(null);
+		// Retry path: the workspace already exists — only finish setup, never
+		// re-create (guards against a DUPLICATE workspace on a second click).
+		if (workspaceCreated) {
+			finishSetup();
+			return;
+		}
 		createWorkspace.mutate(
 			{
 				name,
@@ -640,7 +711,10 @@ function StepCreate() {
 			},
 			{
 				// complete-AFTER-create: only mark setup complete once the create lands.
-				onSuccess: () => completeSetup.mutate(),
+				onSuccess: () => {
+					setWorkspaceCreated(true);
+					finishSetup();
+				},
 				onError: (err) =>
 					setError(err instanceof ApiError ? err.message : GENERIC_ERROR),
 			},
@@ -711,10 +785,12 @@ function StepCreate() {
 				</label>
 			</div>
 
-			{error ? <ErrorStrip message={error} /> : null}
+			<StatusRegion tone="assertive">
+				{error ? <ErrorStrip message={error} /> : null}
+			</StatusRegion>
 
 			<StepFooter
-				label="Create workspace"
+				label={workspaceCreated ? "Complete setup" : "Create workspace"}
 				onSubmit={submit}
 				enabled={canSubmit}
 			/>

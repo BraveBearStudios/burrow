@@ -15,13 +15,23 @@
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { installMockWebSocket } from "../tests/helpers/mockWebSocket";
 import { resetXtermMocks } from "../tests/helpers/mockXterm";
 import { installMockResizeObserver } from "../tests/helpers/resizeObserver";
+import { server } from "../tests/msw/server";
 import { App } from "./App";
 import { useLayoutStore } from "./store/layoutStore";
+
+function envelope<T>(data: T) {
+	return {
+		data,
+		meta: { requestId: "test-request", timestamp: "2026-06-10T00:00:00Z" },
+		error: null,
+	};
+}
 
 vi.mock("@xterm/xterm", () => import("../tests/helpers/mockXterm"));
 vi.mock("@xterm/addon-fit", () => import("../tests/helpers/mockXterm"));
@@ -104,5 +114,42 @@ describe("App shell — interactions (UI-03, criterion 1)", () => {
 		expect(root).toHaveAttribute("data-theme", "light");
 		fireEvent.click(screen.getByRole("button", { name: "Medium theme" }));
 		expect(root).toHaveAttribute("data-theme", "medium");
+	});
+});
+
+describe("App first-run gate — replaces the shell (SETUP-06, WR-04)", () => {
+	it("renders ONLY the SetupWizard (NOT the workspace shell) when setupCompletedAt is null", async () => {
+		// Override the default (configured) /setup/state with an UNCONFIGURED Burrow.
+		server.use(
+			http.get("/api/v1/setup/state", () =>
+				HttpResponse.json(envelope({ setupCompletedAt: null })),
+			),
+		);
+		renderApp();
+
+		// The hard gate is present...
+		expect(
+			await screen.findByRole("dialog", { name: "Set up Burrow" }),
+		).toBeInTheDocument();
+		// ...and the workspace shell (landmark + list + new-workspace CTA) is NOT.
+		expect(
+			screen.queryByRole("main", { name: "Burrow workspace manager" }),
+		).not.toBeInTheDocument();
+		expect(screen.queryByText("project-eta")).not.toBeInTheDocument();
+		expect(
+			screen.queryByRole("button", { name: /New workspace/ }),
+		).not.toBeInTheDocument();
+	});
+
+	it("renders the shell (NOT the gate) when setupCompletedAt is non-null", async () => {
+		// The default MSW double already reports a configured Burrow.
+		renderApp();
+		expect(
+			await screen.findByRole("main", { name: "Burrow workspace manager" }),
+		).toBeInTheDocument();
+		// The setup gate is absent on the configured branch.
+		expect(
+			screen.queryByRole("dialog", { name: "Set up Burrow" }),
+		).not.toBeInTheDocument();
 	});
 });

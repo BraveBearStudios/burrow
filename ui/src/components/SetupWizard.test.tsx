@@ -253,6 +253,86 @@ describe("SetupWizard — complete-after-create ordering (SETUP-06)", () => {
 	});
 });
 
+describe("SetupWizard — complete-after-create failure (SETUP-06, WR-01)", () => {
+	it("a failed /setup/complete latches the create and retries ONLY complete (no duplicate workspace)", async () => {
+		const workspaceCalls: string[] = [];
+		let completeAttempts = 0;
+		server.use(
+			connectionOk(),
+			templateOk(),
+			healthOk(),
+			http.post("/api/v1/workspaces", async ({ request }) => {
+				workspaceCalls.push("workspaces");
+				const body = (await request.json()) as { name: string };
+				return HttpResponse.json(
+					envelope({
+						id: "ws-created",
+						name: body.name,
+						status: "running",
+						vmid: 110,
+						node: "node1",
+						lxcIp: "10.99.0.110",
+						projectRepo: "github.com/acme/omega",
+						projectBranch: "main",
+						pluginSet: "default",
+						createdAt: "2026-06-10T02:00:00Z",
+						stoppedAt: null,
+						destroyedAt: null,
+						deletedAt: null,
+					}),
+				);
+			}),
+			// The first /setup/complete fails; the second (retry) succeeds.
+			http.post("/api/v1/setup/complete", () => {
+				completeAttempts += 1;
+				if (completeAttempts === 1) {
+					return errorEnvelope("internal_error", "Boom.", 500);
+				}
+				return HttpResponse.json(
+					envelope({ setupCompletedAt: "2026-06-10T03:00:00Z" }),
+				);
+			}),
+		);
+		renderWizard();
+
+		// Walk 1 → 2 → 3 → 4.
+		fillConnection();
+		fireEvent.click(
+			screen.getByRole("button", { name: "Validate connection" }),
+		);
+		await screen.findByRole("button", { name: "Verify template" });
+		fireEvent.change(screen.getByLabelText("Template VMID"), {
+			target: { value: "9000" },
+		});
+		fireEvent.change(screen.getByLabelText("Node"), {
+			target: { value: "pve" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Verify template" }));
+		await screen.findByRole("button", { name: "Create workspace" });
+
+		// Step 4 — create succeeds but /setup/complete fails.
+		fireEvent.change(screen.getByLabelText("Name"), {
+			target: { value: "project-omega" },
+		});
+		fireEvent.change(screen.getByLabelText("Git repo"), {
+			target: { value: "github.com/acme/omega" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Create workspace" }));
+
+		// The failure is surfaced and the CTA latches to a complete-only retry.
+		const retry = await screen.findByRole("button", { name: "Complete setup" });
+		expect(
+			screen.getByText("Workspace created, but finishing setup failed. Retry."),
+		).toBeInTheDocument();
+
+		// Retry: this must call /setup/complete again, NOT re-create the workspace.
+		fireEvent.click(retry);
+		await waitFor(() => expect(completeAttempts).toBe(2));
+		// The workspace was created EXACTLY once across the whole flow (no duplicate).
+		expect(workspaceCalls).toEqual(["workspaces"]);
+	});
+});
+
 describe("SetupWizard — hard gate (SETUP-06)", () => {
 	it("does NOT close on Escape (the gate is non-dismissible)", () => {
 		renderWizard();
