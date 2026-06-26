@@ -280,6 +280,95 @@ describe("NewWorkspaceModal — Auto (least-loaded) default (WSX-01)", () => {
 	});
 });
 
+describe("NewWorkspaceModal — persistent checkbox (WSX-02)", () => {
+	// Same body-capturing POST override as WSX-01: round-trip the created row with
+	// the submitted persistent flag so the assertion reads the exact request body.
+	function captureCreateBody() {
+		const captured: { body: WorkspaceCreate | null } = { body: null };
+		server.use(
+			http.post("/api/v1/workspaces", async ({ request }) => {
+				const body = (await request.json()) as WorkspaceCreate;
+				captured.body = body;
+				return HttpResponse.json(
+					{
+						data: {
+							id: "ws-created",
+							name: body.name,
+							status: "running",
+							vmid: 110,
+							node: body.node ?? "node1",
+							lxcIp: "10.99.0.110",
+							projectRepo: body.projectRepo,
+							projectBranch: body.projectBranch ?? "main",
+							pluginSet: body.pluginSet ?? "default",
+							createdAt: "2026-06-10T02:00:00Z",
+							stoppedAt: null,
+							destroyedAt: null,
+							deletedAt: null,
+						},
+						meta: { requestId: "t", timestamp: "2026-06-10T00:00:00Z" },
+						error: null,
+					},
+					{ status: 200 },
+				);
+			}),
+		);
+		return captured;
+	}
+
+	/** Fill only the two required fields (Name, Git repo); leave Node on Auto. */
+	function fillRequiredOnly() {
+		fireEvent.change(screen.getByLabelText("Name"), {
+			target: { value: "project-omega" },
+		});
+		fireEvent.change(screen.getByLabelText("Git repo"), {
+			target: { value: "github.com/acme/omega" },
+		});
+	}
+
+	it("submits persistent:true when the persistent checkbox is checked", async () => {
+		const captured = captureCreateBody();
+		const { unmount } = renderModal();
+		await waitFor(() =>
+			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
+		);
+		fillRequiredOnly();
+		// Query the checkbox by its accessible (verbatim) label, then check it.
+		fireEvent.click(
+			screen.getByLabelText("Persistent (keep workspace after session ends)"),
+		);
+		fireEvent.click(screen.getByRole("button", { name: /Create/ }));
+
+		await waitFor(() =>
+			expect(useLayoutStore.getState().mosaicNode).toBe("ws-created"),
+		);
+		expect(captured.body?.persistent).toBe(true);
+		unmount();
+	});
+
+	it("defaults persistent unchecked → the create body does not send persistent:true", async () => {
+		const captured = captureCreateBody();
+		const { unmount } = renderModal();
+		await waitFor(() =>
+			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
+		);
+		// The checkbox defaults unchecked — leave it alone.
+		const persistentBox = screen.getByLabelText(
+			"Persistent (keep workspace after session ends)",
+		) as HTMLInputElement;
+		expect(persistentBox.checked).toBe(false);
+		fillRequiredOnly();
+		fireEvent.click(screen.getByRole("button", { name: /Create/ }));
+
+		await waitFor(() =>
+			expect(useLayoutStore.getState().mosaicNode).toBe("ws-created"),
+		);
+		// Default (ephemeral): persistent is false (never true).
+		expect(captured.body?.persistent).not.toBe(true);
+		unmount();
+	});
+});
+
 describe("NewWorkspaceModal — dismissal (UI-03)", () => {
 	it("Esc closes the form state", async () => {
 		const { onClose } = renderModal();
