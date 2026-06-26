@@ -1,0 +1,30 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Boots the Burrow control-plane container stack on the Ubuntu tool server.
+# Install:
+#   sudo cp deploy/systemd/burrow.service /etc/systemd/system/burrow.service
+#   # edit WorkingDirectory below to your repo checkout path, then:
+#   sudo systemctl daemon-reload && sudo systemctl enable --now burrow.service
+#
+# This is the CONTAINER-mode unit (docker compose). It is intentionally NOT named
+# the same path 40-control-plane.sh installs (cc-worker-config/systemd/burrow.service),
+# so the venv-mode script does not pick it up; container mode manages the runtime here.
+
+[Unit]
+Description=Burrow control plane (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+# The repo checkout that holds compose.prod.yml + Dockerfile.api/ui + deploy/.
+WorkingDirectory=/opt/burrow/src
+ExecStart=/usr/bin/docker compose -f compose.prod.yml up -d --build
+ExecStop=/usr/bin/docker compose -f compose.prod.yml down
+ExecReload=/usr/bin/docker compose -f compose.prod.yml up -d --build
+
+[Install]
+WantedBy=multi-user.target
