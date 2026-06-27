@@ -90,12 +90,6 @@ def _register_clone_calls(task_status: dict[str, object]) -> None:
     )
     responses.add(
         responses.PUT,
-        f"{_BASE}/pools/burrow-workers",
-        json={"data": None},
-        status=200,
-    )
-    responses.add(
-        responses.PUT,
         f"{_BASE}/nodes/{_NODE}/lxc/201/config",
         json={"data": None},
         status=200,
@@ -122,10 +116,15 @@ async def test_clone_blocks_on_upid_and_wires_pool_and_net0() -> None:
     # Prove the ADR-0003 pool-add and ADR-0004 net0 set were issued, and the net0 string
     # carries the VMID-derived static IP.
     calls = [(c.request.method, c.request.url) for c in responses.calls]
-    assert ("PUT", f"{_BASE}/pools/burrow-workers") in calls
     assert ("PUT", f"{_BASE}/nodes/{_NODE}/lxc/201/config") in calls
     # The UPID-status GET was polled (the block actually happened).
     assert ("GET", f"{_BASE}/nodes/{_NODE}/tasks/{_CLONE_UPID}/status") in calls
+    # The clone is created directly into /pool/burrow-workers (ADR-0003) via pool=,
+    # so VM.Allocate on the pool authorizes the new vmid (no separate pool-add).
+    clone_post = next(c for c in responses.calls if str(c.request.url).endswith("/lxc/9000/clone"))
+    cbody = clone_post.request.body
+    clone_body = unquote(cbody.decode() if isinstance(cbody, bytes) else str(cbody))
+    assert "pool=burrow-workers" in clone_body
 
     net0_put = next(c for c in responses.calls if str(c.request.url).endswith("/lxc/201/config"))
     # The body is form-URL-encoded; decode before asserting on the net0 string.
@@ -150,11 +149,9 @@ async def test_clone_blocks_on_upid_before_pool_and_net0_puts() -> None:
 
     ordered = [(c.request.method, str(c.request.url)) for c in responses.calls]
     status_get = ("GET", f"{_BASE}/nodes/{_NODE}/tasks/{_CLONE_UPID}/status")
-    pool_put = ("PUT", f"{_BASE}/pools/burrow-workers")
     net0_put = ("PUT", f"{_BASE}/nodes/{_NODE}/lxc/201/config")
 
-    # The clone-task status GET (the block) precedes BOTH dependent config PUTs.
-    assert ordered.index(status_get) < ordered.index(pool_put)
+    # The clone-task status GET (the block) precedes the dependent net0 config PUT.
     assert ordered.index(status_get) < ordered.index(net0_put)
 
 

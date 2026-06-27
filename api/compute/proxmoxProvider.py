@@ -240,14 +240,20 @@ class ProxmoxComputeProvider(ComputeProvider):
                     newid=new_vmid,
                     hostname=name,
                     full=1 if full else 0,
+                    # Create the clone DIRECTLY into the worker pool so VM.Allocate on
+                    # /pool/burrow-workers authorizes the NEW vmid. The token has no
+                    # per-vmid allocate on an id that is not yet a pool member
+                    # (chicken-and-egg), so a clone WITHOUT pool= 403s. This also makes
+                    # the separate pool-add below unnecessary (ADR-0003).
+                    pool=_WORKER_POOL,
                 )
             )
             return upid
 
         def _configure() -> None:
-            # ADR-0003: pool-scoped token must add the new VMID to /pool/burrow-workers.
-            self._api.pools(_WORKER_POOL).put(vms=str(new_vmid))
-            # ADR-0004: set the static net0 IP from the VMID.
+            # ADR-0004: set the static net0 IP from the VMID. The pool-add is no longer
+            # needed here — the clone above already created the CT inside
+            # /pool/burrow-workers via pool= (ADR-0003).
             self._api.nodes(node).lxc(new_vmid).config.put(net0=self._net0_for(new_vmid))
 
         # Issue the clone POST and capture its UPID.
