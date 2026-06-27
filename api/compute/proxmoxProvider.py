@@ -73,6 +73,22 @@ REQUIRED_PRIVS: frozenset[str] = frozenset(
 )
 
 
+def _normalize_host(host: str) -> str:
+    """Strip a scheme + trailing slash so a pasted URL works as a proxmoxer host.
+
+    proxmoxer wants ``host`` or ``host:port`` (it supplies https + :8006), NOT a
+    full URL — ``ProxmoxAPI("https://h:8006")`` builds a malformed base URL and
+    every call fails as 'unreachable'. The setup-wizard Host field placeholder
+    shows a URL form, so normalize here to accept both (SETUP-01 UX).
+    """
+    h = host.strip()
+    for scheme in ("https://", "http://"):
+        if h.startswith(scheme):
+            h = h[len(scheme):]
+            break
+    return h.rstrip("/")
+
+
 class ProxmoxComputeProvider(ComputeProvider):
     """Proxmox-backed :class:`ComputeProvider` over a synchronous ``proxmoxer`` client."""
 
@@ -81,7 +97,7 @@ class ProxmoxComputeProvider(ComputeProvider):
         # CA-pinned TLS: pass the CA-cert path to requests' `verify`; never disable
         # verification (CLAUDE.md security posture; block_on=high gate).
         self._api = proxmoxer.ProxmoxAPI(
-            settings.proxmox_host,
+            _normalize_host(settings.proxmox_host),
             user=settings.proxmox_user,
             token_name=settings.proxmox_token_name,
             # SETUP-07: `proxmox_token_value` is a SecretStr; the real value is read
@@ -369,7 +385,7 @@ class ProxmoxComputeProvider(ComputeProvider):
         # The client goes out of scope at method end; the token is never stored,
         # returned, or logged. CA-pinned TLS still applies (never disabled).
         eph = proxmoxer.ProxmoxAPI(
-            host,
+            _normalize_host(host),
             user=user,
             token_name=token_name,
             token_value=token_value,
