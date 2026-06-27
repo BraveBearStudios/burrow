@@ -66,13 +66,24 @@ install -m 755 /tmp/burrow-boot.sh /opt/burrow-boot.sh
 install -m 644 /tmp/burrow-worker.service /etc/systemd/system/burrow-worker.service
 systemctl enable burrow-worker.service
 
-# --- Boot-config placeholder -------------------------------------------------
-# Populated at boot via PULL-AT-BOOT from the control-plane bootconfig endpoint
-# (SC-4 / SC-5) — fetched by burrow-boot.sh, never injected at clone time.
-# Secrets are never persisted here; burrow-boot.sh fetches non-secret config plus
-# a short-lived, discarded git credential at boot.
-log "creating /etc/burrow/worker.env placeholder (populated at boot)"
-mkdir -p /etc/burrow && touch /etc/burrow/worker.env
+# --- Boot-config: bake the (non-secret) CONTROL_PLANE URL --------------------
+# LXC has no exec/file-write API over HTTPS (ADR-0002), so the per-clone create
+# saga CANNOT populate worker.env at clone time. CONTROL_PLANE is the SAME constant
+# for every worker of a given control plane, so it is baked into the template here
+# from CONTROL_PLANE_URL (passed by 20-create-template.sh via `pct exec -- env`).
+# Only this non-secret URL is baked; burrow-boot.sh still PULLS all config + a
+# short-lived, discarded git credential from the bootconfig endpoint at boot.
+mkdir -p /etc/burrow
+if [[ -n "${CONTROL_PLANE_URL:-}" ]]; then
+  log "baking CONTROL_PLANE=${CONTROL_PLANE_URL} into /etc/burrow/worker.env"
+  printf 'CONTROL_PLANE=%s\n' "$CONTROL_PLANE_URL" > /etc/burrow/worker.env
+else
+  log "WARNING: CONTROL_PLANE_URL not provided — worker.env left EMPTY."
+  log "Workers will fail to boot (burrow-boot.sh requires CONTROL_PLANE) until the"
+  log "template is rebuilt with CONTROL_PLANE_URL set."
+  : > /etc/burrow/worker.env
+fi
+chmod 644 /etc/burrow/worker.env
 
 # --- Baked /etc/tmux.conf -----------------------------------------------------
 # Minimal scrollback config read by tmux on every worker boot (WSX-03 criterion 2).

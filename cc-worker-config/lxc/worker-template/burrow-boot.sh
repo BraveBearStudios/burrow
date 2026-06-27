@@ -289,14 +289,25 @@ log "cloning config repo (branch ${CONFIG_BRANCH})"
 rm -rf /tmp/cc-worker-config
 clone_with_token "$GIT_CRED" "$CONFIG_REPO" /tmp/cc-worker-config \
   --depth=1 --branch "$CONFIG_BRANCH"
-cp /tmp/cc-worker-config/claude/CLAUDE.md "${WORKER_HOME}/CLAUDE.md"
+# The config tree is either the repo ROOT (a standalone cc-worker-config repo) or a
+# cc-worker-config/ SUBDIR (the burrow monorepo, where CONFIG_REPO commonly points).
+# Support both so CONFIG_REPO can be either layout.
+CFG_DIR=/tmp/cc-worker-config
+[[ -d /tmp/cc-worker-config/cc-worker-config ]] && CFG_DIR=/tmp/cc-worker-config/cc-worker-config
+# Master CLAUDE.md is optional: copy it if the config repo ships one, else skip —
+# a missing master file must not kill the worker boot.
+if [[ -f "${CFG_DIR}/claude/CLAUDE.md" ]]; then
+  cp "${CFG_DIR}/claude/CLAUDE.md" "${WORKER_HOME}/CLAUDE.md"
+else
+  log "no master claude/CLAUDE.md in the config repo — skipping"
+fi
 
 # Process the versioned plugin manifest from the just-cloned config repo BEFORE
 # the project clone. The fail-closed jq gate rejects an unknown type / malformed
 # manifest (non-zero → ERR trap); only claude-plugin types are pulled fresh
 # (binary/npm-global are baked at provision time).
 log "processing plugin manifest"
-process_manifest /tmp/cc-worker-config/plugins/manifest.json
+process_manifest "${CFG_DIR}/plugins/manifest.json"
 
 log "cloning project repo (branch ${PROJECT_BRANCH})"
 rm -rf "$PROJECT_DIR"

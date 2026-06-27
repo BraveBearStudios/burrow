@@ -37,6 +37,11 @@ ROOTFS_STORAGE="${ROOTFS_STORAGE:-<rootfs-storage>}"       # THIN storage (lvmth
 ROOTFS_SIZE="${ROOTFS_SIZE:-8}"                            # GiB; thin so unwritten blocks cost nothing
 BRIDGE="${BRIDGE:-<bridge>}"                               # the LAN bridge
 TMPL="${TMPL:-ubuntu-24.04-standard_<ver>_amd64.tar.zst}"   # match step 10's pin
+# Baked into the template's /etc/burrow/worker.env so every worker can fetch its
+# bootconfig. The control-plane API base URL reachable FROM the worker subnet —
+# e.g. http://<control-plane-ip>:8081 (the control-plane web port). Empty means
+# workers cannot boot until the template is rebuilt with this set.
+CONTROL_PLANE_URL="${CONTROL_PLANE_URL:-}"
 
 # Worker-template payload authored in Plan 07. Adjust if your layout differs.
 WT_DIR="${HERE}/../worker-template"
@@ -116,7 +121,10 @@ if [[ -d "$PLUGINS_DIR" ]]; then
 fi
 
 log "running provisioner inside CT $TEMPLATE_VMID"
-pct exec "$TEMPLATE_VMID" -- bash /tmp/provision-template.sh
+# Pass the (non-secret) CONTROL_PLANE_URL through to the in-CT provisioner so it
+# can bake CONTROL_PLANE into /etc/burrow/worker.env (LXC has no write API at clone
+# time, so this constant must be baked here).
+pct exec "$TEMPLATE_VMID" -- env CONTROL_PLANE_URL="$CONTROL_PLANE_URL" bash /tmp/provision-template.sh
 
 # ---------------------------------------------------------------------------
 # 3. Stop, then convert to a template (the linked-clone-default applies only to

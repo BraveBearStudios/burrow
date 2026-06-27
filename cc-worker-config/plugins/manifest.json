@@ -1,12 +1,6 @@
 {
   "schemaVersion": "1.0.0",
   "plugins": {
-    "example-claude-plugin": {
-      "source": "github.com/brave-bear-studios/example-claude-plugin",
-      "ref": "v1.0.0",
-      "type": "claude-plugin",
-      "description": "Reference claude-plugin pulled fresh at boot, pinned to an immutable tag for reproducibility (SC-2). Replace source/ref with a real public plugin repo before homelab use."
-    },
     "rtk": {
       "source": "github.com/brave-bear-studios/rtk",
       "ref": "v0.1.0",

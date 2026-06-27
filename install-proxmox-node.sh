@@ -113,6 +113,7 @@ ask WORKER_PREFIX   "Worker subnet prefix length"           "24"
 ask WORKER_GATEWAY  "Worker gateway IP"                     "10.99.0.1"
 ask PROXMOX_HOST    "Proxmox NODE API host the control plane dials (the node, e.g. ${det_node}.lan)" "${det_node}.lan"
 ask ALLOWED_ORIGIN  "Control-plane UI origin (tool server)" "http://burrow.lan"
+ask CONTROL_PLANE_URL "Control-plane URL workers fetch bootconfig from (e.g. http://<tool-server-ip>:8081)" ""
 ROOTFS_SIZE="${ROOTFS_SIZE:-8}"
 
 # ── Validate ───────────────────────────────────────────────────────────────
@@ -137,6 +138,7 @@ ${c_blue}Burrow host-prime plan — node ${NODE_NAME}${c_off}
   Worker network       : ${WORKER_SUBNET}/${WORKER_PREFIX}  gw ${WORKER_GATEWAY}
   Proxmox API host     : ${PROXMOX_HOST}   (the node the control plane dials)
   Control plane (UI)   : ${ALLOWED_ORIGIN}   (your separate Docker/tool server)
+  Worker bootconfig URL: ${CONTROL_PLANE_URL:-<UNSET — set CONTROL_PLANE_URL or workers cannot boot>}
 
 Runs (in order): 00 token/role/ACL -> 10 template download -> 20 build template.
 The token is written ONCE to ${REPO_DIR}/.env (0600, gitignored) and never echoed.
@@ -146,7 +148,7 @@ warn "LOAD-BEARING: the worker IP range (${WORKER_SUBNET}/${WORKER_PREFIX}, VMID
 confirm "Proceed with host-prime on ${NODE_NAME}?" || die "aborted by operator — nothing changed."
 
 # ── Run the numbered scripts ───────────────────────────────────────────────
-export NODE_NAME ROOTFS_STORAGE TMPL_STORAGE TEMPLATE_VMID BRIDGE ROOTFS_SIZE TMPL
+export NODE_NAME ROOTFS_STORAGE TMPL_STORAGE TEMPLATE_VMID BRIDGE ROOTFS_SIZE TMPL CONTROL_PLANE_URL
 export ENV_FILE="${REPO_DIR}/.env"
 
 run_step() {
@@ -212,7 +214,7 @@ ${c_blue}Next — on your Ubuntu tool/Docker server (same LAN, NOT this node):${
        scp root@${PROXMOX_HOST}:${CP_ENV}                /tmp/burrow.env
        scp root@${PROXMOX_HOST}:/etc/pve/pve-root-ca.pem /tmp/pve-ca.pem
        sudo mv /tmp/burrow.env /opt/burrow/.env && sudo chmod 600 /opt/burrow/.env
-       sudo mv /tmp/pve-ca.pem /etc/burrow/pve-ca.pem
+       sudo mv /tmp/pve-ca.pem /etc/burrow/pve-ca.pem && sudo chmod 644 /etc/burrow/pve-ca.pem
        sudo chown -R 10001:10001 /data
   2. Get the app and start it:
        git clone ${REPO_URL} && cd burrow
