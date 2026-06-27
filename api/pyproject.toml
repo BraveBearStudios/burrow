@@ -13,6 +13,13 @@ dependencies = [
     "pydantic-settings==2.14.1",
     "aiosqlite==0.22.1",
     "proxmoxer==2.3.0",
+    # proxmoxer's default https backend is requests-based but does NOT pull requests
+    # itself (it's a proxmoxer extra). Declare it as a runtime dep so the production
+    # image (built with `uv sync --no-dev`) includes it; otherwise the real-Proxmox
+    # path crashes at startup with "requires 'requests' module". It was previously
+    # present only transitively via the dev-only `responses`, so CI (Fake provider)
+    # never exercised the gap.
+    "requests==2.34.2",
     "httpx==0.28.1",
     # Upstream WebSocket *client* to the worker's ttyd (FastAPI/Starlette ship a WS
     # server, not a client). The terminal bridge imports it directly
