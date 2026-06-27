@@ -136,6 +136,17 @@ pct stop "$TEMPLATE_VMID"
 log "converting CT $TEMPLATE_VMID to a template"
 pct template "$TEMPLATE_VMID"
 
+# Re-assert the template-VMID ACL. `pct destroy` (the rebuild path) removes ACL
+# entries referencing /vms/<vmid>, so a rebuild silently strips the provisioner
+# token's VM.Audit/VM.Clone on the template and every subsequent clone 403s. Grant
+# to BOTH principals (privsep effective rights = user ∩ token, ADR-0003) AFTER the
+# (re)create so it survives the destroy. Idempotent; best-effort if names differ.
+log "re-asserting /vms/${TEMPLATE_VMID} ACL (a rebuild's destroy wipes it)"
+pveum acl modify "/vms/${TEMPLATE_VMID}" --users "burrow@pve" --roles BurrowProvisioner 2>/dev/null || \
+  log "  note: could not grant the user ACL (run 00-api-user-role.sh if burrow@pve is absent)"
+pveum acl modify "/vms/${TEMPLATE_VMID}" --tokens "burrow@pve!burrow" --roles BurrowProvisioner 2>/dev/null || \
+  log "  note: could not grant the token ACL (run 00-api-user-role.sh if the token is absent)"
+
 log "STEP 2b complete. Golden template ready at VMID $TEMPLATE_VMID."
 log "Phase-0 manual gate: clone once by hand --full, start, confirm ttyd on the"
 log "LAN interface + 'claude' launches, then destroy the test clone."
