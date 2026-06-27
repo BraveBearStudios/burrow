@@ -127,11 +127,11 @@ if [[ "$TOKEN_EXISTS" -eq 0 ]]; then
   # --- Secret write into .env (the hygiene crux) ---------------------------
   # Refuse to write .env unless git confirms it is ignored, so the secret can
   # never be staged. check-ignore exits 0 only when the path is ignored.
-  if git check-ignore "$ENV_FILE" >/dev/null 2>&1; then
+  if git -C "$(dirname "$ENV_FILE")" check-ignore "$ENV_FILE" >/dev/null 2>&1; then
     umask 077
     { set +x; } 2>/dev/null            # ensure no xtrace can leak the value
-    if [[ ! -f "$ENV_FILE" ]] && [[ -f .env.example ]]; then
-      cp .env.example "$ENV_FILE"
+    if [[ ! -f "$ENV_FILE" ]] && [[ -f "$(dirname "$ENV_FILE")/.env.example" ]]; then
+      cp "$(dirname "$ENV_FILE")/.env.example" "$ENV_FILE"
     fi
     # printf (never echo) the secret into .env; no value ever on a CLI arg.
     printf 'PROXMOX_TOKEN_VALUE=%s\n' "$TOKEN_VALUE" >> "$ENV_FILE"
@@ -152,7 +152,7 @@ if [[ "$TOKEN_EXISTS" -eq 0 ]]; then
     printf '\n' >&2
     if [[ -n "$PASTED" ]]; then
       read -rp "Path to a gitignored env file to write: " DEST
-      if [[ -n "$DEST" ]] && git check-ignore "$DEST" >/dev/null 2>&1; then
+      if [[ -n "$DEST" ]] && git -C "$(dirname "$DEST")" check-ignore "$DEST" >/dev/null 2>&1; then
         umask 077
         printf 'PROXMOX_TOKEN_VALUE=%s\n' "$PASTED" >> "$DEST"
         chmod 0600 "$DEST"

@@ -160,13 +160,18 @@ run_step 20-create-template.sh  "2b (build golden template)"
 
 # ── Emit a clean control-plane.env for the tool server ─────────────────────
 # No inline comments / quotes: docker compose env_file passes values literally.
-CP_ENV="${REPO_DIR}/control-plane.env"
+# Written OUTSIDE the git checkout (it now holds the secret) so it can never be staged.
+CP_ENV="/root/burrow-control-plane.env"
+# Pull the token 00 just wrote into .env so the operator copies ONE ready-to-use file
+# and never hand-copies a hidden secret. tail -n1 = the appended real value (the
+# .env.example scaffold leaves a blank PROXMOX_TOKEN_VALUE line above it).
+TOKEN_VALUE="$(grep '^PROXMOX_TOKEN_VALUE=' "$ENV_FILE" 2>/dev/null | tail -n1 | cut -d= -f2-)"
 umask 077
 cat > "$CP_ENV" <<ENV
 PROXMOX_HOST=${PROXMOX_HOST}
 PROXMOX_USER=burrow@pve
 PROXMOX_TOKEN_NAME=burrow
-PROXMOX_TOKEN_VALUE=
+PROXMOX_TOKEN_VALUE=${TOKEN_VALUE}
 PROXMOX_CA_CERT_PATH=/etc/burrow/pve-ca.pem
 CONFIG_REPO=${REPO_URL}
 CONFIG_BRANCH=${REPO_BRANCH}
@@ -188,18 +193,32 @@ GIT_CREDENTIAL_TOKEN=
 BOOTCONFIG_SOURCE_IP_CHECK=false
 DATABASE_PATH=/data/burrow.db
 ENV
+chmod 0600 "$CP_ENV"
 
 log "host-prime complete on ${NODE_NAME}."
+if [[ -n "$TOKEN_VALUE" ]]; then
+  log "token captured into ${CP_ENV} (0600) — you do NOT copy it by hand."
+else
+  warn "no token in ${ENV_FILE}; ${CP_ENV} has a blank token. Re-run and choose 'rotate' if 00 was interrupted."
+fi
 cat >&2 <<NEXT
 
-${c_blue}Next — on the Ubuntu tool server (same LAN):${c_off}
-  1. Copy the token (from ${REPO_DIR}/.env, key PROXMOX_TOKEN_VALUE) somewhere safe.
-  2. Copy ${CP_ENV} to the tool server as /opt/burrow/.env, then add the
-     PROXMOX_TOKEN_VALUE line (the token from step 1).
-  3. Place the node CA cert at /etc/burrow/pve-ca.pem on the tool server.
-  4. git clone ${REPO_URL} && cd burrow && sudo chown -R 10001:10001 /data
-  5. docker compose -f compose.prod.yml up -d --build
-  6. Browse http://${PROXMOX_HOST}/ -> the first-run setup wizard.
+${c_blue}Next — on your Ubuntu tool/Docker server (same LAN, NOT this node):${c_off}
+  ${CP_ENV} already contains everything, INCLUDING the token (keep it secret).
+  Run these ON the tool server:
 
-${c_yellow}Reminder:${c_off} confirm the worker range is excluded from DHCP before the first workspace boots.
+  1. Bring the config + CA cert over from this node (${PROXMOX_HOST}):
+       sudo mkdir -p /opt/burrow /etc/burrow /data
+       scp root@${PROXMOX_HOST}:${CP_ENV}                /tmp/burrow.env
+       scp root@${PROXMOX_HOST}:/etc/pve/pve-root-ca.pem /tmp/pve-ca.pem
+       sudo mv /tmp/burrow.env /opt/burrow/.env && sudo chmod 600 /opt/burrow/.env
+       sudo mv /tmp/pve-ca.pem /etc/burrow/pve-ca.pem
+       sudo chown -R 10001:10001 /data
+  2. Get the app and start it:
+       git clone ${REPO_URL} && cd burrow
+       sudo docker compose -f compose.prod.yml up -d --build
+  3. Open ${ALLOWED_ORIGIN}/ in a browser -> the first-run setup wizard.
+
+${c_yellow}Reminder:${c_off} exclude the worker IPs from your DHCP pool before creating a workspace.
+${c_yellow}Cleanup:${c_off} once the tool server is up, delete the secret copy on this node:  rm -f ${CP_ENV}
 NEXT
