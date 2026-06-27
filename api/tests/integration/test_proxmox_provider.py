@@ -248,11 +248,16 @@ async def test_clone_raises_task_failed_on_timeout() -> None:
 
 @responses.activate
 async def test_get_node_memory_returns_used_fraction() -> None:
-    """getNodeMemory returns mem/maxmem from /nodes/{node}/status (CAP-01)."""
+    """getNodeMemory returns memory.used/memory.total from /nodes/{node}/status (CAP-01).
+
+    Real PVE nests memory under ``memory: {used, total}`` (NOT top-level mem/maxmem,
+    which only appear on /cluster/resources + node-list rows). The old mock encoded
+    the wrong flat shape, so it green-lit a KeyError that only fired on real infra.
+    """
     responses.add(
         responses.GET,
         f"{_BASE}/nodes/{_NODE}/status",
-        json={"data": {"mem": 100, "maxmem": 400}},
+        json={"data": {"memory": {"used": 100, "total": 400}}},
         status=200,
     )
     fraction = await _provider().getNodeMemory(_NODE)

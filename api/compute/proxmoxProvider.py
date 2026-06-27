@@ -363,8 +363,14 @@ class ProxmoxComputeProvider(ComputeProvider):
 
     async def getNodeMemory(self, node: str) -> float:
         status = await asyncio.to_thread(lambda: self._api.nodes(node).status.get())
-        mem, maxmem = status["mem"], status["maxmem"]
-        return mem / maxmem if maxmem else 1.0
+        # Real PVE /nodes/{node}/status NESTS memory under "memory": {used, total}.
+        # (Top-level mem/maxmem keys exist on /cluster/resources + node-list rows, NOT
+        # on the per-node status — reading them raised KeyError on real infra, which
+        # auto-select swallowed as "unreachable" and the manual-node path surfaced as a
+        # 500.) Read the nested shape defensively.
+        memory = status.get("memory") or {}
+        used, total = memory.get("used", 0), memory.get("total", 0)
+        return used / total if total else 1.0
 
     async def waitTask(self, node: str, upid: str, timeout: float) -> ComputeTask:
         return await self._block(upid, timeout)
