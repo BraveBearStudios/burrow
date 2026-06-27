@@ -111,7 +111,7 @@ ask WORKER_POOL_END   "Worker VMID range end"               "299"
 ask WORKER_SUBNET   "Worker subnet (network address)"       "10.99.0.0"
 ask WORKER_PREFIX   "Worker subnet prefix length"           "24"
 ask WORKER_GATEWAY  "Worker gateway IP"                     "10.99.0.1"
-ask PROXMOX_HOST    "Proxmox API host for the control plane" "${det_node}.lan"
+ask PROXMOX_HOST    "Proxmox NODE API host the control plane dials (the node, e.g. ${det_node}.lan)" "${det_node}.lan"
 ask ALLOWED_ORIGIN  "Control-plane UI origin (tool server)" "http://burrow.lan"
 ROOTFS_SIZE="${ROOTFS_SIZE:-8}"
 
@@ -135,7 +135,8 @@ ${c_blue}Burrow host-prime plan — node ${NODE_NAME}${c_off}
   LAN bridge           : ${BRIDGE}
   Worker VMID range    : ${WORKER_POOL_START}-${WORKER_POOL_END}
   Worker network       : ${WORKER_SUBNET}/${WORKER_PREFIX}  gw ${WORKER_GATEWAY}
-  Control-plane host   : ${PROXMOX_HOST}   UI origin: ${ALLOWED_ORIGIN}
+  Proxmox API host     : ${PROXMOX_HOST}   (the node the control plane dials)
+  Control plane (UI)   : ${ALLOWED_ORIGIN}   (your separate Docker/tool server)
 
 Runs (in order): 00 token/role/ACL -> 10 template download -> 20 build template.
 The token is written ONCE to ${REPO_DIR}/.env (0600, gitignored) and never echoed.
