@@ -26,6 +26,12 @@ dependencies = [
     # (`from websockets.asyncio.client import connect`), so it is a direct dep —
     # not relied on transitively via uvicorn[standard]. Pinned to the STACK.md 16.0.
     "websockets==16.0",
+    # Fernet credential encryption-at-rest for the GUI-managed credential store
+    # (ADR-0015). Confined to lib/secretBox.py behind the SecretKeyProvider seam.
+    "cryptography==49.0.0",
+    # argon2id hashing for the local admin gate that protects the credential surface
+    # (ADR-0015). `import argon2` is provided by argon2-cffi.
+    "argon2-cffi==25.1.0",
 ]
 
 [dependency-groups]
