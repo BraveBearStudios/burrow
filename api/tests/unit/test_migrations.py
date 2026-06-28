@@ -1,15 +1,17 @@
 # SPDX-FileCopyrightText: 2026 Brave Bear Studios
 # SPDX-License-Identifier: AGPL-3.0-or-later
-"""Migration ledger contract for the 003 persistence + settings migration (WSX-02).
+"""Migration ledger contract for the 003 + 004 settings migrations (WSX-02 / ADR-0015).
 
-Locks the 003 migration against regression over a REAL ``SqliteProvider`` on a
-``tmp_path`` DB:
+Locks the 003 and 004 migrations against regression over a REAL ``SqliteProvider``
+on a ``tmp_path`` DB:
 
 - the ``persistent`` column lands with a ``DEFAULT 0`` backfill — a v1.2-shaped row
   inserted BEFORE 003 reads back ``persistent is False`` (ADR-0013);
 - the ``settings`` singleton is seeded ``id=1, setupCompletedAt IS NULL`` (ADR-0011);
 - the ``CHECK (id = 1)`` singleton invariant holds — a second insert collides;
-- a fresh DB and a migrated v1.2-shaped DB converge on the same schema.
+- a fresh DB and a migrated v1.2-shaped DB converge on the same schema;
+- 004 (ADR-0015) adds the nullable credential columns to ``settings`` and the
+  append-only ``audit_log`` table, and re-runs idempotently after a partial apply.
 """
 
 from dataclasses import dataclass
@@ -134,7 +136,19 @@ async def test_fresh_and_migrated_converge(tmp_path: Path) -> None:
 
     fresh_settings = _column_names(await _table_info(fresh._database_path, "settings"))
     migrated_settings = _column_names(await _table_info(migrated_path, "settings"))
-    assert fresh_settings == migrated_settings == {"id", "setupCompletedAt"}
+    assert fresh_settings == migrated_settings
+    # 004 (ADR-0015) widens the settings singleton with the credential columns; the
+    # fully converged schema is the 003 shape plus those.
+    assert fresh_settings == {
+        "id",
+        "setupCompletedAt",
+        "proxmoxTokenEnc",
+        "proxmoxTokenLast4",
+        "gitTokenEnc",
+        "gitTokenLast4",
+        "adminSecretHash",
+        "credentialsUpdatedAt",
+    }
 
 
 async def _apply_partial_003(database_path: str) -> None:
@@ -182,3 +196,105 @@ async def test_migrate_recovers_from_partial_003_apply(tmp_path: Path) -> None:
     assert len(settings_rows) == 1
     assert settings_rows[0]["id"] == 1
     assert settings_rows[0]["setupCompletedAt"] is None
+
+
+# ── 004: credential store + audit log (ADR-0015) ────────────────────────────
+
+_CREDENTIAL_COLUMNS = (
+    "proxmoxTokenEnc",
+    "proxmoxTokenLast4",
+    "gitTokenEnc",
+    "gitTokenLast4",
+    "adminSecretHash",
+    "credentialsUpdatedAt",
+)
+
+
+def _column_info(rows: list[aiosqlite.Row]) -> dict[str, aiosqlite.Row]:
+    """Map column name -> its ``PRAGMA table_info`` row (notnull, dflt_value, pk)."""
+    return {row["name"]: row for row in rows}
+
+
+async def test_004_credential_columns_present_and_nullable(tmp_path: Path) -> None:
+    """004 adds the six credential columns to ``settings``, all nullable, no default."""
+    provider = _provider(tmp_path, "creds.db")
+    await provider.migrate()
+    info = _column_info(await _table_info(provider._database_path, "settings"))
+    for column in _CREDENTIAL_COLUMNS:
+        assert column in info, f"{column} missing from settings"
+        assert info[column]["notnull"] == 0, f"{column} must be nullable (unconfigured deploy)"
+        assert info[column]["dflt_value"] is None, f"{column} must have no default"
+    # A freshly migrated deployment is unconfigured: every credential cell is NULL.
+    async with aiosqlite.connect(provider._database_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute(
+            "SELECT proxmoxTokenEnc, gitTokenEnc, adminSecretHash, credentialsUpdatedAt "
+            "FROM settings WHERE id = 1"
+        )
+        row = await cursor.fetchone()
+        await cursor.close()
+    assert row is not None
+    assert all(row[c] is None for c in row.keys())
+
+
+async def test_audit_log_table_present_and_appendable(tmp_path: Path) -> None:
+    """004 creates the append-only ``audit_log`` with an auto-stamped ``createdAt``."""
+    provider = _provider(tmp_path, "audit.db")
+    await provider.migrate()
+    cols = _column_names(await _table_info(provider._database_path, "audit_log"))
+    assert cols == {"id", "action", "target", "outcome", "sourceIp", "detail", "createdAt"}
+    async with aiosqlite.connect(provider._database_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        # action + outcome are NOT NULL; createdAt auto-stamps; no secret value present.
+        await conn.execute(
+            "INSERT INTO audit_log (id, action, outcome, sourceIp, detail) "
+            "VALUES ('a1', 'credentials.update', 'success', '10.0.0.5', 'proxmoxToken ****1234')"
+        )
+        await conn.commit()
+        cursor = await conn.execute("SELECT action, outcome, createdAt FROM audit_log WHERE id = 'a1'")
+        row = await cursor.fetchone()
+        await cursor.close()
+    assert row is not None
+    assert row["action"] == "credentials.update"
+    assert row["outcome"] == "success"
+    assert row["createdAt"] is not None  # DEFAULT strftime stamped it
+
+
+async def test_migrate_recovers_from_partial_004_apply(tmp_path: Path) -> None:
+    """A re-run after a partial 004 apply converges instead of wedging (WR-03).
+
+    Reproduces the realistic half-applied state: the 004 script applied (all six
+    credential ADD COLUMNs + the ``audit_log`` table) but the ``schema_migrations``
+    ledger row was never written. The re-run's first ``ADD COLUMN`` raises
+    ``duplicate column name``; ``migrate()``'s recovery strips the already-applied
+    ALTERs and replays the idempotent ``CREATE TABLE IF NOT EXISTS audit_log``
+    remainder, then the caller re-ledgers 004. A pre-existing audit row must survive
+    (the table is append-only and IF NOT EXISTS preserves it).
+    """
+    db_path = str(tmp_path / "partial004.db")
+    provider = SqliteProvider(_DbSettings(database_path=db_path))
+    await provider.migrate()  # full 001-004, all ledgered
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.execute(
+            "INSERT INTO audit_log (id, action, outcome) VALUES ('keep', 'admin.verify', 'success')"
+        )
+        # Simulate "004 applied but never ledgered": drop only its ledger row.
+        await conn.execute(
+            "DELETE FROM schema_migrations WHERE version = '004_credentials_and_audit'"
+        )
+        await conn.commit()
+
+    rerun = SqliteProvider(_DbSettings(database_path=db_path))
+    await rerun.migrate()  # must NOT raise "duplicate column name"
+
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT version FROM schema_migrations")
+        applied = {row["version"] for row in await cursor.fetchall()}
+        await cursor.close()
+        cursor = await conn.execute("SELECT id FROM audit_log WHERE id = 'keep'")
+        kept = await cursor.fetchone()
+        await cursor.close()
+    assert "004_credentials_and_audit" in applied
+    assert _column_names(await _table_info(db_path, "settings")) >= set(_CREDENTIAL_COLUMNS)
+    assert kept is not None  # append-only: recovery preserved the existing audit row
