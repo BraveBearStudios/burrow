@@ -119,3 +119,73 @@ class DbProvider(ABC):
         call simply re-writes the timestamp on the existing row (ADR-0011).
         """
         ...
+
+    # ── Credential store (ADR-0015) ───────────────────────────────────────
+
+    @abstractmethod
+    async def setCredentials(self, updates: dict[str, Any]) -> None:
+        """Persist encrypted credential ciphertext + last4 for the provided fields.
+
+        ``updates`` may carry ``proxmox_token_enc``/``proxmox_token_last4`` and/or
+        ``git_token_enc``/``git_token_last4``; only the provided keys are written, so a
+        partial update touches one credential without clearing the other. Always
+        stamps ``credentialsUpdatedAt``. The ciphertext is produced by the caller
+        (``lib.secretBox``); no plaintext secret ever crosses this seam (ADR-0015).
+        """
+        ...
+
+    @abstractmethod
+    async def getCredentialStatus(self) -> dict[str, Any]:
+        """Return credential status ONLY — never a stored value (ADR-0015 / SETUP-07).
+
+        ``{proxmoxTokenSet, proxmoxTokenLast4, gitTokenSet, gitTokenLast4,
+        credentialsUpdatedAt}``. Ciphertext is never returned here; this feeds the
+        write-only ``GET /setup/credentials`` status endpoint.
+        """
+        ...
+
+    @abstractmethod
+    async def getCredentialCiphertext(self, key: str) -> bytes | None:
+        """Return the stored ciphertext for ``key`` (``proxmox_token``/``git_token``).
+
+        Returns the opaque Fernet token bytes (or ``None`` when unset) for the caller
+        to decrypt at the ``lib.secretBox`` boundary. Ciphertext is safe to cross the
+        seam; the plaintext is recovered only inside the service, never persisted.
+        """
+        ...
+
+    @abstractmethod
+    async def setAdminSecret(self, secret_hash: str) -> None:
+        """Store the argon2id hash of the credential-surface admin secret (ADR-0015).
+
+        The caller hashes the secret (``argon2``); this persists the opaque hash only.
+        The plaintext admin secret is never stored or returned.
+        """
+        ...
+
+    @abstractmethod
+    async def getAdminSecretHash(self) -> str | None:
+        """Return the stored argon2id admin-secret hash, or ``None`` when unset.
+
+        The caller verifies a presented secret against it; the provider stays
+        crypto-free (no ``argon2`` import here).
+        """
+        ...
+
+    @abstractmethod
+    async def writeAudit(
+        self,
+        action: str,
+        outcome: str,
+        *,
+        target: str | None = None,
+        source_ip: str | None = None,
+        detail: str | None = None,
+    ) -> None:
+        """Append an immutable ``audit_log`` row (SOC 2 CC7.2/CC7.3).
+
+        Records ``action`` + ``outcome`` (plus optional non-secret ``target``,
+        ``source_ip``, ``detail``) with an auto-stamped ``createdAt``. NEVER pass a
+        secret value in any field.
+        """
+        ...

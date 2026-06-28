@@ -398,3 +398,119 @@ class SqliteProvider(DbProvider):
             )
             await conn.commit()
         return await self.getSetupState()
+
+    # ── Credential store (ADR-0015) ───────────────────────────────────────
+    # Storage only: the ciphertext is produced/consumed by lib.secretBox in the
+    # service, and the argon2 hash by the gate. This file never imports a crypto
+    # symbol — it persists opaque BLOB/TEXT and reads it back, the same seam
+    # discipline that confines aiosqlite here. No plaintext secret is stored.
+
+    # snake_case field -> camelCase settings column for a partial credential write.
+    _CREDENTIAL_COLUMNS = {
+        "proxmox_token_enc": "proxmoxTokenEnc",
+        "proxmox_token_last4": "proxmoxTokenLast4",
+        "git_token_enc": "gitTokenEnc",
+        "git_token_last4": "gitTokenLast4",
+    }
+    # credential key -> ciphertext column, for the resolver's decrypt read.
+    _CIPHERTEXT_COLUMNS = {"proxmox_token": "proxmoxTokenEnc", "git_token": "gitTokenEnc"}
+
+    async def setCredentials(self, updates: dict[str, Any]) -> None:
+        await self._ensure_migrated()
+        assignments: list[str] = []
+        params: dict[str, Any] = {}
+        for field_name, value in updates.items():
+            column = self._CREDENTIAL_COLUMNS.get(field_name)
+            if column is None:
+                raise KeyError(f"unknown credential field: {field_name}")
+            assignments.append(f"{column} = :{field_name}")
+            params[field_name] = value
+        if not assignments:
+            return
+        # Always stamp the change time alongside whichever credential was written,
+        # reusing the canonical strftime shape (no new timestamp format).
+        assignments.append("credentialsUpdatedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
+        async with self._connect() as conn:
+            await conn.execute(
+                f"UPDATE settings SET {', '.join(assignments)} WHERE id = 1", params
+            )
+            await conn.commit()
+
+    async def getCredentialStatus(self) -> dict[str, Any]:
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                "SELECT proxmoxTokenEnc, proxmoxTokenLast4, gitTokenEnc, gitTokenLast4, "
+                "credentialsUpdatedAt FROM settings WHERE id = 1"
+            )
+            row = await cursor.fetchone()
+            await cursor.close()
+        if row is None:
+            return {
+                "proxmoxTokenSet": False,
+                "proxmoxTokenLast4": None,
+                "gitTokenSet": False,
+                "gitTokenLast4": None,
+                "credentialsUpdatedAt": None,
+            }
+        # Status only: the boolean is derived from the ciphertext presence, and the
+        # ciphertext itself is NEVER returned (write-only guarantee, SETUP-07).
+        return {
+            "proxmoxTokenSet": row["proxmoxTokenEnc"] is not None,
+            "proxmoxTokenLast4": row["proxmoxTokenLast4"],
+            "gitTokenSet": row["gitTokenEnc"] is not None,
+            "gitTokenLast4": row["gitTokenLast4"],
+            "credentialsUpdatedAt": row["credentialsUpdatedAt"],
+        }
+
+    async def getCredentialCiphertext(self, key: str) -> bytes | None:
+        await self._ensure_migrated()
+        column = self._CIPHERTEXT_COLUMNS.get(key)
+        if column is None:
+            raise KeyError(f"unknown credential key: {key}")
+        async with self._connect() as conn:
+            cursor = await conn.execute(f"SELECT {column} FROM settings WHERE id = 1")
+            row = await cursor.fetchone()
+            await cursor.close()
+        if row is None or row[0] is None:
+            return None
+        value: bytes = row[0]
+        return value
+
+    async def setAdminSecret(self, secret_hash: str) -> None:
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            await conn.execute(
+                "UPDATE settings SET adminSecretHash = ? WHERE id = 1", (secret_hash,)
+            )
+            await conn.commit()
+
+    async def getAdminSecretHash(self) -> str | None:
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            cursor = await conn.execute("SELECT adminSecretHash FROM settings WHERE id = 1")
+            row = await cursor.fetchone()
+            await cursor.close()
+        if row is None or row[0] is None:
+            return None
+        value: str = row[0]
+        return value
+
+    async def writeAudit(
+        self,
+        action: str,
+        outcome: str,
+        *,
+        target: str | None = None,
+        source_ip: str | None = None,
+        detail: str | None = None,
+    ) -> None:
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            await conn.execute(
+                "INSERT INTO audit_log (id, action, target, outcome, sourceIp, detail) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (uuid.uuid4().hex, action, target, outcome, source_ip, detail),
+            )
+            await conn.commit()
