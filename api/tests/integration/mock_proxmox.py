@@ -87,9 +87,7 @@ def register_task_poll(
     )
 
 
-def resource_exception(
-    status_code: int, message: str, content: str = ""
-) -> ResourceException:
+def resource_exception(status_code: int, message: str, content: str = "") -> ResourceException:
     """Construct a ``ResourceException`` in the verified proxmoxer shape.
 
     ``status_code`` + ``message`` text are exactly what the real provider's
@@ -99,9 +97,7 @@ def resource_exception(
     return ResourceException(status_code, message, content)
 
 
-def register_permissions(
-    host: str, privileges: list[str], *, status: int = 200
-) -> None:
+def register_permissions(host: str, privileges: list[str], *, status: int = 200) -> None:
     """Register the read-only ``GET /access/permissions`` setup probe (SETUP-01).
 
     On ``status==200`` the body is the real-shaped ``{"data": {"/": {priv: 1, ...}}}``

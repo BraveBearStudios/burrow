@@ -92,9 +92,7 @@ async def test_first_run_sets_then_change_requires_current(
 async def test_too_short_secret_is_leak_free_422(
     integration_client: httpx.AsyncClient,
 ) -> None:
-    response = await integration_client.post(
-        "/api/v1/setup/admin-secret", json={"secret": "short"}
-    )
+    response = await integration_client.post("/api/v1/setup/admin-secret", json={"secret": "short"})
     assert response.status_code == 422, response.text
     # The submitted value is never echoed (SecretStr mask + input-stripping handler).
     assert "short" not in response.text

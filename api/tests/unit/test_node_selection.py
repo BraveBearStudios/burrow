@@ -205,9 +205,7 @@ def test_workspace_create_node_defaults_to_none_when_omitted() -> None:
 
 def test_workspace_create_node_explicit_none_is_valid() -> None:
     """An explicit ``node=None`` is valid (auto signal)."""
-    payload = WorkspaceCreate(
-        name="auto", project_repo="git@example.com:acme/auto.git", node=None
-    )
+    payload = WorkspaceCreate(name="auto", project_repo="git@example.com:acme/auto.git", node=None)
     assert payload.node is None
 
 

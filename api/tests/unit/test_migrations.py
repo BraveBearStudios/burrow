@@ -251,7 +251,9 @@ async def test_audit_log_table_present_and_appendable(tmp_path: Path) -> None:
             "VALUES ('a1', 'credentials.update', 'success', '10.0.0.5', 'proxmoxToken ****1234')"
         )
         await conn.commit()
-        cursor = await conn.execute("SELECT action, outcome, createdAt FROM audit_log WHERE id = 'a1'")
+        cursor = await conn.execute(
+            "SELECT action, outcome, createdAt FROM audit_log WHERE id = 'a1'"
+        )
         row = await cursor.fetchone()
         await cursor.close()
     assert row is not None

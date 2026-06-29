@@ -457,9 +457,7 @@ class SqliteProvider(DbProvider):
         # reusing the canonical strftime shape (no new timestamp format).
         assignments.append("credentialsUpdatedAt = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')")
         async with self._connect() as conn:
-            await conn.execute(
-                f"UPDATE settings SET {', '.join(assignments)} WHERE id = 1", params
-            )
+            await conn.execute(f"UPDATE settings SET {', '.join(assignments)} WHERE id = 1", params)
             await conn.commit()
 
     async def getCredentialStatus(self) -> dict[str, Any]:

@@ -161,9 +161,7 @@ class WorkspaceService:
             # through the shared `_fits` comparator (strict `>` refuses, `==`
             # eligible) so there is genuinely ONE comparison source — the guard can
             # never drift from selectNode/`/nodes` if `_fits` semantics change.
-            if not _fits(
-                await self.compute.getNodeMemory(node), self.settings.capacity_threshold
-            ):
+            if not _fits(await self.compute.getNodeMemory(node), self.settings.capacity_threshold):
                 raise CapacityError(node)
             # 1 — reserve VMID via the DB partial-unique INSERT (the race arbiter);
             # persist the chosen node on the row (never None).
@@ -173,9 +171,7 @@ class WorkspaceService:
 
         try:
             # 2 — clone the golden template (provider blocks on the UPID, SC-1).
-            await self.compute.cloneCt(
-                self.settings.template_vmid, vmid, payload.name, node
-            )
+            await self.compute.cloneCt(self.settings.template_vmid, vmid, payload.name, node)
             # 3 — persist boot intent (pull-at-boot DB checkpoint, ADR-0002). WR-03:
             # the per-workspace boot intent (project repo/branch) is the row data
             # persisted at step 1; the global config repo/branch is derived from

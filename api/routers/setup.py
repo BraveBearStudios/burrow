@@ -80,7 +80,9 @@ async def _audit(
     try:
         await db.writeAudit(action, outcome, target=target, source_ip=source_ip, detail=detail)
     except Exception:
-        logger.warning("audit write failed (best-effort); continuing", extra={"auditAction": action})
+        logger.warning(
+            "audit write failed (best-effort); continuing", extra={"auditAction": action}
+        )
 
 
 async def require_admin(
@@ -153,9 +155,7 @@ async def verify_template(
     compute: ComputeProvider = Depends(get_compute),
 ) -> dict[str, object]:
     """Verify the golden template exists and is usable, READ-ONLY (SETUP-02)."""
-    result = await compute.verifyTemplate(
-        template_vmid=body.template_vmid, node=body.node
-    )
+    result = await compute.verifyTemplate(template_vmid=body.template_vmid, node=body.node)
     return respond(result.model_dump(by_alias=True))
 
 
@@ -242,7 +242,9 @@ class SaveCredentialsBody(CamelModel):
             # Fixed message, no secret — the leak-free 422 handler keeps only
             # loc/msg/type and SecretStr masks the value regardless.
             if value is not None and len(value.get_secret_value()) < MIN_CREDENTIAL_LENGTH:
-                raise ValueError(f"a credential must be at least {MIN_CREDENTIAL_LENGTH} characters")
+                raise ValueError(
+                    f"a credential must be at least {MIN_CREDENTIAL_LENGTH} characters"
+                )
         return self
 
 
@@ -303,9 +305,7 @@ async def save_credentials(
 
     if body.git_token is not None:
         git = body.git_token.get_secret_value()
-        await db.setCredentials(
-            {"git_token_enc": box.encrypt(git), "git_token_last4": git[-4:]}
-        )
+        await db.setCredentials({"git_token_enc": box.encrypt(git), "git_token_last4": git[-4:]})
         await _audit(
             db,
             "credentials.update",

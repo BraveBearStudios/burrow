@@ -84,7 +84,7 @@ def _normalize_host(host: str) -> str:
     h = host.strip()
     for scheme in ("https://", "http://"):
         if h.startswith(scheme):
-            h = h[len(scheme):]
+            h = h[len(scheme) :]
             break
     return h.rstrip("/")
 
@@ -444,9 +444,7 @@ class ProxmoxComputeProvider(ComputeProvider):
             # _is_auth_error branch a rejected runtime token surfaced as "host
             # unreachable", sending the operator chasing a network problem.
             if _is_not_found(exc):
-                return TemplateResult(
-                    exists=False, usable=False, vmid=template_vmid, node=node
-                )
+                return TemplateResult(exists=False, usable=False, vmid=template_vmid, node=node)
             if _is_auth_error(exc):
                 raise SetupAuthError("proxmox token was rejected (auth failed)") from None
             raise SetupUnreachableError("proxmox host was unreachable") from None

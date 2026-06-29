@@ -240,7 +240,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # The resolver already logs LOUDLY and falls back on an undecryptable token;
         # this guards the remaining transient case (e.g. a DB hiccup) so a store-read
         # failure cannot crash startup. A genuinely broken DB surfaces on first request.
-        logger.warning("could not load the stored Proxmox token at startup; using the .env fallback")
+        logger.warning(
+            "could not load the stored Proxmox token at startup; using the .env fallback"
+        )
     reconciler = build_reconciler()
     task = asyncio.create_task(_reconcile_loop(reconciler, settings.reconciler_period_s))
     try:
