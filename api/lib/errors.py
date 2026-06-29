@@ -122,3 +122,15 @@ class IllegalVmidError(ServiceError):
         self.vmid = vmid
         # Message is for internal triage only; the router never echoes it (T-01-17).
         super().__init__("vmid out of pool range")
+
+
+class AdminAuthError(ServiceError):
+    """The local admin gate rejected a credential-surface request (ADR-0015).
+
+    Raised when no admin secret is set yet, the admin-secret header is missing, or it
+    does not match the stored argon2id hash. Maps to a 401 envelope with a fixed,
+    generic message — it never reveals which of those conditions failed (no oracle)
+    and never echoes the presented secret.
+    """
+
+    code = "admin_unauthorized"

@@ -39,6 +39,7 @@ from db.provider import DbProvider
 from db.sqliteProvider import SqliteProvider
 from lib.envelope import respond_error
 from lib.errors import (
+    AdminAuthError,
     CapacityError,
     IllegalTransitionError,
     IllegalVmidError,
@@ -65,6 +66,9 @@ _SERVICE_ERROR_STATUS: dict[type[ServiceError], int] = {
     # probed vmid (enumeration resistance, T-01-17). Same wire shape as not_found.
     IllegalVmidError: 404,
     WorkspaceBootError: 502,
+    # Credential-surface admin gate rejection (ADR-0015): 401 with a fixed,
+    # oracle-free message (never reveals no-secret-set vs wrong-secret).
+    AdminAuthError: 401,
 }
 # Operator-facing fallback messages keyed by code, so a router never echoes an
 # internal exception string into the envelope (ASVS V7, T-01-14).
@@ -76,6 +80,7 @@ _SAFE_ERROR_MESSAGES: dict[str, str] = {
     # Generic message for the out-of-pool bootconfig probe — never echoes the vmid.
     "illegal_vmid": "Not found.",
     "boot_failed": "The workspace failed to boot.",
+    "admin_unauthorized": "Admin authorization required.",
     "compute_error": "The compute backend is unavailable.",
     "service_error": "The request could not be completed.",
     "validation_error": "Request validation failed.",

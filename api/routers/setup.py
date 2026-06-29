@@ -35,17 +35,44 @@ is MISSING privileges is the cap's SUCCESS path — it returns 200 with
 likewise returns 200 with ``exists=False`` per the read-only DTO contract.
 """
 
-from fastapi import APIRouter, Depends
-from pydantic import SecretStr
+from fastapi import APIRouter, Depends, Header, Request
+from pydantic import SecretStr, model_validator
 
 from compute.provider import ComputeProvider
 from db.provider import DbProvider
+from lib.adminGate import MIN_ADMIN_SECRET_LENGTH, hash_admin_secret, verify_admin_secret
 from lib.envelope import respond
+from lib.errors import AdminAuthError
 from models.base import CamelModel
 
 from main import get_compute, get_db
 
 router = APIRouter(prefix="/api/v1")
+
+
+async def require_admin(
+    request: Request,
+    x_burrow_admin: str | None = Header(default=None),
+    db: DbProvider = Depends(get_db),
+) -> None:
+    """Gate the credential surface on the local admin secret (ADR-0015).
+
+    Verifies the ``X-Burrow-Admin`` header against the stored argon2id hash. A missing
+    hash (no secret set yet), a missing header, and a mismatch all raise the SAME
+    ``AdminAuthError`` -> 401 (no oracle on which failed). Every decision is audited
+    with the source IP and NEVER the presented secret. Wire as a route dependency on
+    the credential endpoints (``Depends(require_admin)``).
+    """
+    source_ip = request.client.host if request.client else None
+    stored = await db.getAdminSecretHash()
+    ok = (
+        stored is not None
+        and x_burrow_admin is not None
+        and verify_admin_secret(x_burrow_admin, stored)
+    )
+    await db.writeAudit("admin.verify", "success" if ok else "failure", source_ip=source_ip)
+    if not ok:
+        raise AdminAuthError("admin gate rejected")
 
 
 class TestConnectionBody(CamelModel):
@@ -113,3 +140,49 @@ async def complete_setup(db: DbProvider = Depends(get_db)) -> dict[str, object]:
     it simply re-stamps. No new error code is needed.
     """
     return respond(await db.setSetupCompleted())
+
+
+class AdminSecretBody(CamelModel):
+    """Request body for ``POST /setup/admin-secret`` (ADR-0015).
+
+    ``secret`` is a ``SecretStr`` so it is masked in any 422/``repr``. ``current_secret``
+    is required to CHANGE an existing admin secret, so a LAN actor cannot silently
+    take over the gate once it is set.
+    """
+
+    secret: SecretStr
+    current_secret: SecretStr | None = None
+
+    @model_validator(mode="after")
+    def _min_length(self) -> "AdminSecretBody":
+        if len(self.secret.get_secret_value()) < MIN_ADMIN_SECRET_LENGTH:
+            # Fixed message, no secret value — the leak-free 422 handler keeps only
+            # loc/msg/type, and SecretStr masks the value regardless.
+            raise ValueError(f"admin secret must be at least {MIN_ADMIN_SECRET_LENGTH} characters")
+        return self
+
+
+@router.post("/setup/admin-secret")
+async def set_admin_secret(
+    body: AdminSecretBody,
+    request: Request,
+    db: DbProvider = Depends(get_db),
+) -> dict[str, object]:
+    """Set or change the credential-surface admin secret (ADR-0015).
+
+    First-run (no secret yet) is unauthenticated by design — the setup wizard sets it
+    before setup completes, under the LAN-only trust boundary. CHANGING an existing
+    secret requires the current one (``currentSecret``), so the gate cannot be silently
+    taken over post-setup. Only the argon2id hash is stored; the plaintext is never
+    persisted, logged, or returned.
+    """
+    source_ip = request.client.host if request.client else None
+    existing = await db.getAdminSecretHash()
+    if existing is not None:
+        current = body.current_secret.get_secret_value() if body.current_secret else ""
+        if not verify_admin_secret(current, existing):
+            await db.writeAudit("admin.set", "failure", source_ip=source_ip)
+            raise AdminAuthError("current admin secret mismatch")
+    await db.setAdminSecret(hash_admin_secret(body.secret.get_secret_value()))
+    await db.writeAudit("admin.set", "success", source_ip=source_ip)
+    return respond({"adminSecretSet": True})
