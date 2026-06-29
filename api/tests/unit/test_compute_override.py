@@ -27,7 +27,7 @@ from compute.proxmoxProvider import ProxmoxComputeProvider
 class _Settings:
     """Settings stub carrying only the proxmox_* fields the provider reads."""
 
-    proxmox_host: str = "10.0.0.6"
+    proxmox_host: str = "pve1.local"
     proxmox_user: str = "burrow@pve"
     proxmox_token_name: str = "burrow"
     proxmox_token_value: SecretStr = SecretStr("env-token")
