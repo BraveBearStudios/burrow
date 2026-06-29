@@ -17,6 +17,7 @@ its ``sleep`` — the test asserts the task LIFECYCLE, not timing.
 """
 
 import asyncio
+from pathlib import Path
 
 import pytest
 
@@ -28,12 +29,15 @@ from config import settings
 
 
 @pytest.fixture(autouse=True)
-def _fake_compute_singleton(monkeypatch: pytest.MonkeyPatch) -> None:
+def _fake_compute_singleton(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Use the Fake over a high reconcile period so the loop parks on sleep."""
     monkeypatch.setattr(settings, "compute", "fake", raising=False)
     # A long period means the loop runs at most one pass then parks on sleep — the
     # test exercises start+cancel, not the cadence.
     monkeypatch.setattr(settings, "reconciler_period_s", 3600, raising=False)
+    # Isolate the DB the ADR-0015 lifespan store-read touches (getCredentialCiphertext)
+    # to a temp file, so it does not hit the default /data path or leave a stray file.
+    monkeypatch.setattr(settings, "database_path", str(tmp_path / "lifespan.db"), raising=False)
     main.reset_compute()
 
 

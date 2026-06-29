@@ -37,6 +37,7 @@ from compute.proxmoxProvider import ProxmoxComputeProvider
 from config import settings
 from db.provider import DbProvider
 from db.sqliteProvider import SqliteProvider
+from lib.credentialResolver import CredentialResolver
 from lib.envelope import respond_error
 from lib.errors import (
     AdminAuthError,
@@ -110,6 +111,23 @@ _SETUP_ERROR_MAP: dict[type[ComputeError], tuple[str, int]] = {
 _compute_singleton: ComputeProvider | None = None
 _compute_kind: str | None = None
 
+# ADR-0015: the GUI-set Proxmox token (decrypted from the store) as a runtime
+# override for the provider's .env token. Set at startup (from the store, if any) and
+# on every credential write, paired with reset_compute() so the next build rebinds the
+# proxmoxer client to the new token — no restart. None = use the .env value.
+_proxmox_token_override: str | None = None
+
+
+def set_proxmox_token_override(token: str | None) -> None:
+    """Set (or clear) the runtime Proxmox-token override (ADR-0015).
+
+    Callers pair this with :func:`reset_compute` so the next :func:`get_compute`
+    rebuilds the provider bound to the new token. The plaintext lives only in this
+    process holder (as proxmoxer already holds it); it is never logged or persisted.
+    """
+    global _proxmox_token_override
+    _proxmox_token_override = token
+
 
 def get_compute() -> ComputeProvider:
     """Return the process-wide compute provider selected by ``settings.compute``.
@@ -125,7 +143,9 @@ def get_compute() -> ComputeProvider:
         if settings.compute == "fake":
             _compute_singleton = FakeComputeProvider()
         else:
-            _compute_singleton = ProxmoxComputeProvider(settings)
+            _compute_singleton = ProxmoxComputeProvider(
+                settings, token_override=_proxmox_token_override
+            )
     return _compute_singleton
 
 
@@ -205,6 +225,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     and awaits it, suppressing the resulting ``CancelledError`` so the cancel does
     not dirty the shutdown (Pitfall 4) — no leaked task, no surfaced error.
     """
+    # ADR-0015: load a GUI-set Proxmox token from the store into the runtime override
+    # BEFORE the first provider build, so a token set via the UI survives a restart.
+    # A store-read failure must NOT prevent startup: fall back to the .env token
+    # (the override stays None) and log it, rather than crashing the app. A genuinely
+    # broken DB surfaces on the first request anyway; this is not the place to die.
+    try:
+        set_proxmox_token_override(await CredentialResolver(get_db(), settings).proxmox_token())
+    except Exception:
+        logger.warning("could not load the stored Proxmox token at startup; using the .env fallback")
     reconciler = build_reconciler()
     task = asyncio.create_task(_reconcile_loop(reconciler, settings.reconciler_period_s))
     try:

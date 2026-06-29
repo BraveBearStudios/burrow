@@ -92,17 +92,26 @@ def _normalize_host(host: str) -> str:
 class ProxmoxComputeProvider(ComputeProvider):
     """Proxmox-backed :class:`ComputeProvider` over a synchronous ``proxmoxer`` client."""
 
-    def __init__(self, settings: Any) -> None:
+    def __init__(self, settings: Any, token_override: str | None = None) -> None:
         self._settings = settings
+        # ADR-0015: a GUI-set token from the encrypted store (resolved by the caller
+        # and passed as token_override) takes precedence over the .env value, so the
+        # operator can rotate the Proxmox token from the UI without a restart. None
+        # means "no stored token" -> fall back to the .env SecretStr.
+        token_value = (
+            token_override
+            if token_override is not None
+            # SETUP-07: `proxmox_token_value` is a SecretStr; the real value is read
+            # ONLY here, at the proxmoxer boundary, via .get_secret_value().
+            else settings.proxmox_token_value.get_secret_value()
+        )
         # CA-pinned TLS: pass the CA-cert path to requests' `verify`; never disable
         # verification (CLAUDE.md security posture; block_on=high gate).
         self._api = proxmoxer.ProxmoxAPI(
             _normalize_host(settings.proxmox_host),
             user=settings.proxmox_user,
             token_name=settings.proxmox_token_name,
-            # SETUP-07: `proxmox_token_value` is a SecretStr; the real value is read
-            # ONLY here, at the proxmoxer boundary, via .get_secret_value().
-            token_value=settings.proxmox_token_value.get_secret_value(),
+            token_value=token_value,
             verify_ssl=settings.proxmox_ca_cert_path,
         )
 
