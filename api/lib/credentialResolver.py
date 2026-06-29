@@ -13,12 +13,17 @@ no store configured (empty ``BURROW_SECRET_KEY``) never builds a ``SecretBox`` j
 to fall back to ``.env``.
 """
 
+import logging
+
 from config import Settings
 from db.provider import DbProvider
-from lib.secretBox import EnvSecretKeyProvider, SecretBox
+from lib.secretBox import DecryptionError, EnvSecretKeyProvider, SecretBox, SecretKeyError
 
 # The non-production marker returned when no git credential is configured anywhere.
 GIT_PLACEHOLDER_PREFIX = "DEV-PLACEHOLDER-NOT-A-REAL-CREDENTIAL"
+
+# Only non-secret context (never a credential value) ever reaches this logger.
+logger = logging.getLogger("burrow.credentials")
 
 
 class CredentialResolver:
@@ -39,7 +44,16 @@ class CredentialResolver:
         """Return the git credential for a boot fetch (store -> ``.env`` -> placeholder)."""
         enc = await self._db.getCredentialCiphertext("git_token")
         if enc is not None:
-            return self._box().decrypt(enc)
+            try:
+                return self._box().decrypt(enc)
+            except (SecretKeyError, DecryptionError):
+                # A credential IS stored but the key cannot decrypt it. Fall through to
+                # the .env value / placeholder so a key problem does not 500 every
+                # worker boot; log LOUDLY (never the value).
+                logger.error(
+                    "a GitHub credential is stored but could not be decrypted "
+                    "(BURROW_SECRET_KEY missing or changed); falling back to .env"
+                )
         token = self._settings.git_credential_token
         if token:
             return token
@@ -49,5 +63,13 @@ class CredentialResolver:
         """Return a GUI-set Proxmox token, or ``None`` to fall back to the ``.env`` value."""
         enc = await self._db.getCredentialCiphertext("proxmox_token")
         if enc is not None:
-            return self._box().decrypt(enc)
+            try:
+                return self._box().decrypt(enc)
+            except (SecretKeyError, DecryptionError):
+                # Same posture as git: an undecryptable stored token falls back to .env
+                # (None signals "use .env"); logged loudly, never silently masked.
+                logger.error(
+                    "a Proxmox token is stored but could not be decrypted "
+                    "(BURROW_SECRET_KEY missing or changed); falling back to the .env token"
+                )
         return None

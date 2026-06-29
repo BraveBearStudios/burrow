@@ -134,3 +134,14 @@ class AdminAuthError(ServiceError):
     """
 
     code = "admin_unauthorized"
+
+
+class CredentialStoreError(ServiceError):
+    """The encrypted credential store cannot be used (ADR-0015).
+
+    Raised when a credential write is attempted but ``BURROW_SECRET_KEY`` is not
+    configured, so there is no key to encrypt with. Maps to a 503 with a fixed
+    message; it names no secret and reveals nothing about the key.
+    """
+
+    code = "credential_store_unconfigured"

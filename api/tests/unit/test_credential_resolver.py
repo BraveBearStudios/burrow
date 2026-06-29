@@ -75,3 +75,19 @@ async def test_proxmox_none_when_unset_then_store_value(tmp_path: Path) -> None:
         {"proxmox_token_enc": box.encrypt("pve-token-xyz"), "proxmox_token_last4": "-xyz"}
     )
     assert await resolver.proxmox_token() == "pve-token-xyz"
+
+
+async def test_git_decrypt_failure_falls_back_to_env(tmp_path: Path) -> None:
+    # A git credential is stored under `key`, but a resolver with the WRONG key reads it:
+    # decrypt fails -> the resolver must fall back to the .env value, not raise (ADR-0015
+    # hardening: a key problem cannot 500 every worker boot).
+    key = generate_key()
+    _, db, box = _resolver(tmp_path, git_env="ghp_env_fallback_value", key=key)
+    assert box is not None
+    await db.setCredentials(
+        {"git_token_enc": box.encrypt("ghp_stored_value"), "git_token_last4": "alue"}
+    )
+    wrong_key_resolver, _, _ = _resolver(
+        tmp_path, git_env="ghp_env_fallback_value", key=generate_key()
+    )
+    assert await wrong_key_resolver.git_credential("repo") == "ghp_env_fallback_value"

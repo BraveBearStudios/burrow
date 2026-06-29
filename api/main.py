@@ -42,6 +42,7 @@ from lib.envelope import respond_error
 from lib.errors import (
     AdminAuthError,
     CapacityError,
+    CredentialStoreError,
     IllegalTransitionError,
     IllegalVmidError,
     NoFreeVmidError,
@@ -70,6 +71,8 @@ _SERVICE_ERROR_STATUS: dict[type[ServiceError], int] = {
     # Credential-surface admin gate rejection (ADR-0015): 401 with a fixed,
     # oracle-free message (never reveals no-secret-set vs wrong-secret).
     AdminAuthError: 401,
+    # Credential store unusable (BURROW_SECRET_KEY unset): 503, names no secret.
+    CredentialStoreError: 503,
 }
 # Operator-facing fallback messages keyed by code, so a router never echoes an
 # internal exception string into the envelope (ASVS V7, T-01-14).
@@ -82,6 +85,7 @@ _SAFE_ERROR_MESSAGES: dict[str, str] = {
     "illegal_vmid": "Not found.",
     "boot_failed": "The workspace failed to boot.",
     "admin_unauthorized": "Admin authorization required.",
+    "credential_store_unconfigured": "The credential store is not configured.",
     "compute_error": "The compute backend is unavailable.",
     "service_error": "The request could not be completed.",
     "validation_error": "Request validation failed.",
@@ -233,6 +237,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         set_proxmox_token_override(await CredentialResolver(get_db(), settings).proxmox_token())
     except Exception:
+        # The resolver already logs LOUDLY and falls back on an undecryptable token;
+        # this guards the remaining transient case (e.g. a DB hiccup) so a store-read
+        # failure cannot crash startup. A genuinely broken DB surfaces on first request.
         logger.warning("could not load the stored Proxmox token at startup; using the .env fallback")
     reconciler = build_reconciler()
     task = asyncio.create_task(_reconcile_loop(reconciler, settings.reconciler_period_s))

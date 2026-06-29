@@ -17,6 +17,7 @@ snake_case field names so a row maps straight onto the model.
 
 import json
 import logging
+import re
 import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -48,6 +49,26 @@ _WORKSPACE_COLUMNS = (
     "pluginSet AS plugin_set, createdAt AS created_at, stoppedAt AS stopped_at, "
     "destroyedAt AS destroyed_at, deletedAt AS deleted_at"
 )
+
+# Parses the table + column out of an ``ALTER TABLE <t> ADD COLUMN <c> ...`` line so
+# the partial-apply recovery can skip ONLY the columns that already landed (WR-03).
+_ADD_COLUMN_RE = re.compile(r"ALTER\s+TABLE\s+(\w+)\s+ADD\s+COLUMN\s+(\w+)", re.IGNORECASE)
+
+
+def _parse_add_column(line: str) -> tuple[str | None, str | None]:
+    """Return ``(table, column)`` for an ADD COLUMN line, else ``(None, None)``."""
+    match = _ADD_COLUMN_RE.search(line)
+    return (match.group(1), match.group(2)) if match else (None, None)
+
+
+async def _column_exists(conn: aiosqlite.Connection, table: str | None, column: str) -> bool:
+    """True when ``column`` already exists on ``table`` (``PRAGMA table_info``)."""
+    if table is None:
+        return False
+    cursor = await conn.execute(f"PRAGMA table_info({table})")
+    rows = await cursor.fetchall()
+    await cursor.close()
+    return any(row[1] == column for row in rows)
 
 
 class SqliteProvider(DbProvider):
@@ -142,10 +163,13 @@ class SqliteProvider(DbProvider):
         ``OperationalError: duplicate column name``, wedging migration permanently.
 
         Recovery: catch exactly that "duplicate column name" error and re-run the
-        script with the already-applied ADD COLUMN statements stripped. The rest of
-        the migration is authored idempotently (``CREATE TABLE IF NOT EXISTS`` /
-        ``INSERT OR IGNORE``), so replaying the remainder is safe and lets the caller
-        ledger the version, converging the half-applied DB onto the target schema.
+        script, skipping ONLY the ADD COLUMNs whose column already exists (checked per
+        column via ``PRAGMA table_info``). A migration with several sequential ADD
+        COLUMNs (e.g. 004's six) can half-apply — columns 1..k committed, k+1..n not —
+        so blindly stripping EVERY ``ALTER TABLE`` would drop the not-yet-added columns
+        and wedge the schema while the caller ledgers the version as done. Keeping the
+        missing ALTERs and replaying the idempotent remainder (``CREATE TABLE IF NOT
+        EXISTS`` / ``INSERT OR IGNORE``) converges the half-applied DB to the target.
         """
         script = path.read_text(encoding="utf-8")
         try:
@@ -154,16 +178,18 @@ class SqliteProvider(DbProvider):
             if "duplicate column name" not in str(exc).lower():
                 raise
             logger.warning(
-                "migration re-run found an already-applied column; "
-                "replaying the idempotent remainder",
+                "migration re-run found an already-applied column; replaying the "
+                "still-missing columns + the idempotent remainder",
                 extra={"migration": path.name, "cause": str(exc)},
             )
-            remainder = "\n".join(
-                line
-                for line in script.splitlines()
-                if not line.lstrip().upper().startswith("ALTER TABLE")
-            )
-            await conn.executescript(remainder)
+            kept: list[str] = []
+            for line in script.splitlines():
+                if line.lstrip().upper().startswith("ALTER TABLE"):
+                    table, column = _parse_add_column(line)
+                    if column is not None and await _column_exists(conn, table, column):
+                        continue  # this column already landed — skip its ADD COLUMN
+                kept.append(line)
+            await conn.executescript("\n".join(kept))
 
     # ── DbProvider contract ───────────────────────────────────────────────
     async def createWorkspace(self, data: dict[str, Any]) -> Workspace:
@@ -452,7 +478,7 @@ class SqliteProvider(DbProvider):
                 "proxmoxTokenLast4": None,
                 "gitTokenSet": False,
                 "gitTokenLast4": None,
-                "credentialsUpdatedAt": None,
+                "updatedAt": None,
             }
         # Status only: the boolean is derived from the ciphertext presence, and the
         # ciphertext itself is NEVER returned (write-only guarantee, SETUP-07).
@@ -461,7 +487,7 @@ class SqliteProvider(DbProvider):
             "proxmoxTokenLast4": row["proxmoxTokenLast4"],
             "gitTokenSet": row["gitTokenEnc"] is not None,
             "gitTokenLast4": row["gitTokenLast4"],
-            "credentialsUpdatedAt": row["credentialsUpdatedAt"],
+            "updatedAt": row["credentialsUpdatedAt"],
         }
 
     async def getCredentialCiphertext(self, key: str) -> bytes | None:

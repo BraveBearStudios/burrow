@@ -70,7 +70,7 @@ async def test_setcredentials_stores_ciphertext_not_plaintext(tmp_path: Path) ->
     status = await provider.getCredentialStatus()
     assert status["gitTokenSet"] is True
     assert status["gitTokenLast4"] == PLAINTEXT[-4:]
-    assert status["credentialsUpdatedAt"] is not None
+    assert status["updatedAt"] is not None
     # Status must carry neither the plaintext nor the ciphertext.
     assert PLAINTEXT not in str(status)
     assert enc.decode("utf-8") not in str(status)
@@ -111,7 +111,7 @@ async def test_unset_credentials_report_not_set(tmp_path: Path) -> None:
         "proxmoxTokenLast4": None,
         "gitTokenSet": False,
         "gitTokenLast4": None,
-        "credentialsUpdatedAt": None,
+        "updatedAt": None,
     }
     assert await provider.getCredentialCiphertext("git_token") is None
 

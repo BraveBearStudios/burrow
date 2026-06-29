@@ -298,3 +298,51 @@ async def test_migrate_recovers_from_partial_004_apply(tmp_path: Path) -> None:
     assert "004_credentials_and_audit" in applied
     assert _column_names(await _table_info(db_path, "settings")) >= set(_CREDENTIAL_COLUMNS)
     assert kept is not None  # append-only: recovery preserved the existing audit row
+
+
+async def _apply_through_003(database_path: str) -> None:
+    """001 + 002 + 003 applied and ledgered (the post-003 state, pre-004)."""
+    await _apply_pre_003(database_path)
+    async with aiosqlite.connect(database_path) as conn:
+        sql = (_MIGRATIONS_DIR / "003_persistent_and_settings.sql").read_text(encoding="utf-8")
+        await conn.executescript(sql)
+        await conn.execute(
+            "INSERT INTO schema_migrations (version) VALUES ('003_persistent_and_settings')"
+        )
+        await conn.commit()
+
+
+async def test_migrate_recovers_from_mid_sequence_004_apply(tmp_path: Path) -> None:
+    """A 004 re-run after only SOME of the six ADD COLUMNs applied still converges (WR-03).
+
+    The earlier recovery stripped EVERY ALTER on a duplicate-column re-run, so a crash
+    part-way through 004's six sequential ADD COLUMNs would drop the not-yet-added
+    columns and wedge the store while ledgering 004 as done. The per-column recovery
+    keeps the still-missing ALTERs: here columns 1-3 are pre-applied (unledgered) and
+    the re-run must add columns 4-6 + create audit_log, then ledger 004.
+    """
+    db_path = str(tmp_path / "mid004.db")
+    await _apply_through_003(db_path)
+    # Apply ONLY the first three 004 credential ADD COLUMNs; the rest (+ audit_log) and
+    # the 004 ledger row are absent — a faithful mid-sequence half-apply.
+    async with aiosqlite.connect(db_path) as conn:
+        await conn.executescript(
+            "ALTER TABLE settings ADD COLUMN proxmoxTokenEnc BLOB;"
+            "ALTER TABLE settings ADD COLUMN proxmoxTokenLast4 TEXT;"
+            "ALTER TABLE settings ADD COLUMN gitTokenEnc BLOB;"
+        )
+        await conn.commit()
+
+    provider = SqliteProvider(_DbSettings(database_path=db_path))
+    await provider.migrate()  # must converge, not wedge on "duplicate column name"
+
+    settings_cols = _column_names(await _table_info(db_path, "settings"))
+    assert set(_CREDENTIAL_COLUMNS) <= settings_cols, "the not-yet-applied columns were added"
+    audit_cols = _column_names(await _table_info(db_path, "audit_log"))
+    assert "action" in audit_cols, "audit_log was created by the recovery"
+    async with aiosqlite.connect(db_path) as conn:
+        conn.row_factory = aiosqlite.Row
+        cursor = await conn.execute("SELECT version FROM schema_migrations")
+        applied = {row["version"] for row in await cursor.fetchall()}
+        await cursor.close()
+    assert "004_credentials_and_audit" in applied

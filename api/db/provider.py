@@ -139,8 +139,8 @@ class DbProvider(ABC):
         """Return credential status ONLY — never a stored value (ADR-0015 / SETUP-07).
 
         ``{proxmoxTokenSet, proxmoxTokenLast4, gitTokenSet, gitTokenLast4,
-        credentialsUpdatedAt}``. Ciphertext is never returned here; this feeds the
-        write-only ``GET /setup/credentials`` status endpoint.
+        updatedAt}``. Ciphertext is never returned here; this feeds the write-only
+        ``GET /setup/credentials`` status endpoint.
         """
         ...
 
