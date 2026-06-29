@@ -59,3 +59,29 @@ class PostgresProvider(DbProvider):
 
     async def setSetupCompleted(self) -> dict[str, Any]:
         raise NotImplementedError("PostgresProvider.setSetupCompleted — hosted path")
+
+    async def setCredentials(self, updates: dict[str, Any]) -> None:
+        raise NotImplementedError("PostgresProvider.setCredentials — hosted path")
+
+    async def getCredentialStatus(self) -> dict[str, Any]:
+        raise NotImplementedError("PostgresProvider.getCredentialStatus — hosted path")
+
+    async def getCredentialCiphertext(self, key: str) -> bytes | None:
+        raise NotImplementedError("PostgresProvider.getCredentialCiphertext — hosted path")
+
+    async def setAdminSecret(self, secret_hash: str) -> None:
+        raise NotImplementedError("PostgresProvider.setAdminSecret — hosted path")
+
+    async def getAdminSecretHash(self) -> str | None:
+        raise NotImplementedError("PostgresProvider.getAdminSecretHash — hosted path")
+
+    async def writeAudit(
+        self,
+        action: str,
+        outcome: str,
+        *,
+        target: str | None = None,
+        source_ip: str | None = None,
+        detail: str | None = None,
+    ) -> None:
+        raise NotImplementedError("PostgresProvider.writeAudit — hosted path")

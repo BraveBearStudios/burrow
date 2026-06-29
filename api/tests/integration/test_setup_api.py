@@ -62,12 +62,8 @@ def _fake_settings(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(settings, "proxmox_host", "pve1.local", raising=False)
     monkeypatch.setattr(settings, "proxmox_user", "burrow@pve", raising=False)
     monkeypatch.setattr(settings, "proxmox_token_name", "burrow", raising=False)
-    monkeypatch.setattr(
-        settings, "proxmox_token_value", SecretStr("test-token"), raising=False
-    )
-    monkeypatch.setattr(
-        settings, "proxmox_ca_cert_path", "/etc/burrow/pve-ca.pem", raising=False
-    )
+    monkeypatch.setattr(settings, "proxmox_token_value", SecretStr("test-token"), raising=False)
+    monkeypatch.setattr(settings, "proxmox_ca_cert_path", "/etc/burrow/pve-ca.pem", raising=False)
 
 
 # ── endpoint happy paths over the Fake ───────────────────────────────────────
@@ -75,9 +71,7 @@ async def test_test_connection_success_envelope(
     integration_client: httpx.AsyncClient,
 ) -> None:
     """A valid body → 200 ConnectionResult envelope (success, missingPrivileges)."""
-    response = await integration_client.post(
-        "/api/v1/setup/test-connection", json=_CONNECT_BODY
-    )
+    response = await integration_client.post("/api/v1/setup/test-connection", json=_CONNECT_BODY)
     assert response.status_code == 200, response.text
     payload = response.json()
     _assert_envelope(payload)
@@ -89,9 +83,7 @@ async def test_verify_template_success_envelope(
     integration_client: httpx.AsyncClient,
 ) -> None:
     """A valid body → 200 TemplateResult envelope (exists, usable, vmid, node)."""
-    response = await integration_client.post(
-        "/api/v1/setup/verify-template", json=_TEMPLATE_BODY
-    )
+    response = await integration_client.post("/api/v1/setup/verify-template", json=_TEMPLATE_BODY)
     assert response.status_code == 200, response.text
     payload = response.json()
     _assert_envelope(payload)
@@ -109,17 +101,13 @@ async def test_test_connection_token_is_secretstr_redacted_on_422(
     """A 422 (missing host) never echoes the token: the SecretStr is redacted (SETUP-07)."""
     bad_body = {**_CONNECT_BODY}
     del bad_body["host"]
-    response = await integration_client.post(
-        "/api/v1/setup/test-connection", json=bad_body
-    )
+    response = await integration_client.post("/api/v1/setup/test-connection", json=bad_body)
     assert response.status_code == 422, response.text
     assert "operator-typed-token" not in response.text
 
 
 # ── setup error codes mapped at the envelope boundary (over the Fake) ─────────
-def _inject_compute(
-    monkeypatch: pytest.MonkeyPatch, provider: FakeComputeProvider
-) -> None:
+def _inject_compute(monkeypatch: pytest.MonkeyPatch, provider: FakeComputeProvider) -> None:
     """Seed the process-wide compute singleton so ``get_compute()`` returns ``provider``.
 
     The router resolves ``Depends(get_compute)`` against the cached singleton, so
@@ -138,9 +126,7 @@ async def test_auth_failure_maps_to_setup_auth_failed(
     """A SetupAuthError → setup_auth_failed envelope with a token-free message."""
     _inject_compute(monkeypatch, FakeComputeProvider(FakeFailures(setup_auth_fails=True)))
 
-    response = await integration_client.post(
-        "/api/v1/setup/test-connection", json=_CONNECT_BODY
-    )
+    response = await integration_client.post("/api/v1/setup/test-connection", json=_CONNECT_BODY)
     payload = response.json()
     _assert_envelope(payload)
     assert payload["error"]["code"] == "setup_auth_failed"
@@ -158,9 +144,7 @@ async def test_missing_privileges_surface_in_body(
         FakeComputeProvider(FakeFailures(setup_missing_privileges=["VM.Clone", "Sys.Audit"])),
     )
 
-    response = await integration_client.post(
-        "/api/v1/setup/test-connection", json=_CONNECT_BODY
-    )
+    response = await integration_client.post("/api/v1/setup/test-connection", json=_CONNECT_BODY)
     assert response.status_code == 200, response.text
     data = response.json()["data"]
     assert data["success"] is False
@@ -171,13 +155,9 @@ async def test_template_missing_surfaces_in_body(
     integration_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A missing template → exists=False, usable=False (per the body contract)."""
-    _inject_compute(
-        monkeypatch, FakeComputeProvider(FakeFailures(setup_template_missing=True))
-    )
+    _inject_compute(monkeypatch, FakeComputeProvider(FakeFailures(setup_template_missing=True)))
 
-    response = await integration_client.post(
-        "/api/v1/setup/verify-template", json=_TEMPLATE_BODY
-    )
+    response = await integration_client.post("/api/v1/setup/verify-template", json=_TEMPLATE_BODY)
     assert response.status_code == 200, response.text
     data = response.json()["data"]
     assert data["exists"] is False
