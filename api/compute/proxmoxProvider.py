@@ -247,7 +247,12 @@ class ProxmoxComputeProvider(ComputeProvider):
                 .lxc(template_vmid)
                 .clone.post(
                     newid=new_vmid,
-                    hostname=name,
+                    # ADR-0004: the CT hostname MUST end in ``-<vmid>`` so the worker's
+                    # ``resolve_vmid`` (burrow-boot.sh: ``${hostname##*-}``) recovers its
+                    # own VMID and can fetch its bootconfig. The free-form display
+                    # ``name`` is kept in the DB row, never used as the hostname — a
+                    # non-numeric suffix (e.g. ``fable-test`` -> ``test``) aborts the boot.
+                    hostname=f"burrow-w-{new_vmid}",
                     full=1 if full else 0,
                     # Create the clone DIRECTLY into the worker pool so VM.Allocate on
                     # /pool/burrow-workers authorizes the NEW vmid. The token has no
