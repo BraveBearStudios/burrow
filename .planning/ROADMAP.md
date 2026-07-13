@@ -280,7 +280,12 @@ Plans:
   3. CI on `main` passes the Trivy HIGH/CRITICAL gate (PC1 green) via patched base-image digests and/or a reviewed ignore policy (owner + expiry) for unfixable base CVEs (RELX-05).
   4. Release tags are semver `vX.Y.Z` owned by release-please, a hand-pushed milestone tag no longer triggers `release.yml`, and the stale `1.2.0` release PR is unblocked to advance (its actual forward-reconciliation to v1.4.0 lands with the CRED-01 feat merge in Phase 16) (RELX-06).
 
-**Plans**: TBD
+**Plans**: 3 plans (all Wave 1, parallelizable; disjoint files)
+Plans:
+
+- [ ] 15-01-PLAN.md — release.yml: lowercase GHCR owner into one reused base + syft registry auth + narrow tag trigger to semver (RELX-04, RELX-06)
+- [ ] 15-02-PLAN.md — Trivy green-main gate: ci.yml ignore-unfixed + reviewed .trivyignore + repin base image digests (RELX-05)
+- [ ] 15-03-PLAN.md — oss ruleset exclusion for the release-please branch: operator-run gh api runbook + apply (RELX-03; autonomous: false)
 
 ### Phase 16: Land Credential Backend & Reconcile Release Train
 
