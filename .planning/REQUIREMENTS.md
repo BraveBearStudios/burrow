@@ -24,7 +24,7 @@ CI-provable / repo-config; the ACC items are operator-run human UAT on real hard
 
 ### Pipeline & Release Infrastructure (RELX)
 
-- [ ] **RELX-03**: release-please can update its release branch (the active `oss` ruleset excludes `refs/heads/release-please--**`, or the GitHub Actions bot is a bypass actor), so the release PR maintains cleanly and merging it produces a `vX.Y.Z` tag.
+- [x] **RELX-03**: release-please can update its release branch (the active `oss` ruleset excludes `refs/heads/release-please--**`, or the GitHub Actions bot is a bypass actor), so the release PR maintains cleanly and merging it produces a `vX.Y.Z` tag.
 - [x] **RELX-04**: `release.yml` builds every GHCR reference from a **lowercased** owner and the SBOM (syft) step authenticates to the registry, so SBOM + cosign keyless sign + SLSA attestation all succeed and published images ship **signed and attested** (not the current unsigned partial-publish).
 - [x] **RELX-05**: CI on `main` passes the Trivy HIGH/CRITICAL gate (green `main` / precondition PC1) via patched base-image digests and/or a reviewed ignore policy for unfixable base CVEs.
 - [x] **RELX-06**: Release tags follow semver `vX.Y.Z` owned by release-please; hand-pushed milestone tags no longer trigger `release.yml`, and the stale `1.2.0` release PR is reconciled forward to **v1.4.0**.
@@ -106,7 +106,7 @@ proposal one-to-one (the operator-approved 8-phase shape required no reassignmen
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| RELX-03 | Phase 15 | Pending |
+| RELX-03 | Phase 15 | Complete |
 | RELX-04 | Phase 15 | Complete |
 | RELX-05 | Phase 15 | Complete |
 | RELX-06 | Phase 15 | Complete |
