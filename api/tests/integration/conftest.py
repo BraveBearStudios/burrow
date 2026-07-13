@@ -17,6 +17,7 @@ tool here: the ttyd leg is httpx, and proxmoxer (requests-based) is not involved
 the Fake.
 """
 
+import asyncio
 import re
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -34,6 +35,29 @@ from tests.e2e.stub_ttyd_server import handle_ttyd_connection
 # The Fake derives a worker IP from the VMID (10.99.0.<vmid % 256>); the stub ttyd
 # answers the health GET on :7681 for any address in that range.
 _TTYD_URL_PATTERN = re.compile(r"http://10\.99\.0\.\d+:7681/")
+
+
+async def await_workspace_status(
+    client: httpx.AsyncClient,
+    workspace_id: str,
+    status: str,
+    *,
+    attempts: int = 100,
+) -> dict[str, object]:
+    """Poll ``GET /workspaces/{id}`` until it reaches ``status`` (ADR-0017 async-202).
+
+    The create endpoint returns ``202`` + a ``creating`` row and runs the boot saga in
+    a background task on the SAME event loop; the short ``sleep`` yields so that task
+    can progress. Returns the row's ``data`` once it reaches the target status, or
+    raises if it never does within ``attempts``.
+    """
+    for _ in range(attempts):
+        response = await client.get(f"/api/v1/workspaces/{workspace_id}")
+        data = response.json()["data"]
+        if data is not None and data["status"] == status:
+            return data  # type: ignore[no-any-return]
+        await asyncio.sleep(0.02)
+    raise AssertionError(f"workspace {workspace_id} never reached status {status!r}")
 
 
 @pytest.fixture

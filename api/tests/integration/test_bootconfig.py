@@ -25,6 +25,8 @@ import pytest
 
 from config import settings
 
+from tests.integration.conftest import await_workspace_status
+
 # A high-entropy value that cannot occur incidentally; if it shows up in a log
 # record or an event blob, the credential leaked (T-01-18, block_on=high).
 _SENTINEL_CREDENTIAL = "SENTINEL-bootcred-9f2c4e7a1b6d8054-DO-NOT-LOG"
@@ -50,10 +52,16 @@ def _sentinel_token(monkeypatch: pytest.MonkeyPatch) -> str:
 
 
 async def _create_workspace(client: httpx.AsyncClient) -> dict[str, object]:
-    """Create a workspace (so it holds a known in-pool vmid) and return its data."""
+    """Create a workspace and poll it to ``running`` so it holds a resolved IP (ADR-0017).
+
+    The create endpoint returns ``202`` + a ``creating`` row; the boot saga resolves
+    the static IP and lands ``running`` in a background task, so poll to ``running``
+    before returning (the source-IP gate test needs the resolved ``lxc_ip``).
+    """
     response = await client.post("/api/v1/workspaces", json=_CREATE_BODY)
-    assert response.status_code == 200, response.text
-    return response.json()["data"]  # type: ignore[no-any-return]
+    assert response.status_code == 202, response.text
+    creating = response.json()["data"]
+    return await await_workspace_status(client, creating["id"], "running")
 
 
 def _assert_envelope(payload: dict[str, object]) -> None:
