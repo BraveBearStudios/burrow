@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: in-progress
-stopped_at: Autonomous run — Phases 16-18 complete (ship blocker cleared); executing Phase 19 (create-UX async-202)
-last_updated: "2026-07-13T22:15:00.000Z"
+stopped_at: Autonomous run — Phases 16-19 + 21 complete; at Phase 20 checkpoint (pre-release merge feat/v1.4-harden -> main)
+last_updated: "2026-07-13T23:30:00.000Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 13
-  completed_phases: 9
-  total_plans: 6
-  completed_plans: 6
-  percent: 69
+  completed_phases: 11
+  total_plans: 9
+  completed_plans: 9
+  percent: 85
 ---
 
 <!--
@@ -26,11 +26,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 19 — Create-UX Async-202 (cure the ~60s create 504)
+**Current focus:** Phase 20 — Signed GHCR Release & Harden-Runner Block (at the pre-release-merge checkpoint)
 
 ## Current Position
 
-Phase: 19 (Create-UX Async-202) — starting. Phase 18 PASSED — the ship blocker is cleared (credential GUI: wizard steps + Credentials screen + audit panel + BURROW_SECRET_KEY onboarding; api 299 + ui 136 tests green).
+Phase: 20 (Signed GHCR Release) — CHECKPOINT. Phases 16-19 + 21 all PASSED and committed on `feat/v1.4-harden`. To cut a v1.4.0 that contains the credential GUI (18) + async-202 (19) + security hygiene (17), `feat/v1.4-harden` must merge to `main` first, then release PR #1 is merged to tag v1.4.0 -> release.yml. Phase 22 (live homelab UAT) is operator-run. Phase 19 PASSED (async-202: api 302 + ui 136 green).
 Branch: `feat/v1.4-harden` (off green `main` `f9b1868`; the merged `feat/gui-managed-secrets` was pruned locally, remote prune deferred to operator)
 Status: Autonomous /gsd-autonomous run. Phase 15 PASSED (RELX-03 ruleset applied live). Phase 16 PASSED (credential backend merged out-of-band `f9b1868`, main green, release PR #1 → v1.4.0, docs reconciled to ADR-0015). Phase 17 PASSED (Dependabot + CodeQL landed, automated-security-fixes enabled, ROB-01/02 fixed; 194 api tests green).
 Last activity: 2026-07-13
