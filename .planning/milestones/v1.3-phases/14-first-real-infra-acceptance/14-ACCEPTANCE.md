@@ -20,7 +20,11 @@ need a live registry, OIDC, and the Step Security insights for a real run, so th
 
 Every step gives the EXACT command, the EXPECTED output, and an explicit PASS / FAIL line.
 Substitute your repo owner (`<owner>`, the committed placeholder is `BraveBearStudios`) and
-the real published manifest digest (`<digest>`) where shown.
+the real published manifest digest (`<digest>`) where shown. Case matters: the
+`ghcr.io/<owner>` REGISTRY path is lowercase (`ghcr.io/bravebearstudios/...`), because
+`release.yml` builds every image ref from a lowercased owner, while the `--owner` and the
+`--certificate-identity-regexp` github.com identity stay canonical-case `BraveBearStudios`
+(they are GitHub org identities, not registry paths).
 
 ## How to read this runbook
 
@@ -156,7 +160,9 @@ flip (revert to `audit`, re-read the allowlist, and retry; do not ship with a br
 Run these against the PUBLISHED manifest digest from the Step B publish run. Get the digest
 from the run logs (the `Build and push (by digest)` step output, `steps.build.outputs.digest`)
 or by inspecting the registry. Substitute it as `<digest>` below. Run the pair for BOTH
-`burrow-api` and `burrow-ui`.
+`burrow-api` and `burrow-ui`. In the Step E / Step F commands, substitute `<owner>` into the
+`ghcr.io/<owner>` image PATH in lowercase (`ghcr.io/bravebearstudios/...`); the `--owner` and
+`--certificate-identity-regexp` github.com identity stays canonical-case `BraveBearStudios`.
 
 ### Step E: cosign verify (keyless, fails loudly) (mirror of release.yml verify runbook)
 

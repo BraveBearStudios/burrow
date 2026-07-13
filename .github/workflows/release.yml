@@ -196,15 +196,20 @@ jobs:
 # (or release automation) against the PUBLISHED digest, after a real v* tag —
 # it needs the live registry + OIDC and is therefore NOT a PR-CI command:
 #
+# NOTE: the ghcr.io/<owner> REGISTRY path is lowercase (bravebearstudios); the
+# github.com identity in --certificate-identity-regexp and the gh attestation
+# --owner stay canonical-case (BraveBearStudios). They are GitHub ORG identities,
+# not registry paths. Do NOT lowercase them to match: verification would fail.
+#
 #   # Confirm the keyless cosign signature on the published digest:
 #   cosign verify \
 #     --certificate-identity-regexp 'https://github.com/BraveBearStudios/burrow/.*' \
 #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-#     ghcr.io/BraveBearStudios/burrow-api@sha256:<digest>
+#     ghcr.io/bravebearstudios/burrow-api@sha256:<digest>
 #
 #   # Confirm the SLSA build-provenance attestation on the published digest:
 #   gh attestation verify \
-#     oci://ghcr.io/BraveBearStudios/burrow-api@sha256:<digest> \
+#     oci://ghcr.io/bravebearstudios/burrow-api@sha256:<digest> \
 #     --owner BraveBearStudios
 #
 # (Repeat for burrow-ui. Pin deployment configs to the digest, not a floating
