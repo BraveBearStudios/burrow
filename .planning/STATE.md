@@ -2,14 +2,15 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
-status: planning
-last_updated: "2026-07-13T15:10:00.000Z"
+status: executing
+stopped_at: Completed 15-01-PLAN.md (RELX-04 + RELX-06); Phase 15 plan 2 of 3
+last_updated: "2026-07-13T18:02:10.336Z"
 last_activity: 2026-07-13
 progress:
-  total_phases: 8
+  total_phases: 13
   completed_phases: 0
-  total_plans: 0
-  completed_plans: 0
+  total_plans: 3
+  completed_plans: 1
   percent: 0
 ---
 
@@ -25,14 +26,14 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 15 — pipeline-unblock-green-main (v1.4 roadmap complete; ready to plan)
+**Current focus:** Phase 15 — Pipeline Unblock & Green Main
 
 ## Current Position
 
-Phase: 15 — Pipeline Unblock & Green Main (roadmap complete, not yet planned)
-Plan: —
-Status: Roadmap complete — ready to plan Phase 15 with `/gsd:plan-phase 15`
-Last activity: 2026-07-13 — v1.4 roadmap created (Phases 15-22, 21/21 requirements mapped, 0 unmapped)
+Phase: 15 (Pipeline Unblock & Green Main) — EXECUTING
+Plan: 2 of 3
+Status: Ready to execute
+Last activity: 2026-07-13
 
 ## Performance Metrics
 
@@ -116,6 +117,7 @@ Last activity: 2026-07-13 — v1.4 roadmap created (Phases 15-22, 21/21 requirem
 | Phase 13 P04 | 14 | 1 tasks | 1 files |
 | Phase 14 P01 | 18 | 3 tasks | 3 files |
 | Phase 14 P02 | 8min | 3 tasks | 4 files |
+| Phase 15 P01 | 20 | 3 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -185,6 +187,7 @@ Recent decisions affecting current work:
 - [Phase ?]: [Plan 14-01]: ACC-02 automatable slice landed. ci.yml static-gates gains a SHA-pinned fail-fast actionlint gate, but rhysd/actionlint ships NO action.yml (CLI binary repo, verified via API) so a bare uses: rhysd/actionlint@<sha> would fail at runtime; substituted reviewdog/action-actionlint@6fb7acc99f4a1008869fa8a0f09cfca740837d9d (v1.72.0), actionlint's upstream-documented Actions integration, with reporter github-check + fail_level error to make it a real fail-fast gate (its defaults github-pr-check + fail_level none are advisory-only). actionlint RUN deferred to the live Linux runner (unavailable on the Windows dev box, RELX-02); local proof is STRUCTURAL only (parse + SHA-pin + reuse lint clean), NOT a claim it passed locally. All 5 harden-runner steps keep egress-policy: audit with a commented Fulcio/Rekor/TUF/OIDC/GHCR allowlist-prep block pointing at 14-ACCEPTANCE.md audit->block flip. release.yml publish path (4 perms, by-digest, cosign keyless + SLSA attest) byte-unchanged; every uses: across all 3 workflows is a full 40-hex SHA. Phase 14 verification stays human_needed (ACC-01/02/03 real-infra). **(v1.4: actionlint DID pass on the live runner 2026-07-12, run 29221779815 — carried ACC-02 item 13 done; Phase 20 ACC-06 completes the egress audit->block flip.)**
 - [Phase ?]: 14-ACCEPTANCE.md references reviewdog/action-actionlint (the action 14-01 actually wired), not the plan's rhysd/actionlint which ships no action.yml
 - [Phase ?]: ACC-01/02/03 stay human_needed; the 16-item 14-HUMAN-UAT checklist is all result: [pending], rolled up from Phase 03/04. **(v1.4 update: ACC-01 items 1-5 (H9 core) PASSED 2026-07-12 on den01; items 6-11 carry into v1.4 Phase 22 as ACC-04; the first signed release + egress block-flip carry into Phase 20 as ACC-06.)**
+- [Phase ?]: [Plan 15-01]: release.yml builds every ghcr.io image ref from ONE lowercased steps.imgref.outputs.base (metadata images + both SBOMs + cosign sign + attest subject); OWNER passed via env so the runner shell does the ${OWNER,,} lowercase, keeping the raw github.repository_owner literal to exactly one occurrence. Both anchore/sbom-action steps get SYFT_REGISTRY_AUTH_AUTHORITY/USERNAME/PASSWORD (ghcr.io / github.actor / GITHUB_TOKEN) so syft can pull the pushed-by-digest image (the SBOM step that previously failed and shipped unsigned partial publishes). Push tag trigger narrowed to semver v[0-9]+.[0-9]+.[0-9]+ so hand-pushed milestone tags no longer fire the publish job (release-please owns release tags). The github.com OIDC identity-regexp + gh attestation --owner stay canonical-case BraveBearStudios; only the ghcr.io registry path is lowercased. Signed+attested GREEN proof is CI-gated to the first live vX.Y.Z tag (Phase 20 / ACC-06). RELX-04 + RELX-06 structurally landed.
 
 ### Pending Todos
 
@@ -228,8 +231,8 @@ are now claimed by v1.4 Phases 20 + 22.
 
 ## Session Continuity
 
-Last session: 2026-07-13 — v1.4 roadmap created (Phases 15-22)
-Stopped at: roadmap complete, awaiting phase planning
+Last session: 2026-07-13T18:02:10.322Z
+Stopped at: Completed 15-01-PLAN.md (RELX-04 + RELX-06); Phase 15 plan 2 of 3
 Resume file: None
 Next plan: Plan Phase 15 with `/gsd:plan-phase 15` (Pipeline Unblock & Green Main — RELX-03/04/05/06; the true gating work: unblock release-please via the `oss` ruleset, lowercase the GHCR owner + give syft registry auth so images ship signed+attested, green the Trivy HIGH/CRITICAL gate on main, reconcile the tag scheme to semver). Phase 15 gates everything: Phase 16 (merge PR #3) must land on a green main. Phases 17, 19, 21 are parallelizable off the earlier work.
 
