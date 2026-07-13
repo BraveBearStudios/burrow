@@ -1,0 +1,37 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+#
+# Dependabot version updates (SEC-01). One grouped weekly PR per ecosystem so a
+# routine bump lands as a single reviewable PR instead of a swarm of one-per-dep
+# PRs. Covers the API (uv), the UI (npm), and the workflows' pinned actions
+# (github-actions).
+
+version: 2
+
+updates:
+  - package-ecosystem: "uv"
+    directory: "/api"
+    schedule:
+      interval: "weekly"
+    groups:
+      uv:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "npm"
+    directory: "/ui"
+    schedule:
+      interval: "weekly"
+    groups:
+      npm:
+        patterns:
+          - "*"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      github-actions:
+        patterns:
+          - "*"
