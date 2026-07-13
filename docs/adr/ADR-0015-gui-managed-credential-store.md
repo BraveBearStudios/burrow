@@ -140,6 +140,15 @@ live, without an api restart.
 - `tech-spec.md`, `REQUIREMENTS.md`, and `ROADMAP.md` rows that record the secret as
   out-of-scope-at-rest are updated to point at this ADR.
 
+## Operational note: key loss recovery
+
+Onboarding auto-generates `BURROW_SECRET_KEY` into the gitignored `.env`
+(`40-control-plane.sh`). Losing it (a wiped `.env`, a backup restored without it)
+makes the stored ciphertext unrecoverable: re-enter both credentials on the GUI
+Credentials screen to re-encrypt under a fresh key. A missing or rotated key never
+crashes the control plane or worker boot: `CredentialResolver` and the `main.py`
+startup lifespan fall back to the `.env` values and log the mismatch loudly.
+
 ## Revisit trigger
 
 A hosted multi-tenant path where credential access must be per-user (which brings

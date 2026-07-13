@@ -182,6 +182,43 @@ else
     cp "${APP_HOME}/.env.example" "$ENV_FILE"
   fi
 
+  # ── Credential-store Fernet key (ADR-0015 / CRED-06) ──────────────────
+  # Auto-generate BURROW_SECRET_KEY on first assembly so the GUI credential store
+  # works out of the box. Idempotent: a non-empty key is left untouched, and the
+  # write is an in-place temp-file swap under umask 077 (never a duplicate line,
+  # never echoed). The key stays in a shell var + printf (a bash builtin), so it is
+  # never a CLI arg — same hygiene the token write below uses.
+  #
+  # KEY-LOSS RECOVERY: this key decrypts the stored Proxmox token + GitHub PAT.
+  # Losing it (a wiped .env, a backup restored without it) makes the stored
+  # ciphertext UNRECOVERABLE — re-enter both credentials on the GUI Credentials
+  # screen to re-encrypt under a fresh key. A missing/rotated key never crashes the
+  # control plane or worker boot: the resolver + startup fall back to the .env
+  # values (see api/lib/credentialResolver.py + api/main.py lifespan).
+  { set +x; } 2>/dev/null
+  SECRET_KEY_EMPTY_RE='^[[:space:]]*BURROW_SECRET_KEY[[:space:]]*=[[:space:]]*(#.*)?$'
+  if [[ -f "$ENV_FILE" ]] && grep -Eq "$SECRET_KEY_EMPTY_RE" "$ENV_FILE"; then
+    if SECRET_KEY="$(python3 -c 'from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())' 2>/dev/null)" \
+      && [[ -n "$SECRET_KEY" ]]; then
+      TMP_ENV="$(mktemp)"
+      while IFS= read -r line || [[ -n "$line" ]]; do
+        if [[ "$line" =~ $SECRET_KEY_EMPTY_RE ]]; then
+          printf 'BURROW_SECRET_KEY=%s\n' "$SECRET_KEY" >> "$TMP_ENV"
+        else
+          printf '%s\n' "$line" >> "$TMP_ENV"
+        fi
+      done < "$ENV_FILE"
+      mv "$TMP_ENV" "$ENV_FILE"
+      unset SECRET_KEY
+      log "generated BURROW_SECRET_KEY for the credential store (never echoed)"
+    else
+      log "could not auto-generate BURROW_SECRET_KEY (python3 + cryptography unavailable);"
+      log "  leaving it empty — set it by hand to enable the GUI credential store."
+    fi
+  else
+    log "BURROW_SECRET_KEY already set (or no .env) -> leaving as-is"
+  fi
+
   # Non-secret keys filled from operator placeholders (edit before/after run).
   # Use printf appends; the operator can also edit ${ENV_FILE} by hand.
   {
