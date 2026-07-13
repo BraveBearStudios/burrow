@@ -30,6 +30,8 @@ from compute.fakeProvider import FakeComputeProvider
 
 from config import settings
 
+from tests.integration.conftest import await_workspace_status
+
 _CREATE_BODY = {
     "name": "auto-ws",
     "projectRepo": "git@example.com:acme/auto.git",
@@ -74,14 +76,19 @@ async def test_auto_picks_least_loaded_fitting_node(
     response = await integration_client.post(
         "/api/v1/workspaces", json={**_CREATE_BODY, "node": None}
     )
-    assert response.status_code == 200, response.text
+    # ADR-0017: 202 + a creating row now; node is chosen at reservation, so the row
+    # already carries the auto-selected node before the background boot completes.
+    assert response.status_code == 202, response.text
     payload = response.json()
     _assert_envelope(payload)
 
-    data = payload["data"]
-    assert data["status"] == "running"
+    creating = payload["data"]
+    assert creating["status"] == "creating"
     # pve2 (0.3) is least-loaded under the 0.80 threshold; pve1 (0.6) is not chosen.
-    assert data["node"] == "pve2"
+    assert creating["node"] == "pve2"
+
+    running = await await_workspace_status(integration_client, creating["id"], "running")
+    assert running["node"] == "pve2"
 
 
 async def test_manual_node_pick_is_unchanged_end_to_end(
@@ -102,10 +109,13 @@ async def test_manual_node_pick_is_unchanged_end_to_end(
     response = await integration_client.post(
         "/api/v1/workspaces", json={**_CREATE_BODY, "node": "pve3"}
     )
-    assert response.status_code == 200, response.text
-    data = response.json()["data"]
-    assert data["status"] == "running"
-    assert data["node"] == "pve3"
+    assert response.status_code == 202, response.text
+    creating = response.json()["data"]
+    assert creating["status"] == "creating"
+    assert creating["node"] == "pve3"
+
+    running = await await_workspace_status(integration_client, creating["id"], "running")
+    assert running["node"] == "pve3"
 
 
 async def test_auto_no_fit_refuses_with_capacity_envelope_and_no_orphan(
@@ -154,11 +164,15 @@ async def test_persisted_node_matches_selection_inside_lock(
         _fraction_provider({"pve1": 0.95, "pve2": 0.4}),
     )
 
-    created = (
-        await integration_client.post("/api/v1/workspaces", json={**_CREATE_BODY, "node": None})
-    ).json()["data"]
+    create_resp = await integration_client.post(
+        "/api/v1/workspaces", json={**_CREATE_BODY, "node": None}
+    )
+    assert create_resp.status_code == 202, create_resp.text
+    created = create_resp.json()["data"]
+    # The 202 creating row already carries the node chosen inside the reservation lock.
     assert created["node"] == "pve2"
 
-    # Re-read over the list endpoint: the durably persisted row carries the choice.
-    fetched = (await integration_client.get(f"/api/v1/workspaces/{created['id']}")).json()["data"]
+    # Re-read after the background boot lands running: the durably persisted row still
+    # carries the choice (select -> guard -> reserve ran atomically on one node).
+    fetched = await await_workspace_status(integration_client, created["id"], "running")
     assert fetched["node"] == "pve2"

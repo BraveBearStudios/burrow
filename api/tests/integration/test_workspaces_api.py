@@ -10,6 +10,8 @@ envelope for an unknown id, and the 409 envelope for an illegal transition.
 
 import httpx
 
+from tests.integration.conftest import await_workspace_status
+
 _CREATE_BODY = {
     "name": "alpha",
     "projectRepo": "git@example.com:acme/alpha.git",
@@ -26,16 +28,25 @@ def _assert_envelope(payload: dict[str, object]) -> None:
 
 
 async def _create(client: httpx.AsyncClient, **overrides: object) -> dict[str, object]:
+    """POST a create (async-202), assert the ``creating`` row, then poll to ``running``.
+
+    ADR-0017: the endpoint returns ``202`` + a ``creating`` row immediately and boots
+    in the background. This helper asserts that contract and returns the fully-booted
+    ``running`` row so the downstream lifecycle tests keep operating on a running
+    workspace exactly as before the async-202 change.
+    """
     body = {**_CREATE_BODY, **overrides}
     response = await client.post("/api/v1/workspaces", json=body)
-    assert response.status_code == 200, response.text
+    assert response.status_code == 202, response.text
     payload = response.json()
     _assert_envelope(payload)
-    return payload["data"]  # type: ignore[no-any-return]
+    creating = payload["data"]
+    assert creating["status"] == "creating"
+    return await await_workspace_status(client, creating["id"], "running")
 
 
 async def test_create_reaches_running(integration_client: httpx.AsyncClient) -> None:
-    """POST creates a workspace and the saga drives it to ``running`` (WS-01)."""
+    """POST returns 202 + creating; the background saga drives it to ``running`` (WS-01)."""
     data = await _create(integration_client)
     assert data["status"] == "running"
     assert data["name"] == "alpha"
