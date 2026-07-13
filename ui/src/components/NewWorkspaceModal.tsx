@@ -5,17 +5,17 @@
 // a centered 400px modal collecting Name / Git repo / Branch (default `main`) /
 // Node (from useNodes), with required-field validation gating a green `Create`.
 //
-// COSMETIC boot-progress (A3 / Pitfall 5): POST /api/v1/workspaces is SYNCHRONOUS
-// in v1 — it blocks to `running` and returns the final row (no 202+poll). So the
-// 4-step checklist (✓/✓/⟳/○ with a gold-topped spinner on the active step + the
-// `→ 202 · polling status…` footnote) is a time-driven cosmetic animation that runs
-// WHILE the in-flight mutation resolves; it makes NO real per-step API claim. On the
-// resolved `running` row all steps mark ✓, then layoutStore.openPanel(id) + close.
-// A server envelope error (e.g. capacity CAP-01) surfaces the message verbatim as a
-// red ✕ step + an --err strip + a `Close` button (the server already compensated).
-//
-// DEFERRED (note in SUMMARY): migrating create to an async 202 + real status poll so
-// the saga reflects true per-step worker progress is a v1.x improvement, out of scope.
+// ASYNC-202 (UX-01 / ADR-0017): POST /api/v1/workspaces returns 202 + a `creating`
+// row immediately; the boot saga runs server-side and the workspace-list poll
+// (useWorkspaces, 3s refetchInterval) drives the row `creating`→`running`/`error`.
+// The create mutation resolves ON THAT 202, so this modal opens the new workspace's
+// panel (layoutStore.openPanel(id)) and closes IMMEDIATELY on success rather than
+// waiting for `running`. The 4-step checklist (✓/✓/⟳/○ with a gold-topped spinner +
+// the `→ 202 · polling status…` footnote) is a brief confirmation shown while the
+// (now fast) 202 resolves; it makes no real per-step API claim — the list poll is the
+// single status source. A reservation-time envelope error (e.g. capacity CAP-01,
+// which the backend surfaces synchronously before the 202) shows the message verbatim
+// as a red ✕ step + an --err strip + a `Close` button (the server already compensated).
 //
 // Tokens-only (no hex); green reserved for Create; gold reserved for the spinner
 // top-arc; weight ≤500; focus-trapped with Esc-closes / Enter-submits and an

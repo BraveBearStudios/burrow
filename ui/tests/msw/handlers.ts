@@ -150,21 +150,23 @@ export const handlers = [
 		return HttpResponse.json(envelope(found));
 	}),
 
-	// POST /api/v1/workspaces — synchronous create returns a running workspace (v1 saga).
-	// When body.node is null/omitted (the Auto path) the backend auto-selects the
-	// least-loaded node; this fake mirrors that by deriving the least-loaded seed node
-	// (node1 @ 0.42) so the created row always carries a real node string. IN-01: the
-	// backend's create route returns HTTP 200 (synchronous create of the final row),
-	// so this double returns 200 too — backend and doubles must not drift.
+	// POST /api/v1/workspaces — async-202 create returns a `creating` row immediately
+	// (ADR-0017); the boot saga runs server-side and the list poll drives the row to
+	// running/error. When body.node is null/omitted (the Auto path) the backend
+	// auto-selects the least-loaded node at reservation time, so this fake mirrors that
+	// by deriving the least-loaded seed node (node1 @ 0.42) onto the creating row (the
+	// node is chosen before the 202). The VMID is reserved (present); lxcIp is not yet
+	// resolved (null). IN-01: the backend's create route returns HTTP 202, so this
+	// double returns 202 too — backend and doubles must not drift.
 	http.post("/api/v1/workspaces", async ({ request }) => {
 		const body = (await request.json()) as WorkspaceCreate;
 		const created: Workspace = {
 			id: "ws-created",
 			name: body.name,
-			status: "running",
+			status: "creating",
 			vmid: 110,
 			node: body.node ?? autoSelectedNode(),
-			lxcIp: "10.99.0.110",
+			lxcIp: null,
 			projectRepo: body.projectRepo,
 			projectBranch: body.projectBranch ?? "main",
 			pluginSet: body.pluginSet ?? "default",
@@ -173,7 +175,7 @@ export const handlers = [
 			destroyedAt: null,
 			deletedAt: null,
 		};
-		return HttpResponse.json(envelope(created), { status: 200 });
+		return HttpResponse.json(envelope(created), { status: 202 });
 	}),
 
 	// DELETE /api/v1/workspaces/:id — destroy (stop+destroy CT, soft-delete row).

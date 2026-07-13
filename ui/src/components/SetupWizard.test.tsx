@@ -327,10 +327,11 @@ describe("SetupWizard — complete-after-create ordering (SETUP-06)", () => {
 					envelope({
 						id: "ws-created",
 						name: body.name,
-						status: "running",
+						// ADR-0017: create resolves on a 202 + `creating` row.
+						status: "creating",
 						vmid: 110,
 						node: "node1",
-						lxcIp: "10.99.0.110",
+						lxcIp: null,
 						projectRepo: "github.com/acme/omega",
 						projectBranch: "main",
 						pluginSet: "default",
@@ -339,6 +340,7 @@ describe("SetupWizard — complete-after-create ordering (SETUP-06)", () => {
 						destroyedAt: null,
 						deletedAt: null,
 					}),
+					{ status: 202 },
 				);
 			}),
 			http.post("/api/v1/setup/complete", () => {
@@ -403,10 +405,11 @@ describe("SetupWizard — complete-after-create failure (SETUP-06, WR-01)", () =
 					envelope({
 						id: "ws-created",
 						name: body.name,
-						status: "running",
+						// ADR-0017: create resolves on a 202 + `creating` row.
+						status: "creating",
 						vmid: 110,
 						node: "node1",
-						lxcIp: "10.99.0.110",
+						lxcIp: null,
 						projectRepo: "github.com/acme/omega",
 						projectBranch: "main",
 						pluginSet: "default",
@@ -415,6 +418,7 @@ describe("SetupWizard — complete-after-create failure (SETUP-06, WR-01)", () =
 						destroyedAt: null,
 						deletedAt: null,
 					}),
+					{ status: 202 },
 				);
 			}),
 			// The first /setup/complete fails; the second (retry) succeeds.
