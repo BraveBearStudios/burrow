@@ -85,3 +85,6 @@ class PostgresProvider(DbProvider):
         detail: str | None = None,
     ) -> None:
         raise NotImplementedError("PostgresProvider.writeAudit — hosted path")
+
+    async def listAudit(self, limit: int = 100) -> list[dict[str, Any]]:
+        raise NotImplementedError("PostgresProvider.listAudit — hosted path")
