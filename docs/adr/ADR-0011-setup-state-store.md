@@ -41,6 +41,12 @@ a **non-sensitive** marker only: the Proxmox API token is validated in memory an
 lives in `.env` exclusively (CLAUDE.md security posture, milestone decision), so no
 secret is stored in `settings` and no token-at-rest ADR is needed.
 
+> **Superseded (v1.4, ADR-0015):** the credential store now persists the Proxmox
+> token (and the GitHub PAT) Fernet-encrypted at rest via migration `004`. The
+> `settings` singleton is unchanged — it still holds only `setupCompletedAt` — but
+> the "no secret-at-rest, no token-at-rest ADR" posture asserted above no longer
+> holds. See ADR-0015 (GUI-managed encrypted credential store).
+
 ## Decision
 
 Store host-level setup state in a **singleton `settings` table** added by migration
