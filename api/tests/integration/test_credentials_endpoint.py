@@ -14,6 +14,7 @@
 """
 
 import logging
+import secrets
 import sqlite3
 from collections.abc import Iterator
 from io import StringIO
@@ -28,6 +29,9 @@ from lib.secretBox import EnvSecretKeyProvider, SecretBox, generate_key
 
 ADMIN = "test-admin-secret-1234"
 GIT_SENTINEL = "ghp-GITTOKEN-SENTINEL-DO-NOT-LEAK-0123456789"
+# A per-run unique sentinel so a stale value can never satisfy the leak sweep by
+# accident; the ``-DO-NOT-LOG`` suffix makes any leak obvious in output.
+CRED_SENTINEL = f"SENTINEL-cred-{secrets.token_hex(8)}-DO-NOT-LOG"
 
 
 @pytest.fixture
@@ -192,3 +196,53 @@ async def test_write_without_store_key_is_503(integration_client: httpx.AsyncCli
     )
     assert resp.status_code == 503, resp.text
     assert resp.json()["error"]["code"] == "credential_store_unconfigured"
+
+
+async def test_cred_sentinel_never_leaks_but_ciphertext_roundtrips(
+    integration_client: httpx.AsyncClient, store_key: str, captured_logs: StringIO
+) -> None:
+    """CRED-07 RED-IF-REGRESSED: a saved credential leaks its plaintext NOWHERE — no
+    DB cell (``settings``/``audit_log``), no API envelope (save / status / audit), no
+    log line — yet the ciphertext IS stored, is not the plaintext, and decrypts back.
+    """
+    headers = await _set_admin(integration_client)
+    saved = await integration_client.post(
+        "/api/v1/setup/credentials", headers=headers, json={"gitToken": CRED_SENTINEL}
+    )
+    assert saved.status_code == 200, saved.text
+
+    # (a) No cell of ANY table (enumerated from sqlite_master, incl. settings and
+    #     audit_log) holds the plaintext.
+    cells = _all_cells(settings.database_path)
+    assert all(CRED_SENTINEL not in cell for cell in cells), "credential plaintext at rest"
+
+    # (b) No API envelope echoes the plaintext: the save response, the status read,
+    #     and the audit read.
+    status = await integration_client.get("/api/v1/setup/credentials", headers=headers)
+    audit = await integration_client.get("/api/v1/setup/audit", headers=headers)
+    assert audit.status_code == 200, audit.text
+    assert CRED_SENTINEL not in saved.text, "plaintext leaked into the save envelope"
+    assert CRED_SENTINEL not in status.text, "plaintext leaked into the status envelope"
+    assert CRED_SENTINEL not in audit.text, "plaintext leaked into the audit envelope"
+
+    # Non-vacuous: the audit read returned the credentials.update row this write left
+    # (last4 only, never the value) — proving the audit_log sweep above saw real rows.
+    entries = audit.json()["data"]["entries"]
+    assert any(entry["action"] == "credentials.update" for entry in entries)
+
+    # (c) No captured log line holds the plaintext.
+    assert CRED_SENTINEL not in captured_logs.getvalue(), "plaintext reached a log line"
+
+    # POSITIVE contract: the ciphertext BLOB is stored, is NOT the plaintext, and
+    # decrypts back via the same key; the stored last4 == the sentinel's last four.
+    conn = sqlite3.connect(settings.database_path)
+    try:
+        row = conn.execute(
+            "SELECT gitTokenEnc, gitTokenLast4 FROM settings WHERE id = 1"
+        ).fetchone()
+    finally:
+        conn.close()
+    assert row is not None and row[0] is not None
+    assert row[0] != CRED_SENTINEL.encode(), "ciphertext must not be the plaintext bytes"
+    assert SecretBox(EnvSecretKeyProvider(store_key)).decrypt(row[0]) == CRED_SENTINEL
+    assert row[1] == CRED_SENTINEL[-4:]
