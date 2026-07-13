@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Brave Bear Studios
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# provision-template.sh — WORK-01: reproducible golden-template provisioner.
+# provision-template.sh - WORK-01: reproducible golden-template provisioner.
 #
 # Runs ONCE inside the template CT as root, before `pct template`. Bakes the
 # worker software baseline (Ubuntu 24.04 + Node 22 + a pinned claude-code + ttyd
