@@ -237,7 +237,14 @@ jobs:
           format: table
           severity: "HIGH,CRITICAL"
           exit-code: "1"
-          ignore-unfixed: "false"
+          # ignore-unfixed:true drops only base CVEs with no upstream fix so they
+          # stop failing the build; FIXABLE HIGH/CRITICAL still fail the gate and
+          # are cleared by a base-image repin, never allowlisted (RELX-05).
+          ignore-unfixed: "true"
+          # Reviewed residual-unfixable-CVE allowlist (owner|reason|link|reviewed
+          # per entry), seeded with zero CVE entries. The if:always SARIF run below
+          # keeps ALL findings for code scanning, so nothing is hidden.
+          trivyignores: .trivyignore
 
       # Run 2 — the full REPORT: emit a complete SARIF regardless of the gate.
       - name: Trivy scan (SARIF — full report)
