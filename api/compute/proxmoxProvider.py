@@ -519,9 +519,5 @@ def _is_running_or_locked(exc: Exception) -> bool:
     """
     text = str(exc).lower()
     return (
-        "running" in text
-        or "is locked" in text
-        or "lock" in text
-        or "can't lock" in text
-        or "not stopped" in text
+        "running" in text or "is locked (" in text or "can't lock" in text or "not stopped" in text
     )
