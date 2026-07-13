@@ -16,6 +16,7 @@
 // is the single source of every color (index.css [data-theme] blocks).
 
 import { useState } from "react";
+import { CredentialsScreen } from "./components/CredentialsScreen";
 import { Navbar } from "./components/Navbar";
 import { NewWorkspaceModal } from "./components/NewWorkspaceModal";
 import { SetupWizard } from "./components/SetupWizard";
@@ -44,6 +45,7 @@ const middleRowStyle: React.CSSProperties = {
 export function App() {
 	const [theme, setTheme] = useState<ThemeName>(DEFAULT_THEME);
 	const [isModalOpen, setModalOpen] = useState(false);
+	const [isCredentialsOpen, setCredentialsOpen] = useState(false);
 	// The first-run gate signal (SETUP-06): read on mount + invalidated by
 	// useCompleteSetup. While loading, render only the themed --bg root (no flash of
 	// the workspace list). When setupCompletedAt is null the gate renders ONLY the
@@ -81,6 +83,7 @@ export function App() {
 					theme={theme}
 					onThemeChange={setTheme}
 					onNewWorkspace={() => setModalOpen(true)}
+					onOpenCredentials={() => setCredentialsOpen(true)}
 				/>
 				<div style={middleRowStyle}>
 					<WorkspaceList />
@@ -91,6 +94,10 @@ export function App() {
 
 			{isModalOpen ? (
 				<NewWorkspaceModal onClose={() => setModalOpen(false)} />
+			) : null}
+
+			{isCredentialsOpen ? (
+				<CredentialsScreen onClose={() => setCredentialsOpen(false)} />
 			) : null}
 		</div>
 	);
