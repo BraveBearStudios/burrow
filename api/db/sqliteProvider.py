@@ -538,3 +538,31 @@ class SqliteProvider(DbProvider):
                 (uuid.uuid4().hex, action, target, outcome, source_ip, detail),
             )
             await conn.commit()
+
+    async def listAudit(self, limit: int = 100) -> list[dict[str, Any]]:
+        await self._ensure_migrated()
+        async with self._connect() as conn:
+            conn.row_factory = aiosqlite.Row
+            cursor = await conn.execute(
+                # rowid is the insertion-order tiebreaker so two rows stamped in the
+                # same millisecond still come back newest-first deterministically.
+                "SELECT id, action, target, outcome, sourceIp, detail, createdAt "
+                "FROM audit_log ORDER BY createdAt DESC, rowid DESC LIMIT ?",
+                (limit,),
+            )
+            rows = await cursor.fetchall()
+            await cursor.close()
+        # The selected columns are already the camelCase output keys; project each
+        # row into a plain dict. No secret value is ever stored in these columns.
+        return [
+            {
+                "id": row["id"],
+                "action": row["action"],
+                "target": row["target"],
+                "outcome": row["outcome"],
+                "sourceIp": row["sourceIp"],
+                "detail": row["detail"],
+                "createdAt": row["createdAt"],
+            }
+            for row in rows
+        ]

@@ -189,3 +189,14 @@ class DbProvider(ABC):
         secret value in any field.
         """
         ...
+
+    @abstractmethod
+    async def listAudit(self, limit: int = 100) -> list[dict[str, Any]]:
+        """Return recent ``audit_log`` rows newest-first, up to ``limit`` (CRED-05).
+
+        Each dict carries the non-secret audit fields with camelCase keys
+        (``id, action, target, outcome, sourceIp, detail, createdAt``). The rows never
+        contain a secret value by construction (``writeAudit`` forbids it), so this
+        read is safe to surface behind the admin-gated status endpoint. READ-ONLY.
+        """
+        ...

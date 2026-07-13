@@ -322,3 +322,24 @@ async def save_credentials(
 async def get_credentials(db: DbProvider = Depends(get_db)) -> dict[str, object]:
     """Return credential status (set + last4 + updatedAt) ONLY — never a value (ADR-0015)."""
     return respond(await db.getCredentialStatus())
+
+
+# Bounds for the audit-read page size: clamp (never reject) an out-of-range ``limit``.
+_AUDIT_LIMIT_MIN = 1
+_AUDIT_LIMIT_MAX = 500
+_AUDIT_LIMIT_DEFAULT = 100
+
+
+@router.get("/setup/audit", dependencies=[Depends(require_admin)])
+async def get_audit(
+    limit: int = _AUDIT_LIMIT_DEFAULT, db: DbProvider = Depends(get_db)
+) -> dict[str, object]:
+    """Return recent audit_log entries newest-first — admin-gated, READ-ONLY (CRED-05).
+
+    The audit trail is the durable SOC 2 record (CC7.2/CC7.3). This NEVER returns a
+    secret value: the rows never contain one by construction (``writeAudit`` forbids
+    it, and only non-secret columns exist), so the read is safe behind the admin gate.
+    ``limit`` is clamped to ``1..500`` (default ``100``).
+    """
+    clamped = max(_AUDIT_LIMIT_MIN, min(limit, _AUDIT_LIMIT_MAX))
+    return respond({"entries": await db.listAudit(clamped)})
