@@ -136,6 +136,31 @@ async def test_clone_blocks_on_upid_and_wires_pool_and_net0() -> None:
 
 
 @responses.activate
+async def test_clone_hostname_encodes_vmid_not_display_name() -> None:
+    """The CT hostname MUST end in ``-<vmid>`` so the worker recovers its own VMID.
+
+    ``burrow-boot.sh`` ``resolve_vmid`` parses the VMID from ``${hostname##*-}`` and
+    requires it numeric (ADR-0004). Cloning with the free-form workspace *name* left
+    a non-numeric suffix (e.g. name ``fable-test`` -> ``test``), so every worker boot
+    aborted before it could fetch bootconfig or clone the repos. The saga must derive
+    the hostname from the VMID (``burrow-w-<vmid>``), never from the display name.
+    """
+    _register_clone_calls({"status": "stopped", "exitstatus": "OK", "upid": _CLONE_UPID})
+
+    # Display name whose own suffix is NON-numeric — the exact real-infra failure
+    # (name 'fable-test' -> ${host##*-} = 'test'). VMID 201 matches the registered mocks.
+    await _provider().cloneCt(9000, 201, "fable-test", _NODE)
+
+    clone_post = next(c for c in responses.calls if str(c.request.url).endswith("/lxc/9000/clone"))
+    cbody = clone_post.request.body
+    clone_body = unquote(cbody.decode() if isinstance(cbody, bytes) else str(cbody))
+    # Hostname is VMID-derived (suffix '201' -> resolve_vmid recovers 201)...
+    assert "hostname=burrow-w-201" in clone_body
+    # ...and NEVER the free-form name (suffix 'test' would break resolve_vmid).
+    assert "hostname=fable-test" not in clone_body
+
+
+@responses.activate
 async def test_clone_blocks_on_upid_before_pool_and_net0_puts() -> None:
     """WR-05: the clone UPID is confirmed OK BEFORE the pool-add / net0 config PUTs.
 

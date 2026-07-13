@@ -3,113 +3,148 @@ SPDX-FileCopyrightText: 2026 Brave Bear Studios
 SPDX-License-Identifier: AGPL-3.0-or-later
 -->
 
-# Requirements: Burrow — Milestone v1.3 "Go Live"
+# Requirements: Burrow — Milestone v1.4 "Ship & Harden"
 
-**Defined:** 2026-06-24
+**Defined:** 2026-07-13
 **Core Value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
 
-> v1.3 takes Burrow from CI-proven-over-Fake to actually running on the operator's real
-> Proxmox homelab: a guided in-app setup wizard, opt-in workspace persistence + scrollback
-> restore, and the first real-infra acceptance run. Grounded in `.planning/research/SUMMARY.md`.
-> Decisions locked at definition: persistence is **opt-in per workspace** (default ephemeral);
-> the reaper gets a **carve-out + regression test only** (no new auto-reaping); the Proxmox
-> token is **validate-in-memory, `.env`-only** (no secret-at-rest). Multi-agent workers are
-> **deferred to v1.4** (research-first).
+> v1.4 consolidates and ships everything in flight. Grounded in the 2026-07-13 loose-thread
+> recon (`.planning/` session record), which surfaced three live pipeline blockers, a
+> backend-complete-but-UI-less credential store, and a half-configured security posture.
+> Decisions locked at definition: cut as **v1.4.0** (reconcile release-please forward); the
+> **credential store is now secret-at-rest by design** (ADR-0015 supersedes the old
+> `.env`-only posture); a **2nd live worker node is available** for the acceptance capstone
+> (item 9 in-scope); **multi-agent workers are research-only** this milestone (no build).
 
-## Milestone v1.3 Requirements
+## Milestone v1.4 Requirements
 
 Requirements for this milestone. Each maps to exactly one roadmap phase (see Traceability).
-Wizard, persistence, scrollback, and test-hardening are CI-provable over the FakeComputeProvider;
-the ACC items are operator-run human UAT on real infrastructure.
+Pipeline, security-hygiene, credential-frontend, async-create, and backlog items are
+CI-provable / repo-config; the ACC items are operator-run human UAT on real hardware.
 
-### Setup Wizard (SETUP)
+### Pipeline & Release Infrastructure (RELX)
 
-- [x] **SETUP-01**: Operator can enter a Proxmox host + API token in the setup wizard and have it validated **read-only** (capability assertion via the privsep token's `/access/permissions`), reporting connection success and any missing privileges without creating any resource.
-- [x] **SETUP-02**: The wizard verifies the golden worker template exists and is usable on the target node before setup can complete.
-- [x] **SETUP-03**: The wizard runs a control-plane health/readiness check (reusing `/api/v1/health`) confirming the API can reach Proxmox.
-- [x] **SETUP-04**: As its final step, the wizard creates the operator's first workspace.
-- [x] **SETUP-05**: When Burrow is unconfigured (`settings.setupCompletedAt` unset) the UI presents the wizard as a first-run gate before the workspace list; once configured the wizard does not reappear.
-- [x] **SETUP-06**: Wizard steps are idempotent and re-enterable — re-opening re-probes current state and lands on the first failing step (no persisted checkpoint machine).
-- [x] **SETUP-07**: The operator's Proxmox token is written only to the gitignored `.env`, validated in-memory, and is never persisted to the database, returned in an API response, or written to logs.
+- [x] **RELX-03**: release-please can update its release branch (the active `oss` ruleset excludes `refs/heads/release-please--**`, or the GitHub Actions bot is a bypass actor), so the release PR maintains cleanly and merging it produces a `vX.Y.Z` tag.
+- [x] **RELX-04**: `release.yml` builds every GHCR reference from a **lowercased** owner and the SBOM (syft) step authenticates to the registry, so SBOM + cosign keyless sign + SLSA attestation all succeed and published images ship **signed and attested** (not the current unsigned partial-publish).
+- [x] **RELX-05**: CI on `main` passes the Trivy HIGH/CRITICAL gate (green `main` / precondition PC1) via patched base-image digests and/or a reviewed ignore policy for unfixable base CVEs.
+- [x] **RELX-06**: Release tags follow semver `vX.Y.Z` owned by release-please; hand-pushed milestone tags no longer trigger `release.yml`, and the stale `1.2.0` release PR is reconciled forward to **v1.4.0**.
 
-### Workspace Persistence (WSX)
+### Credential Store — ADR-0015 Completion (CRED)
 
-- [x] **WSX-02**: Operator can mark a workspace **persistent** at create time (default remains ephemeral); a persistent workspace survives stop→start with its disk and database row intact instead of being destroyed.
-- [x] **WSX-03**: A persistent workspace's terminal **scrollback survives stop→start** — on reconnect the operator sees prior scrollback (worker-side tmux `new-session -A` reattach).
-- [x] **WSX-04**: The orphan reaper **never destroys a persistent stopped workspace** (the orphan predicate keys on "no owning row," not on "stopped" state), proven by a negative-control regression test.
+- [ ] **CRED-01**: The ADR-0015 credential-store backend (PR #3) is merged to a green `main`, and the secret-at-rest docs (ROADMAP / STATE / tech-spec) are reconciled to reference ADR-0015 (no longer assert "no secret-at-rest").
+- [ ] **CRED-02**: The operator can set a local admin secret in the setup wizard (`POST /setup/admin-secret`); the credential surface is admin-gated via the `X-Burrow-Admin` header.
+- [ ] **CRED-03**: The operator can enter the Proxmox token and GitHub PAT in the wizard and have them **stored encrypted at rest** (Fernet), replacing the current "validated in memory only, never stored" step.
+- [ ] **CRED-04**: An admin-gated post-setup Credentials/Settings screen shows credential status (set + last4 + updatedAt) and supports rotation, and never returns a secret value.
+- [ ] **CRED-05**: An admin-gated read-only audit view (`GET /setup/audit` + a GUI panel) surfaces the append-only credential audit trail (the write path exists; the read path does not).
+- [ ] **CRED-06**: `BURROW_SECRET_KEY` is auto-generated into `.env` on first run when empty (novice-safe), with documented key-loss recovery; a missing/undecryptable key never crashes worker boot.
+- [ ] **CRED-07**: A sentinel-through-`/setup/credentials` leak test proves credential plaintext appears in no DB cell, API envelope, or log line (only Fernet ciphertext + a 4-char last4 persist).
 
-### Test Hardening (TEST)
+### Repo Security Hygiene (SEC)
 
-- [x] **TEST-01**: New setup/persistence compute paths are covered by a **mocked-proxmoxer integration tier** exercising real-shaped UPID async-task polling and `ResourceException` error shapes (closing the Fake-vs-real gap before the persistence-compute work).
-- [x] **TEST-02**: The stop/start e2e suite cleanup is hardened (07r) — per-test workspace-id tracking (W1), asserted cleanup `DELETE` success (W2), and an explicit two-Start-affordance assertion (W3).
+- [ ] **SEC-01**: `.github/dependabot.yml` configures weekly, grouped version-updates for `pip`/`uv` (`api/`), `npm` (`ui/`), and `github-actions` (`.github/workflows/`).
+- [ ] **SEC-02**: Dependabot automated-security-fixes are enabled so vulnerable dependencies get auto-remediation PRs.
+- [ ] **SEC-03**: CodeQL SAST runs on the default branch for Python + JavaScript/TypeScript (source SAST, not only Trivy image CVEs), and its first-run findings are triaged/baselined.
 
-### Real-Infra Acceptance (ACC) — operator-run human UAT on real hardware
+### Create UX (UX)
 
-- [ ] **ACC-01**: On the dev homelab, real create→terminal→stop→start→destroy passes (the H9 gate), along with reaper / auto-stop / capacity on real CTs, real auto node selection, and **real persistent stop/start + scrollback restore**.
-- [x] **ACC-02**: The first live release-please PR merges to produce a version bump + changelog + `v*` tag; harden-runner egress is flipped `audit`→`block` with the discovered allowlist; `actionlint` passes.
-- [ ] **ACC-03**: A real GHCR image publish succeeds and `cosign verify` + `gh attestation verify` pass against the published `@sha256:` digest.
+- [ ] **UX-01**: Creating a workspace returns immediately (`202` + the `creating` row) with the boot saga running in a tracked background task, so a slow real boot never `504`s; the UI's existing 3s list poll drives `creating`→`running`/`error`, and the setup-wizard create step no longer blocks.
+
+### Backlog & Robustness (ROB)
+
+- [ ] **ROB-01**: The `_is_running_or_locked` bare `"lock"` substring match (WR-04) is removed (keep the precise `"is locked"`), with a regression test; the already-resolved 07r and WR-02 todos are filed/closed.
+- [ ] **ROB-02**: The tautological `worker.env` leak assertion in `test_burrow_boot.py` is replaced with an assertion over files the boot script actually writes (or removed, pointing at the stdout/stderr scrub), and em-dashes in worker-template shell comments are swept.
+
+### Multi-Agent Workers Research (AGENT)
+
+- [ ] **AGENT-02**: A research-first ADR / design contract for running Cursor / Copilot CLI / Codex in workers is produced (no build), and the v1.4 credential seam is confirmed **additive** for future per-agent auth.
+
+### Real-Infra Acceptance Capstone (ACC) — operator-run human UAT on real hardware
+
+- [ ] **ACC-04**: On the homelab, the remaining real-infra lifecycle passes (completing carried v1.3 ACC-01 items 6-11): the reaper destroys a real injected orphan LXC + frees its VMID on a non-default node; idle auto-stop fires after the real `idle_window_s` (a brief reconnect does not trip it); capacity holds under real concurrent creates; real least-loaded node selection lands correctly across **≥2 live nodes**; a persistent workspace survives stop→start with disk + scrollback intact; the reaper never destroys a persistent stopped workspace.
+- [ ] **ACC-05**: The GUI credential store is verified live on den01 — migration `004` applies on the real SQLite, a GUI-set Proxmox token applies **without a restart** and survives a restart.
+- [ ] **ACC-06**: The first real `v1.4.0` GHCR release is verified live — `cosign verify` + `gh attestation verify` pass against the published `@sha256:` digest (completing carried ACC-03), and harden-runner egress is flipped `audit`→`block` from the green run's discovered allowlist (completing carried ACC-02 item 14).
 
 ## Future Requirements
 
 Deferred. Tracked, not in this milestone's roadmap.
 
+### Multi-Agent Workers — build (AGENT)
+
+- **AGENT-03+**: Actually boot Cursor / GitHub Copilot CLI / Codex CLI in workers (agent registry + per-agent secrets seam extending the ADR-0015 store + `WorkspaceCreate` DTO + create-modal picker). *A full milestone of its own; v1.4 produces only the research ADR (AGENT-02).*
+
+### Operator Onboarding (HOST)
+
+- **HOST-01**: Replace PRIMING.md's manual clone-on-node with a GitHub-delivered signed-release fetch + `cosign`/`gh attestation` verify flow (download-then-run pinned to a tag, never `curl|bash` for the privileged step). *Self-contained supply-chain/delivery enhancement; its own onboarding milestone.*
+
 ### Persistence v2 (WSX)
 
-- **WSX-05**: Point-in-time snapshot + rollback of a workspace. *Needs `zfspool`/`lvmthin`/`ceph` storage + the `VM.Snapshot` privilege + a sprawl bound. Deferred from v1.3 (Tier-1 stop/start chosen).*
-- **WSX-06**: Suspend/resume (Tier-2 — live process state preserved across stop). *Blocked: CRIU suspend is unsupported/broken for unprivileged LXC.*
-- **WSX-07**: Cross-reboot scrollback (disk-logged history via `tmux pipe-pane`), beyond reconnect-survival.
+- **WSX-05 / WSX-06 / WSX-07**: Snapshots/rollback, CRIU suspend/resume, cross-reboot scrollback. *Deferred from v1.3 (storage backend + `VM.Snapshot` priv + CRIU limits).*
 
-### Multi-Agent Workers (AGENT)
+### Hosted Path (CRED)
 
-- **AGENT-01+**: Boot Cursor / GitHub Copilot CLI / Codex CLI in workers (not only Claude Code). *A full milestone of its own — agent registry + per-agent secrets seam + `WorkspaceCreate` DTO + create-modal picker; research-first (headless ttyd support, non-interactive auth, license terms). Deferred to v1.4; todo stays in `.planning/todos/pending/`.*
+- **CRED-HOSTED**: Implement the credential-store `DbProvider` methods on `postgresProvider.py` (currently `NotImplementedError` stubs) + the `KmsSecretKeyProvider`. *Hosted multi-tenant path only; the v1 self-host store stays SQLite + `EnvSecretKeyProvider`.*
 
 ## Out of Scope
 
-Explicitly excluded. Anti-features from research belong here with reasoning.
+Explicitly excluded. Anti-features belong here with reasoning.
 
 | Feature | Reason |
 |---------|--------|
-| Browser-side Proxmox token/role/template **creation** | Security footgun; contradicts least-priv. The wizard validates an operator-provided token + guides the manual PVE-side privsep steps; it never self-provisions a privileged identity. |
-| Token persisted at rest (DB / secret store) | v1.3 keeps the `.env`-only, validate-in-memory posture (token UX decision A); no new secret-at-rest surface, no encryption-at-rest decision this milestone. |
-| Keeping live processes alive across stop (CRIU suspend) | Unsupported for unprivileged LXC; Tier-1 `pct stop`/`start` restarts the process (disk survives). |
-| Snapshots / rollback | Drags in the storage-backend + `VM.Snapshot` privilege + sprawl classes; deferred to WSX-05. |
-| Infinite-retention scrollback | Bounded last-N only; unbounded history is CPU/disk-costly. |
-| Auto-rerunning a resurrected command on reattach | Reattach to the live tmux session only; no command replay. |
-| Control-plane-side session/terminal recording | The relay stays a dumb opaque bridge; no server-side buffering (explicit anti-pattern). |
-| Auto-reap of stopped **ephemeral** workspaces | Carve-out-only chosen; no new reaper code/TTL this milestone. |
-| Multi-agent workers (Cursor / Copilot / Codex) | Full milestone of its own; research-first; deferred to v1.4. |
+| Building multi-agent workers (Cursor / Copilot / Codex boot) | v1.4 is research-only there (AGENT-02); the build is a full milestone of its own (AGENT-03+). |
+| Postgres credential-store implementation | Hosted-path scope; `postgresProvider` keeps the `NotImplementedError` stubs (correct for v1 self-host). Not a silent "done." |
+| KMS-backed secret key | `EnvSecretKeyProvider` is the v1 self-host mechanism; `KmsSecretKeyProvider` is a reserved hosted-path seam. |
+| Per-repo short-lived PAT minting (A3) | The store serves a single global git token this milestone; per-repo issuance is future work. |
+| Host-prime signed-release delivery | Deferred to its own onboarding milestone (HOST-01). |
 | Real-Proxmox exercise in CI | CI proves contracts over the FakeComputeProvider + mocked proxmoxer; real-infra validation is the ACC human UAT (ci-cd §4.4). |
+| Snapshots / CRIU suspend / cross-reboot scrollback | Deferred to WSX-05/06/07 (storage + `VM.Snapshot` + CRIU limits). |
 
 ## Traceability
 
-Finalized by the roadmapper (2026-06-25). Each requirement maps to exactly one phase; no requirement appears in two phases. Phases 10/12/13 are CI-provable over the FakeComputeProvider, Phase 11 is worker-side (CI-provable via the boot harness), Phase 14 is operator-run human UAT on real infra.
+Finalized by the roadmapper against ROADMAP.md Phases 15-22. Each requirement maps to exactly one
+phase; no requirement appears in two phases. The finalized mapping matches the definition-time
+proposal one-to-one (the operator-approved 8-phase shape required no reassignment):
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| WSX-02  | Phase 10 | Complete |
-| WSX-04  | Phase 10 | Complete |
-| TEST-01 | Phase 10 | Complete |
-| TEST-02 | Phase 10 | Complete |
-| WSX-03  | Phase 11 | Complete |
-| SETUP-01 | Phase 12 | Complete |
-| SETUP-02 | Phase 12 | Complete |
-| SETUP-03 | Phase 12 | Complete |
-| SETUP-07 | Phase 12 | Complete |
-| SETUP-04 | Phase 13 | Complete |
-| SETUP-05 | Phase 13 | Complete |
-| SETUP-06 | Phase 13 | Complete |
-| ACC-01  | Phase 14 | Pending |
-| ACC-02  | Phase 14 | Complete |
-| ACC-03  | Phase 14 | Pending |
+| RELX-03 | Phase 15 | Complete |
+| RELX-04 | Phase 15 | Complete |
+| RELX-05 | Phase 15 | Complete |
+| RELX-06 | Phase 15 | Complete |
+| CRED-01 | Phase 16 | Pending |
+| SEC-01 | Phase 17 | Pending |
+| SEC-02 | Phase 17 | Pending |
+| SEC-03 | Phase 17 | Pending |
+| ROB-01 | Phase 17 | Pending |
+| ROB-02 | Phase 17 | Pending |
+| CRED-02 | Phase 18 | Pending |
+| CRED-03 | Phase 18 | Pending |
+| CRED-04 | Phase 18 | Pending |
+| CRED-05 | Phase 18 | Pending |
+| CRED-06 | Phase 18 | Pending |
+| CRED-07 | Phase 18 | Pending |
+| UX-01 | Phase 19 | Pending |
+| ACC-06 | Phase 20 | Pending |
+| AGENT-02 | Phase 21 | Pending |
+| ACC-04 | Phase 22 | Pending |
+| ACC-05 | Phase 22 | Pending |
 
 **Coverage:**
 
-- v1.3 requirements: 15 total
-- Mapped to phases: 15
+- v1.4 requirements: 21 total
+- Mapped to phases: 21 (finalized) ✓
 - Unmapped: 0 ✓
+- Requirements in two phases: 0 ✓
 
-**ADRs anticipated** (authored within their phase, `docs/adr/`): ADR-0011 setup-state store · ADR-0012 new `ComputeProvider` capabilities (`testConnection`/`verifyTemplate`) · ADR-0013 persistence model (Tier-1 `persistent` flag) · ADR-0014 tmux scrollback. *Token-at-rest ADR avoided by design.*
+**Dependency ordering** (recorded by the roadmapper): Phase 16 depends on 15; Phase 18 depends on 16;
+Phase 20 depends on 15 + 18; Phase 22 depends on 16 + 18 + 20. Phases 17, 19, 21 are parallelizable
+off the earlier work. Phases 15-21 are CI-provable (runner + FakeComputeProvider); Phase 22 is
+operator-run human UAT on real Proxmox (acceptance, not code — NOT CI-provable).
+
+**ADRs anticipated** (authored within their phase, `docs/adr/`): ADR-0016 CodeQL/Dependabot
+security-posture (Phase 17, only if a baseline deviation is recorded) · ADR-0017 async-202 create +
+background-task lifecycle (Phase 19) · ADR-0018 multi-agent worker design contract (Phase 21).
+*ADR-0015 (credential store) already authored; Phase 16 reconciles the docs to it.*
 
 ---
-*Requirements defined: 2026-06-24*
-*Last updated: 2026-06-25 — traceability finalized by the roadmapper against ROADMAP.md Phases 10-14 (15/15 mapped, 0 unmapped, no duplicates)*
+*Requirements defined: 2026-07-13*
+*Last updated: 2026-07-13 — traceability finalized by the roadmapper against ROADMAP.md Phases 15-22 (21/21 mapped, 0 unmapped, no requirement in two phases); the finalized mapping matches the definition-time proposal one-to-one.*

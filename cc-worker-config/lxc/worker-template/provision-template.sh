@@ -37,6 +37,17 @@ export DEBIAN_FRONTEND=noninteractive
 apt-get update && apt-get upgrade -y
 apt-get install -y git curl build-essential ttyd jq tmux
 
+# The `ttyd` apt package ships an ENABLED ttyd.service daemon that binds :7681 on
+# loopback (TTYD_OPTIONS in /etc/default/ttyd: `-i lo -p 7681 ...`). It would win the
+# race for :7681 against the real LAN-bound ttyd that burrow-boot.sh execs, so the
+# worker ttyd fails with EADDRINUSE on 0.0.0.0:7681 and burrow-worker.service
+# restart-loops (the terminal is then loopback-only, unreachable by the proxy). We use
+# the /usr/bin/ttyd BINARY only, never the packaged daemon. Disable + mask it
+# (offline-safe, mirrors the enable below); mask blocks any re-enable on upgrade.
+log "masking the packaged ttyd.service daemon (burrow-worker owns :7681)"
+systemctl disable ttyd.service 2>/dev/null || true
+systemctl mask ttyd.service
+
 # --- Node 22 (NodeSource setup_22.x) + pinned Claude Code ---------------------
 # The `curl | bash` runs inside the worker (not CI); it is the operator's
 # documented trust decision. The Node major is pinned via the setup ref and the

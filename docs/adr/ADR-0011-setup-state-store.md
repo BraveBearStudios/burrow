@@ -7,7 +7,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 ## Status
 
-Accepted
+Accepted. The "no secret enters the database / token stays `.env`-only" consequence
+below is **superseded in part by [ADR-0015](ADR-0015-gui-managed-credential-store.md)**,
+which adds an encrypted (Fernet) GUI-managed credential store in this same `settings`
+singleton for the Proxmox token + GitHub PAT. The setup-state store design (singleton
+`settings` table + `setupCompletedAt`) is unchanged.
 
 ## Context
 

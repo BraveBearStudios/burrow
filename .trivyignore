@@ -1,0 +1,31 @@
+# SPDX-FileCopyrightText: 2026 Brave Bear Studios
+# SPDX-License-Identifier: AGPL-3.0-or-later
+
+# Trivy reviewed ignore policy (RELX-05).
+#
+# This file is the audited allowlist read by the ci.yml build-scan Trivy
+# HIGH/CRITICAL gate (wired via `trivyignores: .trivyignore`). It holds ONLY
+# residual CVEs that are UNFIXABLE-but-accepted: HIGH/CRITICAL findings that
+# still remain AFTER `ignore-unfixed: true` plus the base-image digest repins
+# (Dockerfile.api / Dockerfile.ui), because upstream has no available fix. It is
+# never a blanket mute, and the if:always SARIF run in ci.yml keeps reporting
+# ALL findings to code scanning regardless of what is listed here.
+#
+# HARD RULE: a FIXABLE base HIGH/CRITICAL CVE is NEVER allowlisted in this file.
+# A fixable CVE MUST be cleared by a base-image repin/rebuild (Task 2 digest
+# bump) or escalated. Allowlisting a fixable CVE would silently weaken the very
+# gate RELX-05 exists to green honestly (15-CONTEXT.md, RELX-05 decision).
+#
+# Per-entry acceptance format: each residual CVE is preceded by a single review
+# comment line, then the bare CVE id on the next line:
+#
+#   # owner: <name> | reason: <why unfixable: no upstream fix available> | link: <advisory URL> | reviewed: <YYYY-MM-DD>
+#   CVE-YYYY-NNNNN
+#
+# Residual entries are Claude's-discretion / operator additions driven by the
+# live Trivy findings on the Linux CI runner (the actual HIGH/CRITICAL findings
+# are not visible on the Windows dev box). This file is seeded with ZERO CVE
+# entries: the gate greens via `ignore-unfixed: true` plus the base-image repins,
+# and any genuinely unfixable residual is added below with full attribution.
+#
+# Residual unfixable-but-accepted CVEs (none at seed):

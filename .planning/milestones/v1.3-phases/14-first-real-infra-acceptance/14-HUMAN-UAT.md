@@ -7,12 +7,12 @@ status: partial
 phase: 14-first-real-infra-acceptance
 source: [14-RESEARCH.md, 14-ACCEPTANCE.md, PRIMING.md, 03-HUMAN-UAT.md, 04-HUMAN-UAT.md]
 started: 2026-06-26T00:00:00Z
-updated: 2026-06-26T00:00:00Z
+updated: 2026-07-13T02:55:00Z
 ---
 
 ## Current Test
 
-[awaiting the operator: real Proxmox homelab smoke + the first live signed GHCR release]
+[ACC-01 H9 core PASSED 2026-07-12 (items 1-5) on den01 real Proxmox via the control-plane API + den01 verification. Remaining: ACC-01 items 6-11 (reaper / idle / capacity / node-select / persistence scenarios) + ACC-02/03 (first live signed GHCR release).]
 
 ## About this checklist
 
@@ -34,27 +34,27 @@ back into both files.
 1. **create** a worker (the H9 gate, step 1, mirrors PRIMING.md STEP 4)
    - expected: pick a small repo + branch from a LAN browser and submit; a worker CT is cloned
      `--full`, boots, and the row appears with status running.
-   - result: [pending]
+   - result: [passed 2026-07-12 — worker `burrow-w-975` (vmid 975) created via the real Proxmox path (2026-07-10): cloned `--full`, booted, row `running`, ip 10.0.0.207; lifecycle re-driven this session. Browser-submit UX = operator visual.]
 
 2. **live terminal** (the H9 gate, step 2)
    - expected: the terminal panel shows an interactive, resizable `claude` session over the
      ttyd subprotocol bridge.
-   - result: [pending]
+   - result: [passed (structural) 2026-07-12 — ttyd listening `0.0.0.0:7681`, den01 HTTP 200, argv `ttyd ... exec tmux new-session -A -s burrow claude`. Interactive/resizable browser render = operator visual sign-off.]
 
 3. **stop** with disk preserved (the H9 gate, step 3)
    - expected: status `stopped`, the LXC is stopped on its node, and the rootfs disk is
      preserved (not deleted).
-   - result: [pending]
+   - result: [passed 2026-07-12 — POST /stop -> API `stopped`; den01 `pct status 975: stopped`, ttyd down; disk preserved (subsequent start restored the same disk/ip).]
 
 4. **start** reconnects to the SAME session (the H9 gate, step 4)
    - expected: status `running`, the terminal reconnects to the same `claude` session (the
      tmux `-A` reattach), not a fresh shell.
-   - result: [pending]
+   - result: [passed 2026-07-12 — POST /start -> API `running`, SAME ip 10.0.0.207 (disk intact); ttyd back (pid 270) HTTP 200 with `tmux new-session -A` reattach argv (boot-harness proves -A idempotency). Same-session visual on reconnect = operator confirm.]
 
 5. **destroy** frees the VMID (the H9 gate, step 5)
    - expected: the LXC is gone, the VMID is freed, the row is soft-deleted; out-of-pool CTs are
      untouched.
-   - result: [pending]
+   - result: [passed 2026-07-12 — DELETE -> API `destroyed`; den01 `975.conf does not exist`, `pct list` worker range empty (VMID freed); row soft-deleted.]
 
 6. **reaper destroys a real injected orphan LXC + frees its VMID** (rolls up Phase 04 item 1, CAP-03)
    - expected: inject an orphan CT in the worker pool on a non-default node, run a reconcile
@@ -127,8 +127,8 @@ back into both files.
 ## Summary
 
 - Total items: 16
-- Passed: 0
-- Pending: 16 (all real-infra / live-release; operator-run)
+- Passed: 5 (ACC-01 H9 core — create/terminal/stop/start/destroy, items 1-5, verified 2026-07-12 via control-plane API + den01 SSH; items 2/4 mechanism proven, browser-visual is operator sign-off)
+- Pending: 11 (ACC-01 items 6-11 real-infra scenarios not yet exercised — reaper/idle/capacity/node-select/persistence; ACC-02/03 first live signed GHCR release)
 
 This phase lands `human_needed`. Run the items above on the dev homelab and the first live
 release, then flip each `result: [pending]` to passed and record the evidence (digests, the

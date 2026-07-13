@@ -152,10 +152,12 @@ async def test_no_fit_logs_considered_nodes_and_fractions(
     no_fit = [r for r in caplog.records if r.message == "auto-select found no fitting node"]
     assert len(no_fit) == 1
     record = no_fit[0]
-    # Non-secret diagnostics: node names + fractions + the threshold.
-    assert record.considered["pve1"] == "0.950"
-    assert record.considered["pve2"] == "unreachable"
-    assert record.threshold == 0.80
+    # Non-secret diagnostics logged via extra=; LogRecord has no static attr for them.
+    considered = record.considered  # type: ignore[attr-defined]
+    threshold = record.threshold  # type: ignore[attr-defined]
+    assert considered["pve1"] == "0.950"
+    assert considered["pve2"] == "unreachable"
+    assert threshold == 0.80
 
 
 async def test_raising_node_is_skipped_then_fitting_node_chosen(
@@ -205,9 +207,7 @@ def test_workspace_create_node_defaults_to_none_when_omitted() -> None:
 
 def test_workspace_create_node_explicit_none_is_valid() -> None:
     """An explicit ``node=None`` is valid (auto signal)."""
-    payload = WorkspaceCreate(
-        name="auto", project_repo="git@example.com:acme/auto.git", node=None
-    )
+    payload = WorkspaceCreate(name="auto", project_repo="git@example.com:acme/auto.git", node=None)
     assert payload.node is None
 
 

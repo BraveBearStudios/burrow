@@ -88,6 +88,7 @@ async def test_manual_node_pick_is_unchanged_end_to_end(
     integration_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Explicit node -> the saga uses it verbatim; selectNode is never consulted."""
+
     # Fail selectNode loudly: if the manual path wrongly called it, the create would
     # error — proving the supplied node skips selection entirely.
     async def _boom_select(self: object) -> str:
@@ -154,14 +155,10 @@ async def test_persisted_node_matches_selection_inside_lock(
     )
 
     created = (
-        await integration_client.post(
-            "/api/v1/workspaces", json={**_CREATE_BODY, "node": None}
-        )
+        await integration_client.post("/api/v1/workspaces", json={**_CREATE_BODY, "node": None})
     ).json()["data"]
     assert created["node"] == "pve2"
 
     # Re-read over the list endpoint: the durably persisted row carries the choice.
-    fetched = (
-        await integration_client.get(f"/api/v1/workspaces/{created['id']}")
-    ).json()["data"]
+    fetched = (await integration_client.get(f"/api/v1/workspaces/{created['id']}")).json()["data"]
     assert fetched["node"] == "pve2"

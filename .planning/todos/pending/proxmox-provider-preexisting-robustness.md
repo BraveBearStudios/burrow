@@ -8,6 +8,7 @@ title: ProxmoxProvider pre-existing robustness nits (getNodeMemory KeyError, loc
 area: api/compute
 source: 12-REVIEW.md WR-02 + WR-04 (surfaced during Phase 12, pre-existing)
 severity: warning
+resolves_phase: 17
 resolves_phase: none
 files:
   - api/compute/proxmoxProvider.py

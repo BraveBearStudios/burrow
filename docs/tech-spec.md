@@ -79,7 +79,7 @@ multi-tenant hosted one is additive:
 | Auth | None (LAN-only) | External identity provider, JWT |
 | Backend compute | Proxmox LXC | Containers / serverless |
 | Worker backend | Proxmox LXC | Managed container instances |
-| Secrets | `.env` file | A secrets manager |
+| Secrets | `.env` file + GUI-managed encrypted store (Fernet, ADR-0015) | External secrets manager / KMS (`KmsSecretKeyProvider` seam) |
 | Multi-tenancy | Single user | Per-user FK on all rows, row-level security |
 
 Implementing a Postgres `DbProvider` and an auth middleware is the bulk of the
@@ -955,7 +955,7 @@ the v1 code has to be rewritten. The major pieces, all vendor-neutral:
 - [ ] Authentication: an identity provider + `requireAuth` middleware on all routes
 - [ ] `user_id` FK on all workspace and event rows, row-level security policies applied
 - [ ] `ComputeProvider` implementation for a cloud/container backend
-- [ ] Secrets moved out of `.env` into a secrets manager
+- [ ] Secrets moved out of `.env` into an external secrets manager / KMS (partially done: the GUI-managed Fernet credential store lands per ADR-0015; a full external manager / KMS stays hosted-path via the `KmsSecretKeyProvider` seam)
 - [ ] Move to managed DNS + HTTPS
 - [ ] Observability (error tracking + product analytics) if desired
 - [ ] Security/compliance review appropriate to handling other users' data

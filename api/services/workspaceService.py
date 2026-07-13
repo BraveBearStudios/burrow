@@ -31,6 +31,7 @@ from models.workspace import Workspace, WorkspaceCreate
 
 from config import Settings
 from lib.capacity import _fits
+from lib.credentialResolver import CredentialResolver
 from lib.errors import (
     CapacityError,
     NoFreeVmidError,
@@ -109,6 +110,9 @@ class WorkspaceService:
         self.compute = compute
         self.db = db
         self.settings = settings
+        # ADR-0015: resolves the git credential (and the Proxmox token) DB-first so a
+        # GUI-set value in the encrypted store overrides the .env bootstrap.
+        self._credentials = CredentialResolver(db, settings)
         # Per-workspace in-flight lock: serializes concurrent mutations on a single
         # workspace id within this process (SC-12, A2). Created lazily per id and
         # RECLAIMED when the workspace is destroyed (WR-02) so the dict does not grow
@@ -157,9 +161,7 @@ class WorkspaceService:
             # through the shared `_fits` comparator (strict `>` refuses, `==`
             # eligible) so there is genuinely ONE comparison source — the guard can
             # never drift from selectNode/`/nodes` if `_fits` semantics change.
-            if not _fits(
-                await self.compute.getNodeMemory(node), self.settings.capacity_threshold
-            ):
+            if not _fits(await self.compute.getNodeMemory(node), self.settings.capacity_threshold):
                 raise CapacityError(node)
             # 1 — reserve VMID via the DB partial-unique INSERT (the race arbiter);
             # persist the chosen node on the row (never None).
@@ -169,9 +171,7 @@ class WorkspaceService:
 
         try:
             # 2 — clone the golden template (provider blocks on the UPID, SC-1).
-            await self.compute.cloneCt(
-                self.settings.template_vmid, vmid, payload.name, node
-            )
+            await self.compute.cloneCt(self.settings.template_vmid, vmid, payload.name, node)
             # 3 — persist boot intent (pull-at-boot DB checkpoint, ADR-0002). WR-03:
             # the per-workspace boot intent (project repo/branch) is the row data
             # persisted at step 1; the global config repo/branch is derived from
@@ -409,7 +409,12 @@ class WorkspaceService:
         return ws
 
     async def mint_repo_credential(self, repo: str) -> str:
-        """Return a git credential for a boot fetch — a DEV PLACEHOLDER, not a real cred.
+        """Return a git credential for a boot fetch (ADR-0015: store-first, then .env).
+
+        Resolution is delegated to :class:`CredentialResolver`: a GUI-set PAT in the
+        encrypted store wins, else the ``.env`` ``git_credential_token`` stopgap, else a
+        clearly non-production DEV-PLACEHOLDER. The real per-repo short-lived issuer is
+        still future work; whichever real value is served is a single global token.
 
         PLUGGABLE issuance seam (RESEARCH Open Question 1 / Assumption A3), pending the
         operator's A3 decision. **v1 does NOT mint a real short-lived, per-repo-scoped
@@ -434,20 +439,19 @@ class WorkspaceService:
         a non-empty ``git_credential_token`` in multi-repo use as a misconfiguration
         until the real issuer lands.
         """
-        token = self.settings.git_credential_token
-        if token:
-            # NOT repo-scoped and NOT short-lived: surface the stopgap loudly so an
-            # operator never mistakes the global token for the real A3 issuer. The
-            # token value itself is NEVER logged (only the repo it is served for).
+        # ADR-0015: resolve DB-first (a GUI-set PAT in the encrypted store overrides
+        # the .env stopgap), then .env, then the non-production placeholder.
+        credential = await self._credentials.git_credential(repo)
+        if not credential.startswith("DEV-PLACEHOLDER-NOT-A-REAL-CREDENTIAL"):
+            # A real token (store or .env) is served. It is still a single global
+            # value, NOT the per-repo short-lived A3 issuer, so surface that loudly.
+            # The token value itself is NEVER logged (only the repo it is served for).
             logger.warning(
-                "serving the global, non-repo-scoped git_credential_token (A3 dev "
-                "stopgap, NOT a per-repo short-lived credential)",
+                "serving the global, non-repo-scoped git credential (ADR-0015 store "
+                "or .env stopgap, NOT a per-repo short-lived credential)",
                 extra={"repo": repo},
             )
-            return token
-        # No token configured: an explicitly non-production placeholder, never a
-        # real credential. The DEV-PLACEHOLDER marker makes a leak obvious in triage.
-        return f"DEV-PLACEHOLDER-NOT-A-REAL-CREDENTIAL:{repo}"
+        return credential
 
     # ── lifecycle helpers ──────────────────────────────────────────────────
     def _lock_for(self, workspace_id: str) -> asyncio.Lock:
@@ -519,8 +523,9 @@ class WorkspaceService:
 
         Injectable: the unit tier monkeypatches this to resolve instantly (no
         network); the integration tier exercises the real poll against a stub ttyd.
-        A non-5xx response means ttyd is serving; connect/timeout errors are
-        retried until ``ttyd_timeout`` elapses, then it raises.
+        A non-5xx response means ttyd is serving; transport-level errors (connect
+        refused, timeout, or a mid-boot TCP reset / half-served HTTP) are retried
+        until ``ttyd_timeout`` elapses, then it raises ``WorkspaceBootError``.
         """
         if ip is None:
             raise WorkspaceBootError("no IP resolved for the worker; cannot reach ttyd")
@@ -537,7 +542,16 @@ class WorkspaceService:
                     response = await client.get(f"http://{host}:7681/", timeout=2)
                     if response.status_code < 500:
                         return
-                except (httpx.ConnectError, httpx.TimeoutException):
+                except httpx.TransportError:
+                    # A worker whose ttyd is still coming up can refuse the
+                    # connection, time out, OR accept the TCP handshake then reset /
+                    # half-serve before valid HTTP (ReadError, WriteError,
+                    # RemoteProtocolError). All subclass httpx.TransportError and all
+                    # mean "not ready yet" -> retry to the deadline. Catching only
+                    # ConnectError/TimeoutException let a mid-boot reset escape as a
+                    # raw httpx error, which surfaced to the operator as a generic
+                    # 500 masking the boot failure instead of the honest 502
+                    # boot_failed (the escape hit both the create and start paths).
                     pass
                 await asyncio.sleep(self.settings.ttyd_interval)
         raise WorkspaceBootError(f"ttyd not ready in {self.settings.ttyd_timeout}s")

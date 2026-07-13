@@ -25,31 +25,47 @@ from a browser, with each session running in an ephemeral, reproducible containe
 that is gone when destroyed. If everything else fails, *creating a workspace and
 getting a live, interactive Claude Code terminal in the browser* must work.
 
-## Current Milestone: v1.3 Go Live (Guided Homelab Setup + Real-Infra Acceptance + Persistence)
+## Current Milestone: v1.4 Ship & Harden (GUI Secrets + First Signed Release + Hardening + Live Acceptance)
 
-**Goal:** Take Burrow from CI-proven-over-Fake to actually running on the
-operator's real Proxmox — a guided in-app setup wizard, the real-infra
-acceptance smoke, and workspaces that persist across stop/start with restored
-scrollback.
+**Goal:** Consolidate and ship everything in flight: unblock the CI/release
+pipeline, merge and finish the ADR-0015 GUI-managed credential store, harden the
+repo (Dependabot/CodeQL/backlog), fix the create-UX 504, cut the first real
+signed + attested GHCR release, and prove the whole system on the real Proxmox
+homelab — ending in a live real-infra acceptance capstone. Cut as **v1.4.0**.
 
-**Target features:**
-- **In-app setup wizard:** browser flow to connect + validate a Proxmox
-  host/token, provision/verify the golden template, health-check, and land the
-  first real workspace. CI-provable over a Fake/mock Proxmox connection; the
-  PVE-side least-priv user/role/token creation stays operator-run (the wizard
-  validates a provided token + guides the manual steps, not silently around them).
-- **Real-infra acceptance (ACC-01/02/03):** dev-homelab smoke (real
-  create→terminal→stop→start→destroy + reaper/auto-stop/capacity on real CTs),
-  first live release-please PR + harden-runner egress block-flip, real GHCR
-  publish + cosign/attestation verify. Operator-run on real hardware (human UAT).
-- **Real-boot v2 persistence:** persistent/snapshotted workspaces that survive
-  stop/start instead of being destroyed (WSX-02), and full terminal scrollback
-  restore via tmux/zellij in the worker (WSX-03).
-- Ride-along: harden the stop/start e2e cleanup robustness (07r — W1/W2/W3).
+**Target features (Phases 15-22, dependency-ordered):**
+- **Pipeline unblock + green main (15):** exclude the release-please branch from
+  the active `oss` ruleset (it rejects the bot's ref update), lowercase the GHCR
+  owner + add SBOM registry auth in `release.yml` (mixed-case `BraveBearStudios`
+  makes syft fail so images ship UNSIGNED), green the Trivy HIGH/CRITICAL gate on
+  main (PC1), and resolve the manual-tag/semver skew.
+- **Land credential backend + reconcile release train (16):** merge PR #3 onto a
+  green main, reconcile release-please to v1.4.0, update the secret-at-rest docs
+  to reference ADR-0015, prune the merged local branch.
+- **Repo security + backlog hygiene (17):** `dependabot.yml` (pip/npm/actions) +
+  automated-security-fixes; enable CodeQL SAST on the default branch (today code
+  scanning is 100% Trivy image CVEs, zero source SAST); clear the todo backlog
+  (file 07r, fix WR-04, boot-credential-leak-test tautology, em-dash sweep).
+- **Credential store frontend + onboarding key (18):** the ship blocker — backend
+  is done but curl-only. Admin-secret + credentials wizard steps, admin-gated
+  Settings/Credentials screen, audit read endpoint + panel, `X-Burrow-Admin`
+  client, `BURROW_SECRET_KEY` auto-generation in onboarding, extended leak test.
+- **Create-UX async-202 (19):** `POST /workspaces` returns 202 + a `creating` row,
+  the saga runs in a tracked background task, the UI's existing 3s poll drives
+  state — curing the ~60s create 504.
+- **Signed GHCR release + harden-runner block (20):** clean `v1.4.0` tag → green
+  signed + attested `release.yml` → cosign/attestation verify (ACC-03) → flip
+  harden-runner egress audit→block from the green run's telemetry (ACC-02).
+- **Multi-agent workers research spike (21):** research-only ADR for Cursor /
+  Copilot CLI / Codex workers; confirm the credential seam is additive. No build.
+- **Live homelab acceptance capstone (22):** ACC-01 items 6-11 on real Proxmox
+  (item 9 uses a confirmed 2nd live worker node), credential-store live smoke,
+  verify the signed release against a homelab-pulled image.
 
-**Out of this milestone (deferred):** multi-agent workers (Cursor / Copilot CLI /
-Codex CLI in workers) — a full milestone of its own, research-first, deferred to
-v1.4. The todo stays in `.planning/todos/pending/` unlinked.
+**Out of this milestone (deferred):** building multi-agent workers (v1.4 is
+research-only there); host-prime signed-release delivery (its own onboarding
+milestone); the Postgres credential-store impl (hosted-path `NotImplementedError`
+stub stays — correct for v1 self-host).
 
 ## Requirements
 
@@ -84,9 +100,9 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 
 ### Active
 
-<!-- v1.3 active scope lives in REQUIREMENTS.md (setup wizard, ACC-01/02/03 real-infra acceptance, WSX-02/WSX-03 persistence, 07r e2e nit). -->
+<!-- v1.4 active scope lives in REQUIREMENTS.md (pipeline unblock, credential-store merge + frontend, dependabot/codeql, async-202 create, first signed release, live acceptance capstone). -->
 
-- [ ] Milestone v1.3 Go Live — see REQUIREMENTS.md. The carried ACC-01/02/03 real-infra acceptance (flip the ★ items above + the per-phase `*-HUMAN-UAT.md` checklists to passed) is now **in-scope this milestone**, not deferred.
+- [ ] Milestone v1.4 Ship & Harden — see REQUIREMENTS.md. v1.3 Go Live shipped 2026-06-26 (setup wizard + opt-in persistence + scrollback + ACC-01 H9 core passed 2026-07-12). v1.4 unblocks the release pipeline, ships the ADR-0015 GUI credential store (backend done; frontend + onboarding key remain), hardens the repo (Dependabot/CodeQL), and finishes the real-infra acceptance (ACC-01 items 6-11 + ACC-02/03 first signed release) — proven live on the homelab.
 
 ### Out of Scope
 
@@ -97,7 +113,7 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 - Cloud / container compute backend — v1 targets Proxmox LXC only; the `ComputeProvider` seam exists but a non-Proxmox impl is out of scope.
 - Real-Proxmox exercise in CI — CI proves clean builds + inter-app behavior against a `FakeComputeProvider` and mocked Proxmox; real-infra validation happens in the dev environment, not CI (ci-cd §4.4).
 - Native mobile app — browser-first; responsive web only.
-- Secrets manager — v1 uses a gitignored `.env`; a secrets manager is hosted-path scope.
+- External secrets manager / KMS — v1 uses a gitignored `.env` plus the GUI-managed encrypted (Fernet) credential store (ADR-0015, v1.4) for the Proxmox token + GitHub PAT; a full external secrets manager / KMS (`KmsSecretKeyProvider` seam) stays hosted-path scope.
 
 ## Context
 
@@ -178,4 +194,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-06-24 — v1.3 "Go Live" started. Scope: an in-app guided setup wizard (connect/validate Proxmox → provision/verify template → health-check → first workspace), real-infra acceptance (ACC-01/02/03, now in-scope), real-boot v2 persistence (WSX-02 persistent/snapshotted workspaces + WSX-03 scrollback restore), and the 07r stop/start e2e cleanup nit. Multi-agent workers (Cursor/Copilot/Codex) deferred to v1.4, research-first. Phase numbering continues from v1.2's last phase (9) → v1.3 resumes at 10.*
+*Last updated: 2026-07-13 — v1.4 "Ship & Harden" started. Scope: unblock the CI/release pipeline (oss-ruleset exclusion + GHCR-lowercase/SBOM-auth + Trivy-green main), merge + finish the ADR-0015 GUI credential store (backend done; frontend + onboarding key remain), repo hardening (Dependabot + CodeQL + backlog), async-202 create-UX, the first real signed + attested GHCR release (ACC-02/03), and a live homelab acceptance capstone (ACC-01 items 6-11, 2nd node confirmed). Multi-agent workers = research-only spike this milestone. Cut as v1.4.0. Phase numbering continues from v1.3's last phase (14) → v1.4 resumes at 15. v1.3 "Go Live" shipped 2026-06-26.*

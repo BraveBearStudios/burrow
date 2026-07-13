@@ -160,9 +160,7 @@ async def test_sentinel_absent_from_422_validation_body(
     bad_body = {**_CONNECT_BODY}
     del bad_body["host"]  # omit a sibling required field -> 422, sentinel still present
 
-    response = await integration_client.post(
-        "/api/v1/setup/test-connection", json=bad_body
-    )
+    response = await integration_client.post("/api/v1/setup/test-connection", json=bad_body)
 
     assert response.status_code == 422, response.text
     assert SENTINEL not in response.text, "token leaked into the 422 validation body"

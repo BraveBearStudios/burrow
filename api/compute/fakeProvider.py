@@ -253,7 +253,5 @@ class FakeComputeProvider(ComputeProvider):
     async def verifyTemplate(self, template_vmid: int, node: str) -> TemplateResult:
         self._maybe_fail("verifyTemplate")
         if self._failures.setup_template_missing:
-            return TemplateResult(
-                exists=False, usable=False, vmid=template_vmid, node=node
-            )
+            return TemplateResult(exists=False, usable=False, vmid=template_vmid, node=node)
         return TemplateResult(exists=True, usable=True, vmid=template_vmid, node=node)

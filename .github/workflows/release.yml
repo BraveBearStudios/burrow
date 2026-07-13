@@ -1,12 +1,16 @@
 # SPDX-FileCopyrightText: 2026 Brave Bear Studios
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Burrow release supply-chain (CICD-05). A v* tag (or a published GitHub
-# Release) builds BOTH production images, pushes them to GHCR by immutable
-# digest, then for each published image: generates a syft SBOM in SPDX AND
+# Burrow release supply-chain (CICD-05). A semver v[0-9]+.[0-9]+.[0-9]+ tag (or a
+# published GitHub Release) builds BOTH production images, pushes them to GHCR by
+# immutable digest, then for each published image: generates a syft SBOM in SPDX AND
 # CycloneDX, signs the image KEYLESS with cosign (Sigstore + GitHub OIDC — no
 # long-lived key), and emits a SLSA build-provenance attestation bound to the
 # digest. (ci-cd-and-testing.md §5.4/§5.5.)
+#
+# Release tags are owned by release-please: only a full semver vX.Y.Z tag fires
+# this workflow, and operators no longer hand-push two-component v1.x milestone
+# tags (a milestone tag would otherwise trigger a spurious sign/attest/publish).
 #
 # Splits cleanly from ci.yml: ci.yml builds + Trivy-scans on PR WITHOUT pushing
 # (CICD-04); this file owns SBOM / sign / provenance / GHCR-publish and runs
@@ -23,7 +27,7 @@ name: release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   release:
     types: [published]
 
@@ -90,13 +94,29 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      # Compute the lowercased ghcr.io/<owner>/<image> base ONCE, then reuse it
+      # for the metadata tags, both SBOMs, cosign sign, and the attest subject.
+      # docker/metadata-action lowercases only the PUSHED tag; syft/cosign/attest
+      # build their own ref, so the raw mixed-case owner (BraveBearStudios)
+      # desyncs them from the pushed digest, fails the syft pull, and ships an
+      # unsigned partial publish. One base output fixes all five refs uniformly.
+      # OWNER comes in via env (not inline) so the shell,
+      # not the expansion, does the ${VAR,,} lowercase (runner default shell is
+      # bash on ubuntu-latest).
+      - name: Compute lowercased GHCR image base
+        id: imgref
+        env:
+          OWNER: ${{ github.repository_owner }}
+          IMAGE: ${{ matrix.image }}
+        run: echo "base=ghcr.io/${OWNER,,}/${IMAGE}" >> "$GITHUB_OUTPUT"
+
       # Compute the §2.4 release tags (X.Y.Z, X.Y, latest, sha-<short>) and the
       # OCI source/revision/version labels for the fully-qualified GHCR image.
       - name: Image metadata (tags + OCI labels)
         id: meta
         uses: docker/metadata-action@318604b99e75e41977312d83839a89be02ca4893 # v5.9.0
         with:
-          images: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          images: ${{ steps.imgref.outputs.base }}
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
@@ -120,8 +140,15 @@ jobs:
       # the exact published artifact (ci-cd §5.4: SPDX + CycloneDX both required).
       - name: SBOM (SPDX)
         uses: anchore/sbom-action@d8a2c0130026bf585de5c176ab8f7ce62d75bf04 # v0.20.7
+        env:
+          # Give syft explicit ghcr.io auth so it can PULL the pushed-by-digest
+          # image for the SBOM. Without it the private-package pull fails and the
+          # sign/attest chain aborts. Same GITHUB_TOKEN docker/login-action used.
+          SYFT_REGISTRY_AUTH_AUTHORITY: ghcr.io
+          SYFT_REGISTRY_AUTH_USERNAME: ${{ github.actor }}
+          SYFT_REGISTRY_AUTH_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
-          image: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          image: ${{ steps.imgref.outputs.base }}@${{ steps.build.outputs.digest }}
           format: spdx-json
           output-file: sbom-${{ matrix.image }}.spdx.json
 
@@ -129,8 +156,14 @@ jobs:
       # single format, so dual-format == two runs).
       - name: SBOM (CycloneDX)
         uses: anchore/sbom-action@d8a2c0130026bf585de5c176ab8f7ce62d75bf04 # v0.20.7
+        env:
+          # Second SBOM run needs the same ghcr.io pull auth as the SPDX run
+          # (one action invocation emits one format, so dual-format == two runs).
+          SYFT_REGISTRY_AUTH_AUTHORITY: ghcr.io
+          SYFT_REGISTRY_AUTH_USERNAME: ${{ github.actor }}
+          SYFT_REGISTRY_AUTH_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
-          image: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+          image: ${{ steps.imgref.outputs.base }}@${{ steps.build.outputs.digest }}
           format: cyclonedx-json
           output-file: sbom-${{ matrix.image }}.cyclonedx.json
 
@@ -145,7 +178,7 @@ jobs:
           COSIGN_YES: "true"
         run: |
           cosign sign --yes \
-            "ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}"
+            "${{ steps.imgref.outputs.base }}@${{ steps.build.outputs.digest }}"
 
       # SLSA build-provenance attestation, bound to the digest and pushed to the
       # registry alongside the image. subject-name MUST be the fully-qualified
@@ -153,7 +186,7 @@ jobs:
       - name: Attest build provenance (SLSA)
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3.0.0
         with:
-          subject-name: ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}
+          subject-name: ${{ steps.imgref.outputs.base }}
           subject-digest: ${{ steps.build.outputs.digest }}
           push-to-registry: true
 
@@ -163,15 +196,20 @@ jobs:
 # (or release automation) against the PUBLISHED digest, after a real v* tag —
 # it needs the live registry + OIDC and is therefore NOT a PR-CI command:
 #
+# NOTE: the ghcr.io/<owner> REGISTRY path is lowercase (bravebearstudios); the
+# github.com identity in --certificate-identity-regexp and the gh attestation
+# --owner stay canonical-case (BraveBearStudios). They are GitHub ORG identities,
+# not registry paths. Do NOT lowercase them to match: verification would fail.
+#
 #   # Confirm the keyless cosign signature on the published digest:
 #   cosign verify \
 #     --certificate-identity-regexp 'https://github.com/BraveBearStudios/burrow/.*' \
 #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-#     ghcr.io/BraveBearStudios/burrow-api@sha256:<digest>
+#     ghcr.io/bravebearstudios/burrow-api@sha256:<digest>
 #
 #   # Confirm the SLSA build-provenance attestation on the published digest:
 #   gh attestation verify \
-#     oci://ghcr.io/BraveBearStudios/burrow-api@sha256:<digest> \
+#     oci://ghcr.io/bravebearstudios/burrow-api@sha256:<digest> \
 #     --owner BraveBearStudios
 #
 # (Repeat for burrow-ui. Pin deployment configs to the digest, not a floating

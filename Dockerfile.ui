@@ -10,8 +10,8 @@
 # HEALTHCHECK that asserts a 200 on /.
 
 # ── Build stage ────────────────────────────────────────────────────────
-# node:22 — digest resolved 2026-06-11 (multi-arch index).
-FROM node:22@sha256:2d178f2785b96dfbf62a416ca2e40f50e30150b4ff3320d706f0d96e90600eb3 AS build
+# node:22 — digest resolved 2026-07-13 (multi-arch index).
+FROM node:22@sha256:a25c9934ff6382cd4f08b6bc26c82bf4ea69b1e6f8dabfb2ead457374127c365 AS build
 
 WORKDIR /app
 
@@ -25,7 +25,7 @@ COPY ui/ ./
 RUN npm run build
 
 # ── Runtime stage ──────────────────────────────────────────────────────
-# nginx:1.27-alpine — digest resolved 2026-06-11 (multi-arch index).
+# nginx:1.27-alpine — digest resolved 2026-07-13 (multi-arch index).
 FROM nginx:1.27-alpine@sha256:65645c7bb6a0661892a8b03b89d0743208a18dd2f3f17a54ef4b76fb8e2f2a10 AS runtime
 
 # OCI provenance + AGPL §13 source-availability labels (dynamic values from CI).
@@ -38,6 +38,14 @@ LABEL org.opencontainers.image.source="https://github.com/BraveBearStudios/burro
       org.opencontainers.image.licenses="AGPL-3.0-or-later" \
       org.opencontainers.image.title="burrow-ui" \
       org.opencontainers.image.version="${IMAGE_VERSION}"
+
+# Patch the pinned Alpine base at build time. nginx:1.27-alpine lags Alpine's
+# security releases, so its libxml2 / musl / nghttp2-libs / zlib carry FIXABLE
+# HIGH CVEs (CVE-2026-6732 / -40200 / -27135 / -22184). `apk upgrade` pulls the
+# patched packages from the base's pinned Alpine repo, keeping the Trivy
+# HIGH/CRITICAL gate green (RELX-05) without waiting for an upstream nginx rebuild.
+# A fixable CVE is cleared by upgrade, never allowlisted in .trivyignore.
+RUN apk upgrade --no-cache
 
 # Unprivileged nginx: serve the SPA on :8080 and write the pid + all temp paths
 # under /tmp so a non-root user owns every file nginx touches at runtime.
