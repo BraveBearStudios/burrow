@@ -39,6 +39,14 @@ LABEL org.opencontainers.image.source="https://github.com/BraveBearStudios/burro
       org.opencontainers.image.title="burrow-ui" \
       org.opencontainers.image.version="${IMAGE_VERSION}"
 
+# Patch the pinned Alpine base at build time. nginx:1.27-alpine lags Alpine's
+# security releases, so its libxml2 / musl / nghttp2-libs / zlib carry FIXABLE
+# HIGH CVEs (CVE-2026-6732 / -40200 / -27135 / -22184). `apk upgrade` pulls the
+# patched packages from the base's pinned Alpine repo, keeping the Trivy
+# HIGH/CRITICAL gate green (RELX-05) without waiting for an upstream nginx rebuild.
+# A fixable CVE is cleared by upgrade, never allowlisted in .trivyignore.
+RUN apk upgrade --no-cache
+
 # Unprivileged nginx: serve the SPA on :8080 and write the pid + all temp paths
 # under /tmp so a non-root user owns every file nginx touches at runtime.
 RUN set -eux; \
