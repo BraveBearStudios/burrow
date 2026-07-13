@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: executing
-stopped_at: Completed 15-01-PLAN.md (RELX-04 + RELX-06); Phase 15 plan 2 of 3
-last_updated: "2026-07-13T18:02:10.336Z"
+stopped_at: Completed 15-02-PLAN.md (RELX-05 Trivy gate policy + base repins); Phase 15 plan 3 of 3
+last_updated: "2026-07-13T18:37:56.501Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 13
   completed_phases: 0
   total_plans: 3
-  completed_plans: 1
+  completed_plans: 2
   percent: 0
 ---
 
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 15 (Pipeline Unblock & Green Main) — EXECUTING
-Plan: 2 of 3
+Plan: 3 of 3
 Status: Ready to execute
 Last activity: 2026-07-13
 
@@ -118,6 +118,7 @@ Last activity: 2026-07-13
 | Phase 14 P01 | 18 | 3 tasks | 3 files |
 | Phase 14 P02 | 8min | 3 tasks | 4 files |
 | Phase 15 P01 | 20 | 3 tasks | 2 files |
+| Phase 15 P02 | 24 | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -188,6 +189,9 @@ Recent decisions affecting current work:
 - [Phase ?]: 14-ACCEPTANCE.md references reviewdog/action-actionlint (the action 14-01 actually wired), not the plan's rhysd/actionlint which ships no action.yml
 - [Phase ?]: ACC-01/02/03 stay human_needed; the 16-item 14-HUMAN-UAT checklist is all result: [pending], rolled up from Phase 03/04. **(v1.4 update: ACC-01 items 1-5 (H9 core) PASSED 2026-07-12 on den01; items 6-11 carry into v1.4 Phase 22 as ACC-04; the first signed release + egress block-flip carry into Phase 20 as ACC-06.)**
 - [Phase ?]: [Plan 15-01]: release.yml builds every ghcr.io image ref from ONE lowercased steps.imgref.outputs.base (metadata images + both SBOMs + cosign sign + attest subject); OWNER passed via env so the runner shell does the ${OWNER,,} lowercase, keeping the raw github.repository_owner literal to exactly one occurrence. Both anchore/sbom-action steps get SYFT_REGISTRY_AUTH_AUTHORITY/USERNAME/PASSWORD (ghcr.io / github.actor / GITHUB_TOKEN) so syft can pull the pushed-by-digest image (the SBOM step that previously failed and shipped unsigned partial publishes). Push tag trigger narrowed to semver v[0-9]+.[0-9]+.[0-9]+ so hand-pushed milestone tags no longer fire the publish job (release-please owns release tags). The github.com OIDC identity-regexp + gh attestation --owner stay canonical-case BraveBearStudios; only the ghcr.io registry path is lowercased. Signed+attested GREEN proof is CI-gated to the first live vX.Y.Z tag (Phase 20 / ACC-06). RELX-04 + RELX-06 structurally landed.
+- [Phase 15]: [Plan 15-02]: RELX-05 Trivy gate greened structurally. ci.yml build-scan HIGH/CRITICAL gate set ignore-unfixed:true + trivyignores:.trivyignore (reviewed zero-seed allowlist: SPDX header + owner|reason|link|reviewed per-entry + explicit unfixable-only / never-allowlist-a-fixable rule; reuse-clean via inline # header, no sidecar). The if:always SARIF run + trivy-action SHA are byte-unchanged. Fixable base HIGH/CRITICAL are cleared by a base repin, never allowlisted; the GREEN-gate proof is CI-gated to the Linux runner (PR #3 CI).
+- [Phase 15]: [Plan 15-02]: Base digests repinned via the anonymous Docker Registry v2 HTTP API index digest (docker/crane/skopeo absent on the Windows box). Real repin: python:3.12-slim (both api stages, identical) a39549e2->423ed6ab + node:22 2d178f27->a25c9934; nginx:1.27-alpine + ghcr uv:0.9.9 re-resolved 2026-07-13, already current. Resolved-date advanced to 2026-07-13 only because a real repin landed; the fixable-base-CVE lever is NOT carried as un-repinnable.
+- [Phase 15]: [Plan 15-02]: Out-of-scope discovery D-15-02-01 (deferred-items.md): the committed 15-02-PLAN.md reds the repo-wide reuse hard gate (1 Invalid SPDX License Expression from plan prose quoting an SPDX tag with same-line trailing text). CICD-06 not RELX-05; not fixed per the scope boundary. Green-main blocker owned by Phase 16 (merge PR #3); one-line tool-sanctioned remedy documented.
 
 ### Pending Todos
 
@@ -231,10 +235,10 @@ are now claimed by v1.4 Phases 20 + 22.
 
 ## Session Continuity
 
-Last session: 2026-07-13T18:02:10.322Z
-Stopped at: Completed 15-01-PLAN.md (RELX-04 + RELX-06); Phase 15 plan 2 of 3
+Last session: 2026-07-13T18:31:45.985Z
+Stopped at: Completed 15-02-PLAN.md (RELX-05 Trivy gate policy + base repins); Phase 15 plan 3 of 3
 Resume file: None
-Next plan: Plan Phase 15 with `/gsd:plan-phase 15` (Pipeline Unblock & Green Main — RELX-03/04/05/06; the true gating work: unblock release-please via the `oss` ruleset, lowercase the GHCR owner + give syft registry auth so images ship signed+attested, green the Trivy HIGH/CRITICAL gate on main, reconcile the tag scheme to semver). Phase 15 gates everything: Phase 16 (merge PR #3) must land on a green main. Phases 17, 19, 21 are parallelizable off the earlier work.
+Next plan: Execute plan 15-03 (RELX-03: exclude `refs/heads/release-please--**` from the `oss` ruleset; operator/admin-run `gh api` change, documented not committed). Phase 15 then closes the pipeline-unblock critical path so Phase 16 can merge PR #3 onto a green main. NOTE: the reuse hard gate will red on PR CI until D-15-02-01 (the 15-02-PLAN.md invalid SPDX expression, see deferred-items.md) is fixed by the green-main sequencing.
 
 ## Operator Next Steps
 

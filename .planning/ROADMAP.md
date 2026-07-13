@@ -284,7 +284,7 @@ Plans:
 Plans:
 
 - [x] 15-01-PLAN.md — release.yml: lowercase GHCR owner into one reused base + syft registry auth + narrow tag trigger to semver (RELX-04, RELX-06)
-- [ ] 15-02-PLAN.md — Trivy green-main gate: ci.yml ignore-unfixed + reviewed .trivyignore + repin base image digests (RELX-05)
+- [x] 15-02-PLAN.md — Trivy green-main gate: ci.yml ignore-unfixed + reviewed .trivyignore + repin base image digests (RELX-05)
 - [ ] 15-03-PLAN.md — oss ruleset exclusion for the release-please branch: operator-run gh api runbook + apply (RELX-03; autonomous: false)
 
 ### Phase 16: Land Credential Backend & Reconcile Release Train
@@ -413,7 +413,7 @@ Plans:
 | 12. Setup Wizard Backend | v1.3 | 2/2 | Complete    | 2026-06-26 |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 4/4 | Complete    | 2026-06-26 |
 | 14. First Real-Infra Acceptance | v1.3 | 2/2 | Complete   | 2026-06-26 |
-| 15. Pipeline Unblock & Green Main | v1.4 | 1/3 | In Progress|  |
+| 15. Pipeline Unblock & Green Main | v1.4 | 2/3 | In Progress|  |
 | 16. Land Credential Backend & Reconcile Release Train | v1.4 | 0/TBD | Not started | - |
 | 17. Repo Security & Backlog Hygiene | v1.4 | 0/TBD | Not started | - |
 | 18. Credential Store Frontend & Onboarding Key | v1.4 | 0/TBD | Not started | - |
