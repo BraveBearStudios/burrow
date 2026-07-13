@@ -35,6 +35,11 @@ properties of that token shaped this decision:
    `.env` exclusively (CLAUDE.md security posture, milestone decision), so no
    secret enters the database and no token-at-rest store is introduced.
 
+> **Superseded (v1.4, ADR-0015):** point 2 no longer holds — the credential store
+> now persists the validated Proxmox token Fernet-encrypted at rest. The wizard's
+> throwaway-client validation path (this ADR's decision) is unchanged; only the
+> "never comes to rest" posture is superseded. See ADR-0015.
+
 Two shapes for "where does the wizard validation logic live" were considered:
 
 - **A. A setup-specific module that talks to Proxmox directly.** Fast to write,
