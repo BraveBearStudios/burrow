@@ -146,7 +146,7 @@ acceptance capstone (ACC-01 item 9 in-scope); multi-agent workers are research-o
 (the credential backend) is mergeable (+18/0 vs main); the true gating work is the three pipeline
 blockers (the `oss` ruleset, the mixed-case GHCR owner + syft auth, and the red Trivy `main` gate).
 
-- [ ] **Phase 15: Pipeline Unblock & Green Main** — exclude the release-please branch from the `oss` ruleset, lowercase the GHCR owner + give the SBOM step registry auth so images ship signed+attested, green the Trivy HIGH/CRITICAL gate on main (PC1), reconcile the tag scheme to semver (RELX-03/04/05/06; CI-provable)
+- [x] **Phase 15: Pipeline Unblock & Green Main** — exclude the release-please branch from the `oss` ruleset, lowercase the GHCR owner + give the SBOM step registry auth so images ship signed+attested, green the Trivy HIGH/CRITICAL gate on main (PC1), reconcile the tag scheme to semver (RELX-03/04/05/06; CI-provable) (completed 2026-07-13)
 - [ ] **Phase 16: Land Credential Backend & Reconcile Release Train** — merge PR #3 onto a green main, reconcile release-please forward from the stale 1.2.0 to v1.4.0, reconcile the secret-at-rest docs to ADR-0015, prune the merged local branch (CRED-01; CI-provable; depends on 15)
 - [ ] **Phase 17: Repo Security & Backlog Hygiene** — Dependabot config + automated-security-fixes, CodeQL SAST on the default branch + first-run baseline, clear the 4-item todo backlog (SEC-01/02/03, ROB-01/02; CI-provable; parallelizable)
 - [ ] **Phase 18: Credential Store Frontend & Onboarding Key** — wizard admin-secret + credentials steps, admin-gated Settings/Credentials screen, audit read endpoint + panel, `X-Burrow-Admin` client, `BURROW_SECRET_KEY` auto-generation, extended leak test (CRED-02..07; CI-provable; depends on 16)
@@ -285,7 +285,7 @@ Plans:
 
 - [x] 15-01-PLAN.md — release.yml: lowercase GHCR owner into one reused base + syft registry auth + narrow tag trigger to semver (RELX-04, RELX-06)
 - [x] 15-02-PLAN.md — Trivy green-main gate: ci.yml ignore-unfixed + reviewed .trivyignore + repin base image digests (RELX-05)
-- [ ] 15-03-PLAN.md — oss ruleset exclusion for the release-please branch: operator-run gh api runbook + apply (RELX-03; autonomous: false). Runbook authored + committed (17b5707); PAUSED at a blocking human-action checkpoint awaiting the operator's admin-scoped ruleset PUT (RELX-03 live proof is human-gated).
+- [x] 15-03-PLAN.md — oss ruleset exclusion for the release-please branch: operator-run gh api runbook + apply (RELX-03; autonomous: false). Runbook authored + committed (17b5707); PAUSED at a blocking human-action checkpoint awaiting the operator's admin-scoped ruleset PUT (RELX-03 live proof is human-gated).
 
 ### Phase 16: Land Credential Backend & Reconcile Release Train
 
@@ -413,7 +413,7 @@ Plans:
 | 12. Setup Wizard Backend | v1.3 | 2/2 | Complete    | 2026-06-26 |
 | 13. Setup Wizard UI + First-Run Gate | v1.3 | 4/4 | Complete    | 2026-06-26 |
 | 14. First Real-Infra Acceptance | v1.3 | 2/2 | Complete   | 2026-06-26 |
-| 15. Pipeline Unblock & Green Main | v1.4 | 2/3 | In Progress|  |
+| 15. Pipeline Unblock & Green Main | v1.4 | 3/3 | Complete   | 2026-07-13 |
 | 16. Land Credential Backend & Reconcile Release Train | v1.4 | 0/TBD | Not started | - |
 | 17. Repo Security & Backlog Hygiene | v1.4 | 0/TBD | Not started | - |
 | 18. Credential Store Frontend & Onboarding Key | v1.4 | 0/TBD | Not started | - |
