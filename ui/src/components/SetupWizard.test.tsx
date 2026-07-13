@@ -1,14 +1,15 @@
 // SPDX-FileCopyrightText: 2026 Brave Bear Studios
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// SetupWizard tests (SETUP-04/06). Drives the binding 13-UI-SPEC first-run gate over
-// MSW: the gate renders the "Set up Burrow" dialog with the step-1 `Validate
-// connection` CTA; a successful test-connection AUTO-ADVANCES to the `Verify
-// template` step; a setup_auth_failed envelope surfaces the mapped token-free copy
-// with the Host field still present (inline retry); a success=false result renders
-// the mono missing-privilege list (NOT an --err strip); the full 1→2→3→4 walk fires
-// POST /setup/complete AFTER POST /workspaces (complete-after-create ordering); and
-// Escape does NOTHING (the gate is a non-dismissible hard block).
+// SetupWizard tests (SETUP-04/06 + CRED-03). Drives the binding 13-UI-SPEC first-run
+// gate over MSW: the gate renders the "Set up Burrow" dialog with the step-1 `Validate
+// connection` CTA; a successful test-connection AUTO-ADVANCES to the `Verify template`
+// step; a setup_auth_failed envelope surfaces the mapped token-free copy with the Host
+// field still present (inline retry); a success=false result renders the mono
+// missing-privilege list (NOT an --err strip); the credential steps set the in-memory
+// admin secret (never localStorage) and save credentials with the X-Burrow-Admin
+// header; the full 1..6 walk fires POST /setup/complete AFTER POST /workspaces
+// (complete-after-create ordering); and Escape does NOTHING (non-dismissible gate).
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -22,6 +23,7 @@ import { HttpResponse, http } from "msw";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { server } from "../../tests/msw/server";
+import { useAdminStore } from "../store/useAdminStore";
 import { SetupWizard } from "./SetupWizard";
 
 function envelope<T>(data: T) {
@@ -92,8 +94,65 @@ function healthOk() {
 	);
 }
 
+/** A handler that accepts the first-run admin-secret set (step 4). */
+function adminSecretOk() {
+	return http.post("/api/v1/setup/admin-secret", () =>
+		HttpResponse.json(envelope({ adminSecretSet: true })),
+	);
+}
+
+/** A handler that accepts the credential save + returns status (step 5). */
+function credentialsOk() {
+	return http.post("/api/v1/setup/credentials", () =>
+		HttpResponse.json(
+			envelope({
+				proxmoxTokenSet: true,
+				proxmoxTokenLast4: "alue",
+				gitTokenSet: false,
+				gitTokenLast4: null,
+				updatedAt: "2026-06-10T02:30:00Z",
+			}),
+		),
+	);
+}
+
+/** Fill + submit the step-4 admin-secret fields, then wait for the step-5 CTA. */
+async function passAdminSecret() {
+	fireEvent.change(screen.getByLabelText("Admin secret"), {
+		target: { value: "admin-secret-1" },
+	});
+	fireEvent.change(screen.getByLabelText("Confirm admin secret"), {
+		target: { value: "admin-secret-1" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Set admin secret" }));
+	await screen.findByRole("button", { name: "Save credentials" });
+}
+
+/** Fill + submit the step-5 credentials fields, then wait for the step-6 CTA. */
+async function passCredentials() {
+	fireEvent.change(screen.getByLabelText("Proxmox token value"), {
+		target: { value: "pve-token-value" },
+	});
+	fireEvent.click(screen.getByRole("button", { name: "Save credentials" }));
+	await screen.findByRole("button", { name: "Create workspace" });
+}
+
+/** True when `value` appears in ANY localStorage cell (leak assertion). */
+function isInLocalStorage(value: string): boolean {
+	for (let i = 0; i < localStorage.length; i++) {
+		const key = localStorage.key(i);
+		if (key && (localStorage.getItem(key) ?? "").includes(value)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 beforeEach(() => {
 	localStorage.clear();
+	// The admin store is a module singleton — reset it so a secret set in one test
+	// never bleeds into the next.
+	useAdminStore.getState().clear();
 });
 
 afterEach(() => {
@@ -184,13 +243,83 @@ describe("SetupWizard — step-1 connection (SETUP-04)", () => {
 	});
 });
 
+describe("SetupWizard — credential steps (CRED-03)", () => {
+	/** Walk steps 1..3 so the wizard sits on step 4 (admin secret). */
+	async function walkToAdminSecret() {
+		server.use(connectionOk(), templateOk(), healthOk());
+		renderWizard();
+		fillConnection();
+		fireEvent.click(
+			screen.getByRole("button", { name: "Validate connection" }),
+		);
+		await screen.findByRole("button", { name: "Verify template" });
+		fireEvent.change(screen.getByLabelText("Template VMID"), {
+			target: { value: "9000" },
+		});
+		fireEvent.change(screen.getByLabelText("Node"), {
+			target: { value: "pve" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Verify template" }));
+		await screen.findByRole("button", { name: "Set admin secret" });
+	}
+
+	it("sets the admin secret in memory only (NOT localStorage) and advances to credentials", async () => {
+		server.use(adminSecretOk(), credentialsOk());
+		await walkToAdminSecret();
+		await passAdminSecret();
+
+		// Advanced to step 5 (credentials).
+		expect(
+			screen.getByRole("button", { name: "Save credentials" }),
+		).toBeInTheDocument();
+		// The secret is held in the in-memory store...
+		expect(useAdminStore.getState().secret).toBe("admin-secret-1");
+		// ...and NEVER written to any web storage.
+		expect(isInLocalStorage("admin-secret-1")).toBe(false);
+	});
+
+	it("saves the Proxmox token with the X-Burrow-Admin header, then advances to create", async () => {
+		type SaveBody = { proxmoxTokenValue?: string; gitToken?: string };
+		let sentHeader: string | null = null;
+		let sentBody: SaveBody | null = null;
+		server.use(
+			adminSecretOk(),
+			http.post("/api/v1/setup/credentials", async ({ request }) => {
+				sentHeader = request.headers.get("X-Burrow-Admin");
+				sentBody = (await request.json()) as SaveBody;
+				return HttpResponse.json(
+					envelope({
+						proxmoxTokenSet: true,
+						proxmoxTokenLast4: "alue",
+						gitTokenSet: false,
+						gitTokenLast4: null,
+						updatedAt: "2026-06-10T02:30:00Z",
+					}),
+				);
+			}),
+		);
+		await walkToAdminSecret();
+		await passAdminSecret();
+		await passCredentials();
+
+		// Advanced to step 6 (create) once credentials saved.
+		expect(
+			screen.getByRole("button", { name: "Create workspace" }),
+		).toBeInTheDocument();
+		expect(sentHeader).toBe("admin-secret-1");
+		expect(sentBody).toEqual({ proxmoxTokenValue: "pve-token-value" });
+	});
+});
+
 describe("SetupWizard — complete-after-create ordering (SETUP-06)", () => {
-	it("POSTs /setup/complete AFTER /workspaces on the step-4 create success", async () => {
+	it("POSTs /setup/complete AFTER /workspaces on the step-6 create success", async () => {
 		const callOrder: string[] = [];
 		server.use(
 			connectionOk(),
 			templateOk(),
 			healthOk(),
+			adminSecretOk(),
+			credentialsOk(),
 			http.post("/api/v1/workspaces", async ({ request }) => {
 				callOrder.push("workspaces");
 				const body = (await request.json()) as { name: string };
@@ -221,14 +350,14 @@ describe("SetupWizard — complete-after-create ordering (SETUP-06)", () => {
 		);
 		renderWizard();
 
-		// Step 1 → 2.
+		// Step 1 -> 2.
 		fillConnection();
 		fireEvent.click(
 			screen.getByRole("button", { name: "Validate connection" }),
 		);
 		await screen.findByRole("button", { name: "Verify template" });
 
-		// Step 2 → 3.
+		// Step 2 -> 3.
 		fireEvent.change(screen.getByLabelText("Template VMID"), {
 			target: { value: "9000" },
 		});
@@ -238,9 +367,13 @@ describe("SetupWizard — complete-after-create ordering (SETUP-06)", () => {
 		fireEvent.click(screen.getByRole("button", { name: "Verify template" }));
 
 		// Step 3 auto-probes on mount and (both ok) auto-advances to step 4.
-		await screen.findByRole("button", { name: "Create workspace" });
+		await screen.findByRole("button", { name: "Set admin secret" });
 
-		// Step 4 → create → complete.
+		// Steps 4 -> 5 -> 6 (admin secret, then credentials).
+		await passAdminSecret();
+		await passCredentials();
+
+		// Step 6 create -> complete.
 		fireEvent.change(screen.getByLabelText("Name"), {
 			target: { value: "project-omega" },
 		});
@@ -261,6 +394,8 @@ describe("SetupWizard — complete-after-create failure (SETUP-06, WR-01)", () =
 			connectionOk(),
 			templateOk(),
 			healthOk(),
+			adminSecretOk(),
+			credentialsOk(),
 			http.post("/api/v1/workspaces", async ({ request }) => {
 				workspaceCalls.push("workspaces");
 				const body = (await request.json()) as { name: string };
@@ -295,7 +430,7 @@ describe("SetupWizard — complete-after-create failure (SETUP-06, WR-01)", () =
 		);
 		renderWizard();
 
-		// Walk 1 → 2 → 3 → 4.
+		// Walk 1 -> 2 -> 3 -> 4.
 		fillConnection();
 		fireEvent.click(
 			screen.getByRole("button", { name: "Validate connection" }),
@@ -308,9 +443,13 @@ describe("SetupWizard — complete-after-create failure (SETUP-06, WR-01)", () =
 			target: { value: "pve" },
 		});
 		fireEvent.click(screen.getByRole("button", { name: "Verify template" }));
-		await screen.findByRole("button", { name: "Create workspace" });
+		await screen.findByRole("button", { name: "Set admin secret" });
 
-		// Step 4 — create succeeds but /setup/complete fails.
+		// Steps 4 -> 5 -> 6 (admin secret, then credentials).
+		await passAdminSecret();
+		await passCredentials();
+
+		// Step 6 — create succeeds but /setup/complete fails.
 		fireEvent.change(screen.getByLabelText("Name"), {
 			target: { value: "project-omega" },
 		});
