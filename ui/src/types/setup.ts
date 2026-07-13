@@ -41,3 +41,50 @@ export interface VerifyTemplateBody {
 	templateVmid: number;
 	node: string;
 }
+
+// ── Credential store (ADR-0015 / CRED-02..05) ──────────────────────────────
+// camelCase to match the backend CamelModel JSON (api/routers/setup.py). The
+// secret values in these bodies are TRANSIENT — held in React form state / the
+// in-memory useAdminStore only, never persisted or logged client-side.
+
+/** POST /setup/admin-secret body. `currentSecret` is required only to CHANGE an
+ *  already-set secret; first-run (wizard) omits it. */
+export interface AdminSecretBody {
+	secret: string;
+	currentSecret?: string;
+}
+
+/** POST /setup/credentials body. At least one field must be present (the backend
+ *  422s an empty write); a Proxmox token is validated read-only before persist. */
+export interface SaveCredentialsBody {
+	proxmoxTokenValue?: string;
+	gitToken?: string;
+}
+
+/** GET/POST /setup/credentials status — mirrors the backend getCredentialStatus
+ *  keys EXACTLY (api/db/sqliteProvider.py). Write-only store: a secret VALUE is
+ *  never returned, only whether it is set + its last 4 chars + the change time. */
+export interface CredentialStatus {
+	proxmoxTokenSet: boolean;
+	proxmoxTokenLast4: string | null;
+	gitTokenSet: boolean;
+	gitTokenLast4: string | null;
+	updatedAt: string | null;
+}
+
+/** One row of the credential audit trail (audit_log columns, CRED-05). `target`,
+ *  `sourceIp`, and `detail` are nullable per the schema. */
+export interface AuditEntry {
+	id: string;
+	action: string;
+	target: string | null;
+	outcome: string;
+	sourceIp: string | null;
+	detail: string | null;
+	createdAt: string;
+}
+
+/** GET /setup/audit result — recent audit rows, newest-first (bounded). */
+export interface AuditList {
+	entries: AuditEntry[];
+}
