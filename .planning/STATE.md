@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: in-progress
-stopped_at: Autonomous run — Phase 16 recorded complete (out-of-band merge); executing Phase 17
-last_updated: "2026-07-13T21:00:00.000Z"
+stopped_at: Autonomous run — Phases 16 + 17 complete; executing Phase 18 (credential store frontend, ship blocker)
+last_updated: "2026-07-13T21:30:00.000Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 13
-  completed_phases: 7
-  total_plans: 3
-  completed_plans: 3
-  percent: 54
+  completed_phases: 8
+  total_plans: 4
+  completed_plans: 4
+  percent: 62
 ---
 
 <!--
@@ -26,13 +26,13 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 17 — Repo Security & Backlog Hygiene (autonomous run)
+**Current focus:** Phase 18 — Credential Store Frontend & Onboarding Key (the milestone ship blocker)
 
 ## Current Position
 
-Phase: 17 (Repo Security & Backlog Hygiene) — starting
+Phase: 18 (Credential Store Frontend & Onboarding Key) — starting
 Branch: `feat/v1.4-harden` (off green `main` `f9b1868`; the merged `feat/gui-managed-secrets` was pruned locally, remote prune deferred to operator)
-Status: Autonomous /gsd-autonomous run. Phase 15 PASSED (RELX-03 ruleset applied live, verified). Phase 16 PASSED — the credential backend was squash-merged out-of-band (`f9b1868`), main CI green, release PR #1 reconciled to v1.4.0, secret-at-rest docs reconciled to ADR-0015, local branch pruned.
+Status: Autonomous /gsd-autonomous run. Phase 15 PASSED (RELX-03 ruleset applied live). Phase 16 PASSED (credential backend merged out-of-band `f9b1868`, main green, release PR #1 → v1.4.0, docs reconciled to ADR-0015). Phase 17 PASSED (Dependabot + CodeQL landed, automated-security-fixes enabled, ROB-01/02 fixed; 194 api tests green).
 Last activity: 2026-07-13
 
 ## Performance Metrics
