@@ -285,7 +285,7 @@ Plans:
 
 - [x] 15-01-PLAN.md — release.yml: lowercase GHCR owner into one reused base + syft registry auth + narrow tag trigger to semver (RELX-04, RELX-06)
 - [x] 15-02-PLAN.md — Trivy green-main gate: ci.yml ignore-unfixed + reviewed .trivyignore + repin base image digests (RELX-05)
-- [ ] 15-03-PLAN.md — oss ruleset exclusion for the release-please branch: operator-run gh api runbook + apply (RELX-03; autonomous: false)
+- [ ] 15-03-PLAN.md — oss ruleset exclusion for the release-please branch: operator-run gh api runbook + apply (RELX-03; autonomous: false). Runbook authored + committed (17b5707); PAUSED at a blocking human-action checkpoint awaiting the operator's admin-scoped ruleset PUT (RELX-03 live proof is human-gated).
 
 ### Phase 16: Land Credential Backend & Reconcile Release Train
 

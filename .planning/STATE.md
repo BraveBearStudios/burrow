@@ -2,9 +2,9 @@
 gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
-status: executing
-stopped_at: Completed 15-02-PLAN.md (RELX-05 Trivy gate policy + base repins); Phase 15 plan 3 of 3
-last_updated: "2026-07-13T18:37:56.501Z"
+status: awaiting-operator
+stopped_at: Paused at 15-03 blocking human-action checkpoint (RELX-03 oss-ruleset release-please exclusion; operator applies the ruleset PUT with an admin-scoped gh)
+last_updated: "2026-07-13T18:51:43.000Z"
 last_activity: 2026-07-13
 progress:
   total_phases: 13
@@ -30,9 +30,9 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 
 ## Current Position
 
-Phase: 15 (Pipeline Unblock & Green Main) — EXECUTING
+Phase: 15 (Pipeline Unblock & Green Main) — EXECUTING (plan 15-03 paused at a blocking human-action checkpoint)
 Plan: 3 of 3
-Status: Ready to execute
+Status: Awaiting operator — 15-03 RELX-03 runbook authored + committed (17b5707); the live oss-ruleset exclusion is an operator GitHub-admin action (session gh token lacks admin:org/repo-admin)
 Last activity: 2026-07-13
 
 ## Performance Metrics
@@ -192,6 +192,7 @@ Recent decisions affecting current work:
 - [Phase 15]: [Plan 15-02]: RELX-05 Trivy gate greened structurally. ci.yml build-scan HIGH/CRITICAL gate set ignore-unfixed:true + trivyignores:.trivyignore (reviewed zero-seed allowlist: SPDX header + owner|reason|link|reviewed per-entry + explicit unfixable-only / never-allowlist-a-fixable rule; reuse-clean via inline # header, no sidecar). The if:always SARIF run + trivy-action SHA are byte-unchanged. Fixable base HIGH/CRITICAL are cleared by a base repin, never allowlisted; the GREEN-gate proof is CI-gated to the Linux runner (PR #3 CI).
 - [Phase 15]: [Plan 15-02]: Base digests repinned via the anonymous Docker Registry v2 HTTP API index digest (docker/crane/skopeo absent on the Windows box). Real repin: python:3.12-slim (both api stages, identical) a39549e2->423ed6ab + node:22 2d178f27->a25c9934; nginx:1.27-alpine + ghcr uv:0.9.9 re-resolved 2026-07-13, already current. Resolved-date advanced to 2026-07-13 only because a real repin landed; the fixable-base-CVE lever is NOT carried as un-repinnable.
 - [Phase 15]: [Plan 15-02]: Out-of-scope discovery D-15-02-01 (deferred-items.md): the committed 15-02-PLAN.md reds the repo-wide reuse hard gate (1 Invalid SPDX License Expression from plan prose quoting an SPDX tag with same-line trailing text). CICD-06 not RELX-05; not fixed per the scope boundary. Green-main blocker owned by Phase 16 (merge PR #3); one-line tool-sanctioned remedy documented.
+- [Phase 15]: [Plan 15-03]: RELX-03 documentation half landed, live apply PAUSED at a blocking human-action checkpoint. Authored `15-RELX-03-RULESET-RUNBOOK.md` (commit 17b5707) with the exact `gh api` fetch -> `jq` modify -> `--method PUT` sequence for the `oss` ruleset (id 18189353): the jq appends `refs/heads/release-please--**` to `conditions.ref_name.exclude` (deduped) and projects the PUT body to `{name,target,enforcement,bypass_actors,conditions,rules}` so read-only GET fields cannot reset protections (T-15-08), plus the Settings -> Rules -> Rulesets UI fallback + a diff sanity-check + a post-apply enforcement/bypass verify + the confirmation (no `Error updating ref`). SURGICAL: only the release-please glob is excluded, no bypass actor added, other rules stay enforced (T-15-07). The live exclusion is an operator GitHub repo-admin action; the session gh token lacks admin:org/repo-admin so the executor did NOT run the PUT. **RELX-03 NOT complete until the operator applies it and a release-please run maintains its branch cleanly.**
 
 ### Pending Todos
 
@@ -235,11 +236,11 @@ are now claimed by v1.4 Phases 20 + 22.
 
 ## Session Continuity
 
-Last session: 2026-07-13T18:31:45.985Z
-Stopped at: Completed 15-02-PLAN.md (RELX-05 Trivy gate policy + base repins); Phase 15 plan 3 of 3
-Resume file: None
-Next plan: Execute plan 15-03 (RELX-03: exclude `refs/heads/release-please--**` from the `oss` ruleset; operator/admin-run `gh api` change, documented not committed). Phase 15 then closes the pipeline-unblock critical path so Phase 16 can merge PR #3 onto a green main. NOTE: the reuse hard gate will red on PR CI until D-15-02-01 (the 15-02-PLAN.md invalid SPDX expression, see deferred-items.md) is fixed by the green-main sequencing.
+Last session: 2026-07-13T18:51:43.000Z
+Stopped at: 15-03 PAUSED at a blocking human-action checkpoint (RELX-03). Task 1 (runbook) authored + committed (17b5707); Task 2 (the live oss-ruleset exclusion) is an operator GitHub-admin action.
+Resume file: .planning/phases/15-pipeline-unblock-green-main/15-RELX-03-RULESET-RUNBOOK.md
+Next plan: OPERATOR ACTION to resume 15-03 (RELX-03). Follow 15-RELX-03-RULESET-RUNBOOK.md with an admin-scoped gh: fetch ruleset 18189353, `jq`-append `refs/heads/release-please--**` to `conditions.ref_name.exclude` (deduped, body projected to name/target/enforcement/bypass_actors/conditions/rules), `gh api --method PUT ... --input ruleset.new.json` (or the Settings -> Rules -> Rulesets UI fallback). Then push a commit to main / re-run the failed release-please run and confirm NO `Error updating ref heads/release-please--branches--main`. Reply `applied` once live. Only then does Phase 15 close (2/3 -> 3/3) so Phase 16 can merge PR #3 onto a green main. NOTE: the reuse hard gate will red on PR CI until D-15-02-01 (the 15-02-PLAN.md invalid SPDX expression, see deferred-items.md) is fixed by the green-main sequencing.
 
 ## Operator Next Steps
 
-- Plan Phase 15 with `/gsd:plan-phase 15` (the pipeline-unblock critical path).
+- **RESUME 15-03 (RELX-03):** apply the `oss`-ruleset release-please exclusion per `.planning/phases/15-pipeline-unblock-green-main/15-RELX-03-RULESET-RUNBOOK.md` with your admin-scoped `gh` (the session token lacks repo-admin), then confirm a clean release-please run and reply `applied`. This closes Phase 15's pipeline-unblock critical path.
