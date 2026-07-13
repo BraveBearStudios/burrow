@@ -523,8 +523,9 @@ class WorkspaceService:
 
         Injectable: the unit tier monkeypatches this to resolve instantly (no
         network); the integration tier exercises the real poll against a stub ttyd.
-        A non-5xx response means ttyd is serving; connect/timeout errors are
-        retried until ``ttyd_timeout`` elapses, then it raises.
+        A non-5xx response means ttyd is serving; transport-level errors (connect
+        refused, timeout, or a mid-boot TCP reset / half-served HTTP) are retried
+        until ``ttyd_timeout`` elapses, then it raises ``WorkspaceBootError``.
         """
         if ip is None:
             raise WorkspaceBootError("no IP resolved for the worker; cannot reach ttyd")
@@ -541,7 +542,16 @@ class WorkspaceService:
                     response = await client.get(f"http://{host}:7681/", timeout=2)
                     if response.status_code < 500:
                         return
-                except (httpx.ConnectError, httpx.TimeoutException):
+                except httpx.TransportError:
+                    # A worker whose ttyd is still coming up can refuse the
+                    # connection, time out, OR accept the TCP handshake then reset /
+                    # half-serve before valid HTTP (ReadError, WriteError,
+                    # RemoteProtocolError). All subclass httpx.TransportError and all
+                    # mean "not ready yet" -> retry to the deadline. Catching only
+                    # ConnectError/TimeoutException let a mid-boot reset escape as a
+                    # raw httpx error, which surfaced to the operator as a generic
+                    # 500 masking the boot failure instead of the honest 502
+                    # boot_failed (the escape hit both the create and start paths).
                     pass
                 await asyncio.sleep(self.settings.ttyd_interval)
         raise WorkspaceBootError(f"ttyd not ready in {self.settings.ttyd_timeout}s")
