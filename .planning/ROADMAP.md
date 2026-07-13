@@ -10,7 +10,7 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 - ✅ **v1.0 MVP** — Phases 0-4 (shipped 2026-06-11)
 - ✅ **v1.1 UI Polish + Stop/Start Controls** — Phases 5-6 (shipped 2026-06-15)
 - ✅ **v1.2 Backlog Fixes + Release Automation** — Phases 7-9 (shipped 2026-06-16)
-- 🚧 **v1.3 Go Live** — Phases 10-14 (active; guided setup wizard + opt-in persistence + scrollback restore + first real-infra acceptance)
+- ✅ **v1.3 Go Live** — Phases 10-14 (shipped 2026-06-26; guided setup wizard + opt-in persistence + scrollback restore + first real-infra acceptance)
 
 Shipped milestone detail is archived per version in `milestones/`:
 [`v1.0-ROADMAP.md`](milestones/v1.0-ROADMAP.md),
@@ -99,7 +99,7 @@ restore, real-boot v2), and the 07r e2e-cleanup-robustness nit. See
 
 </details>
 
-### 🚧 v1.3 Go Live (Phases 10-14) — ACTIVE
+### ✅ v1.3 Go Live (Phases 10-14) — SHIPPED 2026-06-26
 
 **Milestone goal:** take Burrow from CI-proven-over-Fake to actually running on the operator's
 real Proxmox — a guided in-app setup wizard, opt-in workspaces that persist across stop/start with
