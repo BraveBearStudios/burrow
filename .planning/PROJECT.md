@@ -113,7 +113,7 @@ provider; real-infra acceptance (★) is the dev-homelab smoke, not CI, by desig
 - Cloud / container compute backend — v1 targets Proxmox LXC only; the `ComputeProvider` seam exists but a non-Proxmox impl is out of scope.
 - Real-Proxmox exercise in CI — CI proves clean builds + inter-app behavior against a `FakeComputeProvider` and mocked Proxmox; real-infra validation happens in the dev environment, not CI (ci-cd §4.4).
 - Native mobile app — browser-first; responsive web only.
-- Secrets manager — v1 uses a gitignored `.env`; a secrets manager is hosted-path scope.
+- External secrets manager / KMS — v1 uses a gitignored `.env` plus the GUI-managed encrypted (Fernet) credential store (ADR-0015, v1.4) for the Proxmox token + GitHub PAT; a full external secrets manager / KMS (`KmsSecretKeyProvider` seam) stays hosted-path scope.
 
 ## Context
 

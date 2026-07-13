@@ -7,7 +7,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 
 ## Status
 
-Accepted
+Accepted. The "token in memory only, no token at rest" stance below is **superseded in
+part by [ADR-0015](ADR-0015-gui-managed-credential-store.md)**, which adds an encrypted
+(Fernet) at-rest credential store so an operator can set the Proxmox token + GitHub PAT
+from the GUI. The `testConnection` / `verifyTemplate` capabilities defined here are
+unchanged.
 
 ## Context
 
