@@ -1,12 +1,16 @@
 # SPDX-FileCopyrightText: 2026 Brave Bear Studios
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# Burrow release supply-chain (CICD-05). A v* tag (or a published GitHub
-# Release) builds BOTH production images, pushes them to GHCR by immutable
-# digest, then for each published image: generates a syft SBOM in SPDX AND
+# Burrow release supply-chain (CICD-05). A semver v[0-9]+.[0-9]+.[0-9]+ tag (or a
+# published GitHub Release) builds BOTH production images, pushes them to GHCR by
+# immutable digest, then for each published image: generates a syft SBOM in SPDX AND
 # CycloneDX, signs the image KEYLESS with cosign (Sigstore + GitHub OIDC — no
 # long-lived key), and emits a SLSA build-provenance attestation bound to the
 # digest. (ci-cd-and-testing.md §5.4/§5.5.)
+#
+# Release tags are owned by release-please: only a full semver vX.Y.Z tag fires
+# this workflow, and operators no longer hand-push two-component v1.x milestone
+# tags (a milestone tag would otherwise trigger a spurious sign/attest/publish).
 #
 # Splits cleanly from ci.yml: ci.yml builds + Trivy-scans on PR WITHOUT pushing
 # (CICD-04); this file owns SBOM / sign / provenance / GHCR-publish and runs
@@ -23,7 +27,7 @@ name: release
 
 on:
   push:
-    tags: ["v*"]
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   release:
     types: [published]
 
