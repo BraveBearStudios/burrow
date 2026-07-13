@@ -4,7 +4,10 @@ Discoveries made during execution that are outside the current plan's scope. Log
 per the GSD scope boundary (auto-fix only issues directly caused by the current
 task's changes; log the rest here for the owner to decide).
 
-## D-15-02-01 — reuse lint invalid SPDX expression in 15-02-PLAN.md (CICD-06, not RELX-05)
+## D-15-02-01 — reuse lint invalid SPDX expression in 15-02-PLAN.md (CICD-06, not RELX-05) — **RESOLVED 2026-07-13**
+
+**Resolution:** Fixed in the Phase 15 closeout (a green-main blocker for the phase goal). Bracketed the quoted two-line SPDX header in `15-02-PLAN.md` with the `REUSE-IgnoreStart` / `REUSE-IgnoreEnd` comment pair (reuse's documented mechanism). `uvx --with charset-normalizer reuse lint` now returns exit 0 — "compliant... 464/464, 0 Invalid SPDX License Expressions." Original report retained below.
+
 
 - **Found during:** Plan 15-02 Task 1 (running `uvx --with charset-normalizer reuse lint`,
   the ci.yml hard gate, to confirm the new `.trivyignore` was recognized).
