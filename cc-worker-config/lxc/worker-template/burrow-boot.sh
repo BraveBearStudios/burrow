@@ -2,7 +2,7 @@
 # SPDX-FileCopyrightText: 2026 Brave Bear Studios
 # SPDX-License-Identifier: AGPL-3.0-or-later
 #
-# burrow-boot.sh — WORK-02/04: live pull-at-boot worker orchestration.
+# burrow-boot.sh - WORK-02/04: live pull-at-boot worker orchestration.
 #
 # Runs on every workspace boot via burrow-worker.service. Self-resolves its VMID,
 # bounded-retries the FROZEN control-plane bootconfig endpoint, clones the config
@@ -11,7 +11,7 @@
 # reaches over the worker's network address.
 #
 # Frozen decisions (each has an ADR):
-#   - ttyd is PERSISTENT — NO `--once` (SC-8 / ADR-0006): closing a browser tab
+#   - ttyd is PERSISTENT - NO `--once` (SC-8 / ADR-0006): closing a browser tab
 #     DETACHES; it must never terminate the live Claude session. Destroy is the
 #     only kill path.
 #   - ttyd binds the worker LAN interface (--interface 0.0.0.0), NOT `lo`
@@ -20,7 +20,7 @@
 #     (ADR-0002): no secret is ever written to /etc/burrow/worker.env.
 #
 # Credential hygiene (SC-3, T-03-01..04): the minted git credential is fed to
-# `git clone` via an in-memory GIT_ASKPASS helper inside a SUBSHELL — never in a
+# `git clone` via an in-memory GIT_ASKPASS helper inside a SUBSHELL - never in a
 # clone URL (leaks via `ps`/reflog/.git/config), never on disk, never in
 # /etc/burrow/worker.env, unset after the clones. There is NO `set -x` anywhere
 # (it would echo the token). The ERR trap redacts $BASH_COMMAND as a backstop;
@@ -39,7 +39,7 @@ log() { echo "[burrow-boot] $*" >&2; }
 # token can never appear in $BASH_COMMAND in the first place (it lives only in a
 # subshell-local env var), so this scrub is defense-in-depth (RESEARCH Pattern 3).
 #
-# redact_secrets <text> — strip credential-shaped substrings, format-aware + exact.
+# redact_secrets <text> - strip credential-shaped substrings, format-aware + exact.
 # Pure (no globals beyond GIT_CRED), so it is unit-testable in isolation. Layer 1
 # redacts the LIVE credential value exactly when $GIT_CRED is in scope (format-
 # agnostic, the real backstop). Layer 2 is a format-aware net for the credential
@@ -47,7 +47,7 @@ log() { echo "[burrow-boot] $*" >&2; }
 # gh*_ prefixes, in case a future refactor puts a token on a command line before
 # $GIT_CRED is set. Each Layer-2 pattern is BOUNDED to the token's own characters
 # (extglob `+(...)`) so it stops at a token boundary rather than swallowing the rest
-# of the line — the over-greedy `ghp_*` glob bug this replaces.
+# of the line - the over-greedy `ghp_*` glob bug this replaces.
 redact_secrets() {
   local cmd="$1"
   shopt -s extglob
@@ -83,7 +83,7 @@ PROJECT_DIR="${WORKER_HOME}/project"
 # --- VMID self-resolution (ADR-0004) -----------------------------------------
 # The worker resolves its own VMID from its hostname; the control plane keys the
 # bootconfig endpoint off that VMID. The AUTHORITATIVE VMID<->static-IP mapping is
-# operator-recorded in cc-worker-config/lxc/host-prime/30-network-notes.md — the
+# operator-recorded in cc-worker-config/lxc/host-prime/30-network-notes.md - the
 # hostname-suffix parse below is [ASSUMED] (confirm at the dev-homelab smoke,
 # Pitfall 4). A non-integer suffix returns non-zero (ERR trap → fast non-zero).
 resolve_vmid() {
@@ -96,9 +96,9 @@ resolve_vmid() {
 
 # --- Bounded-retry bootconfig fetch (RESEARCH Pattern 2) ---------------------
 # ~5 attempts with capped backoff, then fail non-zero (a transient CP blip must
-# not abort an otherwise-good boot, but a real outage must surface — never hang).
+# not abort an otherwise-good boot, but a real outage must surface - never hang).
 # Echoes the unwrapped .data JSON on stdout. A 404 (out-of-pool / no workspace)
-# is caught by curl -f. The credential is in .data.gitCredential — read it from
+# is caught by curl -f. The credential is in .data.gitCredential - read it from
 # the returned JSON, never log it.
 fetch_bootconfig() {
   local cp="$1" vmid="$2" attempt=0 max=5 delay=1 body
@@ -122,7 +122,7 @@ fetch_bootconfig() {
 # The token is fed to git via GIT_ASKPASS inside a SUBSHELL, so it can never
 # escape to the parent env, a command line, the clone URL, or /etc/burrow/worker.env.
 # x-access-token is the GitHub App installation-token / fine-grained PAT convention
-# ([ASSUMED] per A2/A3 — the operator's mint mechanism is pending; confirm at smoke).
+# ([ASSUMED] per A2/A3 - the operator's mint mechanism is pending; confirm at smoke).
 clone_with_token() {
   local token="$1" url="$2" dest="$3"; shift 3
   (
@@ -158,7 +158,7 @@ ASK
 #
 # [ASSUMED] (A1 / Open-Q-2): the enabledPlugins[<name>]=true shape in
 # ~/.claude/settings.json is the directory-install enablement key for
-# claude-code@2.1.170 — CONFIRM at the dev-homelab smoke (`claude plugin list` /
+# claude-code@2.1.170 - CONFIRM at the dev-homelab smoke (`claude plugin list` /
 # `--debug`). The master CLAUDE.md copy is independent and works regardless.
 install_claude_plugin() {
   local name="$1" source="$2" ref="$3"
@@ -192,7 +192,7 @@ install_claude_plugin() {
 # CI and boot never diverge: every entry needs string source/ref/type and
 # type ∈ {claude-plugin,binary,npm-global}. An unknown/unsupported type or a
 # missing key fails the gate → `return 1` → the ERR trap fires → non-zero boot
-# (fail-closed, the locked decision — never skip-and-continue).
+# (fail-closed, the locked decision - never skip-and-continue).
 #
 # Only `type=="claude-plugin"` entries are pulled fresh at boot; `binary` and
 # `npm-global` are baked into the golden template at provision time and SKIPPED.
@@ -294,7 +294,7 @@ clone_with_token "$GIT_CRED" "$CONFIG_REPO" /tmp/cc-worker-config \
 # Support both so CONFIG_REPO can be either layout.
 CFG_DIR=/tmp/cc-worker-config
 [[ -d /tmp/cc-worker-config/cc-worker-config ]] && CFG_DIR=/tmp/cc-worker-config/cc-worker-config
-# Master CLAUDE.md is optional: copy it if the config repo ships one, else skip —
+# Master CLAUDE.md is optional: copy it if the config repo ships one, else skip -
 # a missing master file must not kill the worker boot.
 if [[ -f "${CFG_DIR}/claude/CLAUDE.md" ]]; then
   cp "${CFG_DIR}/claude/CLAUDE.md" "${WORKER_HOME}/CLAUDE.md"
@@ -333,7 +333,7 @@ fi
 # --- ttyd: PERSISTENT (no --once, SC-8) + LAN bind (no `lo`, SC-9 / WORK-04) --
 # --interface 0.0.0.0 exposes :7681 on the worker LAN address so the proxy can
 # reach it; the LAN boundary + least privilege are the v1 controls (LAN-only,
-# no auth — ADR-0007). NO --once: tab close detaches, never terminates.
+# no auth - ADR-0007). NO --once: tab close detaches, never terminates.
 #
 # The inner shell wraps the worker command in `tmux new-session -A -s burrow`
 # (one fixed session per worker; WSX-03 / ADR-0014). `-A` reattaches to the

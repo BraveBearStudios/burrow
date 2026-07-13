@@ -12,9 +12,9 @@ proves:
   ttyd was invoked with the FROZEN ``--interface 0.0.0.0`` and NO ``--once``.
 - ``test_bootconfig_retry_then_fail`` — a down control plane → ~5 bounded retries
   (log-line count) then a non-zero boot (ERR-trapped), never an infinite hang.
-- ``test_no_credential_leak`` — after a green boot the sentinel credential and the
-  project repo URL appear in NO captured stdout/stderr line and NOT in worker.env
-  (scrub-proof, T-03-01..03, block_on=high).
+- ``test_no_credential_leak`` — after a green boot the sentinel credential appears in NO
+  captured stdout/stderr line and in NO file the boot wrote under HOME; the project repo
+  URL is absent from stdout/stderr (scrub-proof, T-03-01..03, block_on=high).
 - ``test_frozen_ttyd_line`` — a static grep of the script: ``--once`` absent,
   ``--interface 0.0.0.0`` present (ADR-0006/0007 frozen tail).
 
@@ -140,8 +140,15 @@ def test_no_credential_leak(
     stub_ttyd_path: Path,
     tmp_path: Path,
 ) -> None:
-    """Scrub-proof: the sentinel credential + project URL are absent from output + worker.env."""
-    proc, _home, etc_burrow = _run_boot(
+    """Scrub-proof: the sentinel credential leaks into NO boot log line and NO file on disk.
+
+    The stdout/stderr scrub covers both the credential and the project repo URL. The on-disk
+    scrub then walks EVERY file the boot wrote under HOME (the clones, ~/.claude, settings,
+    git metadata) and asserts the credential is in none of them (SC-3). The project repo URL
+    is intentionally NOT checked on disk: git legitimately records the file:// origin in
+    ~/project/.git/config — only the short-lived CREDENTIAL must never touch disk.
+    """
+    proc, home, _etc = _run_boot(
         boot_script,
         control_plane=fake_control_plane.url,
         tmp_path=tmp_path,
@@ -153,9 +160,16 @@ def test_no_credential_leak(
     assert SENTINEL_CREDENTIAL not in captured, "credential leaked into a boot log line"
     assert fake_control_plane.project_repo not in captured, "project repo URL leaked into output"
 
-    # The short-lived credential must NEVER be persisted to the worker env file.
-    worker_env = (etc_burrow / "worker.env").read_text()
-    assert SENTINEL_CREDENTIAL not in worker_env, "credential persisted to worker.env (SC-3)"
+    # The short-lived credential must NEVER be persisted to disk. Walk every file the boot
+    # wrote under HOME and assert the sentinel appears in none. Read bytes so binary/git
+    # objects can't raise a decode error.
+    sentinel_bytes = SENTINEL_CREDENTIAL.encode()
+    leaked = [
+        str(path.relative_to(home))
+        for path in home.rglob("*")
+        if path.is_file() and sentinel_bytes in path.read_bytes()
+    ]
+    assert not leaked, f"credential persisted to disk under HOME (SC-3): {leaked}"
 
 
 def test_frozen_ttyd_line(boot_script: Path) -> None:
