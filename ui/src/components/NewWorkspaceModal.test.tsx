@@ -3,11 +3,13 @@
 
 // NewWorkspaceModal tests (UI-03). Drives the binding 02-UI-SPEC create flow over
 // MSW: required-field validation gating the Create button (verbatim `{Field} is
-// required.` copy), a successful POST → the cosmetic 4-step boot-progress saga →
+// required.` copy), a successful POST → the brief 4-step boot-progress confirmation →
 // layoutStore.openPanel(newId) + close, and a server envelope error (capacity
-// CAP-01) surfacing the message verbatim + a Close button. The boot-progress is
-// COSMETIC (synchronous create, A3/Pitfall 5) — the test asserts the steps +
-// `→ 202 · polling status…` footnote render, not any real per-step API claim.
+// CAP-01) surfacing the message verbatim + a Close button. ASYNC-202 (ADR-0017): the
+// POST resolves on a 202 + `creating` row and the modal closes IMMEDIATELY on that
+// success (not on `running`); the workspace-list poll drives the later transition. The
+// test asserts the steps + `→ 202 · polling status…` footnote render, not any real
+// per-step API claim.
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -97,7 +99,7 @@ describe("NewWorkspaceModal — create saga (UI-03)", () => {
 	// than a spy on the singleton store method — a spy's identity is shared across
 	// tests, so a stray async could be attributed to the wrong test; the store's
 	// mosaicNode is reset per test, making "did the panel open?" leak-proof.
-	it("submits → cosmetic boot-progress (4 steps + 202 footnote) → opens the panel + closes", async () => {
+	it("submits → boot-progress (4 steps + 202 footnote) → opens the panel + closes on the 202 creating row", async () => {
 		const { onClose, unmount } = renderModal();
 		await waitFor(() =>
 			expect(screen.getByRole("option", { name: "node1" })).toBeInTheDocument(),
@@ -114,7 +116,8 @@ describe("NewWorkspaceModal — create saga (UI-03)", () => {
 		).toBeInTheDocument();
 		expect(screen.getByText(/Waiting for Claude/)).toBeInTheDocument();
 
-		// On the resolved running row the panel opens (newId) + the modal closes.
+		// On the resolved 202 creating row the panel opens (newId) + the modal closes
+		// immediately (ADR-0017); the list poll drives the later running transition.
 		await waitFor(() =>
 			expect(useLayoutStore.getState().mosaicNode).toBe("ws-created"),
 		);
@@ -188,11 +191,11 @@ describe("NewWorkspaceModal — Auto (least-loaded) default (WSX-01)", () => {
 						data: {
 							id: "ws-created",
 							name: body.name,
-							status: "running",
+							status: "creating",
 							vmid: 110,
 							// Auto (null/omitted) → the server picks the least-loaded node1.
 							node: body.node ?? "node1",
-							lxcIp: "10.99.0.110",
+							lxcIp: null,
 							projectRepo: body.projectRepo,
 							projectBranch: body.projectBranch ?? "main",
 							pluginSet: body.pluginSet ?? "default",
@@ -204,9 +207,9 @@ describe("NewWorkspaceModal — Auto (least-loaded) default (WSX-01)", () => {
 						meta: { requestId: "t", timestamp: "2026-06-10T00:00:00Z" },
 						error: null,
 					},
-					// IN-01: the backend create route returns 200 — keep this double
-					// aligned so the UI doubles never drift from the backend status.
-					{ status: 200 },
+					// IN-01: the backend create route returns 202 + a creating row
+					// (async-202, ADR-0017) — keep this double aligned with the backend.
+					{ status: 202 },
 				);
 			}),
 		);
@@ -294,10 +297,10 @@ describe("NewWorkspaceModal — persistent checkbox (WSX-02)", () => {
 						data: {
 							id: "ws-created",
 							name: body.name,
-							status: "running",
+							status: "creating",
 							vmid: 110,
 							node: body.node ?? "node1",
-							lxcIp: "10.99.0.110",
+							lxcIp: null,
 							projectRepo: body.projectRepo,
 							projectBranch: body.projectBranch ?? "main",
 							pluginSet: body.pluginSet ?? "default",
@@ -309,7 +312,7 @@ describe("NewWorkspaceModal — persistent checkbox (WSX-02)", () => {
 						meta: { requestId: "t", timestamp: "2026-06-10T00:00:00Z" },
 						error: null,
 					},
-					{ status: 200 },
+					{ status: 202 },
 				);
 			}),
 		);
