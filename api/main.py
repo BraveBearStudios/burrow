@@ -19,7 +19,8 @@ wired here in :func:`create_app`.
 import asyncio
 import contextlib
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Coroutine
+from typing import Any
 
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -220,6 +221,28 @@ async def _reconcile_loop(reconciler: Reconciler, period_s: float) -> None:
         await asyncio.sleep(period_s)
 
 
+# ADR-0017: app-scoped registry of in-flight create boot-saga tasks. The create
+# endpoint returns 202 immediately and runs the boot saga as a background task; this
+# set holds a STRONG reference so the task is not garbage-collected mid-flight (a bare
+# ``asyncio.create_task`` handle is weakly held by the loop), and it lets the lifespan
+# cancel any still-live create on shutdown. It lives at APP scope, NOT on the
+# per-request service instance, because ``get_service`` builds a fresh service per call.
+_create_tasks: set[asyncio.Task[Any]] = set()
+
+
+def schedule_create_task(coro: Coroutine[Any, Any, None]) -> None:
+    """Schedule a create boot-saga coroutine as a tracked background task (ADR-0017).
+
+    Injected into :meth:`WorkspaceService.scheduleCreate` (the ``schedule`` seam) so the
+    service stays free of app-registry coupling. The task is added to :data:`_create_tasks`
+    and removed on completion via ``add_done_callback`` so the set never grows unbounded;
+    the lifespan cancels + drains any still-live task on shutdown (no leak past shutdown).
+    """
+    task = asyncio.create_task(coro)
+    _create_tasks.add(task)
+    task.add_done_callback(_create_tasks.discard)
+
+
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     """Own the periodic reconcile task: spawn on startup, cancel cleanly on shutdown.
@@ -251,6 +274,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
             await task
+        # ADR-0017: cancel + drain any in-flight create boot-saga tasks so none leaks
+        # past shutdown. Snapshot the set first (each task's done-callback mutates it
+        # as it settles). gather(return_exceptions=True) absorbs the resulting
+        # CancelledError, mirroring the reconciler cancel/suppress style above.
+        create_tasks = list(_create_tasks)
+        for create_task in create_tasks:
+            create_task.cancel()
+        await asyncio.gather(*create_tasks, return_exceptions=True)
 
 
 def _envelope_exception_handler(request: Request, exc: Exception) -> JSONResponse:
