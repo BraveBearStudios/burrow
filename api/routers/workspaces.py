@@ -18,18 +18,27 @@ from lib.errors import WorkspaceNotFoundError
 from models.workspace import Workspace, WorkspaceCreate
 from services.workspaceService import WorkspaceService
 
-from main import get_db, get_service
+from main import get_db, get_service, schedule_create_task
 
 router = APIRouter(prefix="/api/v1")
 
 
-@router.post("/workspaces")
+@router.post("/workspaces", status_code=202)
 async def create_workspace(
     payload: WorkspaceCreate,
     service: WorkspaceService = Depends(get_service),
 ) -> dict[str, object]:
-    """Create a workspace and run the create saga to ``running`` (WS-01)."""
-    workspace = await service.createWorkspace(payload)
+    """Reserve a workspace and return ``202`` + the ``creating`` row (WS-01, ADR-0017).
+
+    Async-202 contract: the create returns as soon as the VMID is reserved and the
+    ``creating`` row is persisted; the boot saga (clone -> start -> ttyd health ->
+    ``running``) runs in a tracked background task, so a slow real boot never ``504``s.
+    The UI's existing workspace-list poll drives the row from ``creating`` to
+    ``running`` (or ``error`` if the boot saga's compensation fires). Reservation-time
+    errors (capacity, no free VMID) still surface synchronously via the ``main.py``
+    exception handlers because they raise from ``reserveWorkspace`` before the ``202``.
+    """
+    workspace = await service.scheduleCreate(payload, schedule=schedule_create_task)
     return respond(workspace.model_dump(by_alias=True))
 
 

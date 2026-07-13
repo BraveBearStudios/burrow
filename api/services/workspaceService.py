@@ -20,7 +20,9 @@ import asyncio
 import logging
 import os
 import re
+from collections.abc import Callable, Coroutine
 from datetime import datetime, timezone
+from typing import Any
 
 import httpx
 
@@ -132,19 +134,56 @@ class WorkspaceService:
 
     # ── create saga (WS-01/02/03, CAP-01/04) ──────────────────────────────
     async def createWorkspace(self, payload: WorkspaceCreate) -> Workspace:
-        """Run the 8-step create saga; compensate to ``error`` on any failure.
+        """Run the full 8-step create saga synchronously to ``running`` (WS-01).
 
-        Steps (RESEARCH Pattern 2): (0) capacity guard; (1) reserve VMID + persist
-        ``creating`` row; (2) clone (UPID-blocked); (3) inject boot config (DB
-        write); (4) start (UPID-blocked); (5) resolve static IP; (6) await ttyd
-        health; (7) mark ``running``. Any failure after step 1 triggers idempotent
-        stop+destroy, a redacted ``boot.error`` event, and ``status=error``.
+        Composes :meth:`reserveWorkspace` (steps 0+1) then :meth:`_runBootSaga`
+        (steps 2-7 + compensation) and returns the ``running`` row, so the external
+        behavior is unchanged: internal callers and the unit tier that await this
+        method still get a fully-booted workspace, or the SAME raise on any failure.
+        The router no longer uses this path — it calls :meth:`scheduleCreate` to
+        return ``202`` + a ``creating`` row and run the boot saga in the background
+        (ADR-0017) — but this synchronous composition is kept as the single place
+        the two saga halves are joined.
+        """
+        ws = await self.reserveWorkspace(payload)
+        return await self._runBootSaga(ws, payload)
+
+    async def scheduleCreate(
+        self,
+        payload: WorkspaceCreate,
+        *,
+        schedule: Callable[[Coroutine[Any, Any, None]], None],
+    ) -> Workspace:
+        """Reserve fast, run the boot saga in the background, return ``creating`` (ADR-0017).
+
+        Runs steps 0+1 (:meth:`reserveWorkspace`) synchronously so a reservation-time
+        rejection (capacity, no free VMID) still surfaces to the caller before the
+        ``202``, then hands the boot saga to the caller-injected ``schedule`` callback
+        (``main.schedule_create_task``) as a tracked background task and returns the
+        ``creating`` row immediately. The ``schedule`` seam keeps this service free of
+        any app-level task-registry coupling. The list poll drives the row from
+        ``creating`` to ``running``/``error`` (the boot saga's compensation still lands
+        ``error`` even after the ``202`` is returned and the client is gone).
+        """
+        ws = await self.reserveWorkspace(payload)
+        schedule(self._run_boot_saga_safe(ws, payload))
+        return ws
+
+    async def reserveWorkspace(self, payload: WorkspaceCreate) -> Workspace:
+        """Steps 0+1: capacity guard + VMID reservation under the create-lock (CAP-01/04).
+
+        Returns the persisted ``creating`` row (node resolved, VMID reserved). This is
+        the fast, synchronously-rejecting half of the saga: a full node or an exhausted
+        pool raises here (``CapacityError`` / ``NoFreeVmidError``) BEFORE any boot work,
+        so both the synchronous :meth:`createWorkspace` and the async :meth:`scheduleCreate`
+        surface those errors the same way (ADR-0017: the ``202`` is only returned once
+        reservation has succeeded).
         """
         # 0+1 — capacity guard + VMID reservation, SERIALIZED under one lock so two
         # concurrent creates cannot both pass a stale capacity read and overcommit
         # the node (Pitfall 5). The lock spans ONLY check+reserve; it is released
-        # before the multi-second clone below so concurrent creates parallelize the
-        # slow saga steps (FROZEN guardrail 6).
+        # before the multi-second clone (in the boot saga) so concurrent creates
+        # parallelize the slow saga steps (FROZEN guardrail 6).
         async with self._create_lock:
             # 0a — resolve the target node ONCE, inside the lock (WSX-01). When the
             # operator omitted a node (`payload.node is None`), auto-select the
@@ -165,7 +204,36 @@ class WorkspaceService:
                 raise CapacityError(node)
             # 1 — reserve VMID via the DB partial-unique INSERT (the race arbiter);
             # persist the chosen node on the row (never None).
-            ws = await self._reserve_vmid_and_row(payload, node)
+            return await self._reserve_vmid_and_row(payload, node)
+
+    async def _run_boot_saga_safe(self, ws: Workspace, payload: WorkspaceCreate) -> None:
+        """Background wrapper (ADR-0017): run the boot saga, swallowing the exception.
+
+        The boot saga's own compensation already lands the row in ``error`` (SC-11), so
+        a failed background boot needs no re-raise here — swallowing it keeps the tracked
+        task from carrying an un-retrieved exception (which would surface as an asyncio
+        warning). The reason is logged REDACTED (``_safe``) so a repo URL or token
+        embedded in the failure text can never reach the log.
+        """
+        try:
+            await self._runBootSaga(ws, payload)
+        except Exception as exc:
+            logger.warning(
+                "background boot saga failed (row compensated to error): %s",
+                _safe(exc),
+                extra={"workspace_id": ws.id},
+            )
+
+    async def _runBootSaga(self, ws: Workspace, payload: WorkspaceCreate) -> Workspace:
+        """Steps 2-7 + compensation: boot the reserved ``creating`` row to ``running``.
+
+        Steps (RESEARCH Pattern 2): (2) clone (UPID-blocked); (3) persist boot intent
+        (DB checkpoint); (4) start (UPID-blocked); (5) resolve static IP; (6) await ttyd
+        health; (7) mark ``running``. Any failure triggers idempotent stop+destroy, a
+        redacted ``boot.error`` event, and ``status=error`` — never stuck ``creating``
+        (SC-11, Pitfall 4). ``node`` and ``vmid`` are read from the reserved row.
+        """
+        node = ws.node
         vmid = ws.vmid
         assert vmid is not None  # reservation always assigns a vmid
 
