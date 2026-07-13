@@ -8,6 +8,7 @@ title: test_no_credential_leak asserts against a file burrow-boot.sh never write
 area: api/tests/boot
 source: 11-REVIEW.md WR-01 (surfaced during Phase 11, pre-existing)
 severity: warning
+resolves_phase: 17
 resolves_phase: none
 files:
   - api/tests/boot/test_burrow_boot.py
