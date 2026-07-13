@@ -100,10 +100,12 @@ Explicitly excluded. Anti-features belong here with reasoning.
 
 ## Traceability
 
-Finalized by the roadmapper. Each requirement maps to exactly one phase; no requirement appears in two phases. Proposed mapping below (roadmapper confirms/adjusts against ROADMAP.md Phases 15-22):
+Finalized by the roadmapper against ROADMAP.md Phases 15-22. Each requirement maps to exactly one
+phase; no requirement appears in two phases. The finalized mapping matches the definition-time
+proposal one-to-one (the operator-approved 8-phase shape required no reassignment):
 
-| Requirement | Phase (proposed) | Status |
-|-------------|------------------|--------|
+| Requirement | Phase | Status |
+|-------------|-------|--------|
 | RELX-03 | Phase 15 | Pending |
 | RELX-04 | Phase 15 | Pending |
 | RELX-05 | Phase 15 | Pending |
@@ -129,11 +131,20 @@ Finalized by the roadmapper. Each requirement maps to exactly one phase; no requ
 **Coverage:**
 
 - v1.4 requirements: 21 total
-- Mapped to phases: 21 (proposed)
+- Mapped to phases: 21 (finalized) ✓
 - Unmapped: 0 ✓
+- Requirements in two phases: 0 ✓
 
-**ADRs anticipated** (authored within their phase, `docs/adr/`): ADR-0016 CodeQL/Dependabot security-posture (Phase 17, if a deviation is recorded) · ADR-0017 async-202 create + background-task lifecycle (Phase 19) · ADR-0018 multi-agent worker design contract (Phase 21). *ADR-0015 (credential store) already authored; Phase 16 reconciles the docs to it.*
+**Dependency ordering** (recorded by the roadmapper): Phase 16 depends on 15; Phase 18 depends on 16;
+Phase 20 depends on 15 + 18; Phase 22 depends on 16 + 18 + 20. Phases 17, 19, 21 are parallelizable
+off the earlier work. Phases 15-21 are CI-provable (runner + FakeComputeProvider); Phase 22 is
+operator-run human UAT on real Proxmox (acceptance, not code — NOT CI-provable).
+
+**ADRs anticipated** (authored within their phase, `docs/adr/`): ADR-0016 CodeQL/Dependabot
+security-posture (Phase 17, only if a baseline deviation is recorded) · ADR-0017 async-202 create +
+background-task lifecycle (Phase 19) · ADR-0018 multi-agent worker design contract (Phase 21).
+*ADR-0015 (credential store) already authored; Phase 16 reconciles the docs to it.*
 
 ---
 *Requirements defined: 2026-07-13*
-*Last updated: 2026-07-13 — derived from the loose-thread recon; traceability proposed, to be finalized by the roadmapper against ROADMAP.md Phases 15-22.*
+*Last updated: 2026-07-13 — traceability finalized by the roadmapper against ROADMAP.md Phases 15-22 (21/21 mapped, 0 unmapped, no requirement in two phases); the finalized mapping matches the definition-time proposal one-to-one.*
