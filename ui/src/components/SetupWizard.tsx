@@ -1,17 +1,19 @@
 // SPDX-FileCopyrightText: 2026 Brave Bear Studios
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
-// SetupWizard is the full-page first-run GATE (SETUP-04/06) to the binding
+// SetupWizard is the full-page first-run GATE (SETUP-04/06 + CRED-03) to the binding
 // 13-UI-SPEC contract. An unconfigured Burrow renders ONLY this wizard; it blocks
 // the app until the operator validates the Proxmox connection, verifies the worker
-// template, confirms control-plane health, and creates a first workspace — at which
-// point setup is marked complete (POST /setup/complete) and the gate flips away.
+// template, confirms control-plane health, sets the admin secret, stores the
+// credentials, and creates a first workspace — at which point setup is marked
+// complete (POST /setup/complete) and the gate flips away.
 //
-// Four ordered steps AUTO-ADVANCE on success: (1) token validation → (2) template
-// verify → (3) health → (4) create first workspace. There is NO persisted checkpoint
-// machine: position is derived from live state only (an unconfigured Burrow opens on
-// step 1). Errors map by ApiError.code to the FIXED token-free backend messages
-// (_SAFE_ERROR_MESSAGES) + static UI guidance; inputs stay populated for inline retry.
+// Six ordered steps AUTO-ADVANCE on success: (1) token validation → (2) template
+// verify → (3) health → (4) admin secret → (5) credentials → (6) create first
+// workspace. There is NO persisted checkpoint machine: position is derived from live
+// state only (an unconfigured Burrow opens on step 1). Errors map by ApiError.code to
+// the FIXED token-free backend messages (_SAFE_ERROR_MESSAGES) + static UI guidance;
+// inputs stay populated for inline retry.
 //
 // Hard-gate a11y: role="dialog", aria-modal, aria-label="Set up Burrow", focus on
 // mount, focus trapped (the only interactive surface), Enter submits the active step,
@@ -20,26 +22,38 @@
 // for the forward CTA + the ✓ rows + the focus ring; gold (--gold) is reserved to the
 // StepSpinner top-arc ONLY; --err for the ✕ + the left-bordered error strip.
 //
-// SECURITY (T-13-07): the Proxmox token lives ONLY in step-1 form state and is passed
-// to useTestConnection.mutate. It is NEVER written to the query cache / Zustand /
-// localStorage and NEVER logged. The token field is type="password".
+// SECURITY (T-13-07 / ADR-0015): every secret — the step-1 Proxmox test token, the
+// step-4 admin secret, the step-5 stored Proxmox token + GitHub PAT — lives ONLY in
+// transient form state. On success the admin secret is held in the IN-MEMORY
+// useAdminStore (never persisted); nothing is written to the query cache /
+// localStorage and nothing is logged. Every secret field is type="password".
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { ApiError, api } from "../api/client";
 import {
 	useCompleteSetup,
+	useSaveCredentials,
+	useSetAdminSecret,
 	useTestConnection,
 	useVerifyTemplate,
 } from "../hooks/useSetup";
 import { useCreateWorkspace } from "../hooks/useWorkspaces";
+import { useAdminStore } from "../store/useAdminStore";
+import type { SaveCredentialsBody } from "../types/setup";
 
-/** The four gate steps (1-indexed to match the checklist labels). */
+/** The six gate steps (1-indexed to match the checklist labels). The admin-secret
+ *  + credentials steps (ADR-0015 / CRED-03) sit after health, before create. */
 const STEP_LABELS = [
 	"1 Connection",
 	"2 Template",
 	"3 Health",
-	"4 First workspace",
+	"4 Admin secret",
+	"5 Credentials",
+	"6 First workspace",
 ] as const;
+
+/** Minimum admin-secret length — mirrors api/lib/adminGate.MIN_ADMIN_SECRET_LENGTH. */
+const MIN_ADMIN_SECRET_LENGTH = 8;
 
 /** The fixed, token-free error copy mapped from ApiError.code (UI-SPEC Copywriting). */
 const ERROR_COPY: Record<string, { message: string; guidance: string }> = {
@@ -55,6 +69,14 @@ const ERROR_COPY: Record<string, { message: string; guidance: string }> = {
 	setup_template_not_found: {
 		message: "The worker template was not found on the target node.",
 		guidance: "Confirm the template VMID and node, then re-verify.",
+	},
+	admin_unauthorized: {
+		message: "Admin authorization required.",
+		guidance: "Re-enter the admin secret, then retry.",
+	},
+	credential_store_unconfigured: {
+		message: "The credential store is not configured.",
+		guidance: "Set BURROW_SECRET_KEY on the control plane, then retry.",
 	},
 };
 
@@ -660,7 +682,156 @@ function HealthRow({ label, state }: { label: string; state: HealthState }) {
 	);
 }
 
-/** Step 4 — create the first workspace, then mark setup complete (complete-AFTER-create). */
+/** Step 4 — set the admin secret that gates the credential surface (ADR-0015).
+ *  First-run is UNAUTHENTICATED; on success the secret is held in memory only
+ *  (useAdminStore) so step 5's admin-gated save carries the X-Burrow-Admin header. */
+function StepAdminSecret({ onAdvance }: { onAdvance: () => void }) {
+	const setAdminSecret = useSetAdminSecret();
+	const setSecret = useAdminStore((state) => state.setSecret);
+	const [secret, setSecretValue] = useState("");
+	const [confirm, setConfirm] = useState("");
+	const [error, setError] = useState<{
+		message: string;
+		guidance?: string;
+	} | null>(null);
+
+	const tooShort = secret.length > 0 && secret.length < MIN_ADMIN_SECRET_LENGTH;
+	const mismatch = confirm.length > 0 && confirm !== secret;
+	const isValid =
+		secret.length >= MIN_ADMIN_SECRET_LENGTH && secret === confirm;
+	const canSubmit = isValid && !setAdminSecret.isPending;
+
+	const submit = () => {
+		if (!canSubmit) {
+			return;
+		}
+		setError(null);
+		// The secret is transient form state; it is stored in memory (useAdminStore)
+		// ONLY on success, and NEVER written to web storage or logged.
+		setAdminSecret.mutate(
+			{ secret },
+			{
+				onSuccess: () => {
+					setSecret(secret);
+					onAdvance();
+				},
+				onError: (err) => setError(mapError(err)),
+			},
+		);
+	};
+
+	return (
+		<>
+			<StepHeading title="Set an admin secret" />
+			<Field
+				id="setup-admin-secret"
+				label="Admin secret"
+				value={secret}
+				onChange={setSecretValue}
+				type="password"
+				placeholder="••••••••"
+				invalid={tooShort}
+			/>
+			<Field
+				id="setup-admin-secret-confirm"
+				label="Confirm admin secret"
+				value={confirm}
+				onChange={setConfirm}
+				type="password"
+				placeholder="••••••••"
+				invalid={mismatch}
+			/>
+			<span style={helperStyle}>
+				Gates the credential store + settings. At least{" "}
+				{MIN_ADMIN_SECRET_LENGTH} characters. Held in memory only — you re-enter
+				it after a reload.
+			</span>
+
+			<StatusRegion tone="assertive">
+				{error ? (
+					<ErrorStrip message={error.message} guidance={error.guidance} />
+				) : null}
+			</StatusRegion>
+
+			<StepFooter
+				label="Set admin secret"
+				onSubmit={submit}
+				enabled={canSubmit}
+			/>
+		</>
+	);
+}
+
+/** Step 5 — store the Proxmox token (required) + GitHub PAT (optional), admin-gated
+ *  (ADR-0015). The Proxmox token is validated then persisted by the backend; both
+ *  inputs are transient password state, never cached or logged. */
+function StepCredentials({ onAdvance }: { onAdvance: () => void }) {
+	const saveCredentials = useSaveCredentials();
+	const [proxmoxToken, setProxmoxToken] = useState("");
+	const [gitToken, setGitToken] = useState("");
+	const [error, setError] = useState<{
+		message: string;
+		guidance?: string;
+	} | null>(null);
+
+	const isValid = proxmoxToken.trim() !== "";
+	const canSubmit = isValid && !saveCredentials.isPending;
+
+	const submit = () => {
+		if (!canSubmit) {
+			return;
+		}
+		setError(null);
+		const body: SaveCredentialsBody = { proxmoxTokenValue: proxmoxToken };
+		if (gitToken.trim() !== "") {
+			body.gitToken = gitToken;
+		}
+		saveCredentials.mutate(body, {
+			onSuccess: () => onAdvance(),
+			onError: (err) => setError(mapError(err)),
+		});
+	};
+
+	return (
+		<>
+			<StepHeading title="Store your credentials" />
+			<Field
+				id="setup-proxmox-token"
+				label="Proxmox token value"
+				value={proxmoxToken}
+				onChange={setProxmoxToken}
+				type="password"
+				placeholder="••••••••"
+			/>
+			<Field
+				id="setup-git-token"
+				label="GitHub PAT (optional)"
+				value={gitToken}
+				onChange={setGitToken}
+				type="password"
+				placeholder="••••••••"
+			/>
+			<span style={helperStyle}>
+				Validated, then encrypted at rest. The Proxmox token applies without a
+				restart; the PAT is optional.
+			</span>
+
+			<StatusRegion tone="assertive">
+				{error ? (
+					<ErrorStrip message={error.message} guidance={error.guidance} />
+				) : null}
+			</StatusRegion>
+
+			<StepFooter
+				label="Save credentials"
+				onSubmit={submit}
+				enabled={canSubmit}
+			/>
+		</>
+	);
+}
+
+/** Step 6 — create the first workspace, then mark setup complete (complete-AFTER-create). */
 function StepCreate() {
 	const createWorkspace = useCreateWorkspace();
 	const completeSetup = useCompleteSetup();
@@ -914,7 +1085,9 @@ export function SetupWizard() {
 						{step === 1 ? <StepConnection onAdvance={advance} /> : null}
 						{step === 2 ? <StepTemplate onAdvance={advance} /> : null}
 						{step === 3 ? <StepHealth onAdvance={advance} /> : null}
-						{step === 4 ? <StepCreate /> : null}
+						{step === 4 ? <StepAdminSecret onAdvance={advance} /> : null}
+						{step === 5 ? <StepCredentials onAdvance={advance} /> : null}
+						{step === 6 ? <StepCreate /> : null}
 					</div>
 				</div>
 			</div>
