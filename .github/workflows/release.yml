@@ -8,9 +8,12 @@
 # long-lived key), and emits a SLSA build-provenance attestation bound to the
 # digest. (ci-cd-and-testing.md §5.4/§5.5.)
 #
-# Release tags are owned by release-please: only a full semver vX.Y.Z tag fires
-# this workflow, and operators no longer hand-push two-component v1.x milestone
-# tags (a milestone tag would otherwise trigger a spurious sign/attest/publish).
+# Release tags are owned by release-please: a full semver vX.Y.Z tag (or a published
+# Release) fires this workflow. A manual workflow_dispatch (version + ref inputs) is
+# the escape hatch for when release-please's GITHUB_TOKEN-created tag does NOT
+# re-trigger Actions (GitHub suppresses recursive events; see the on: block).
+# Operators no longer hand-push two-component v1.x milestone tags (a milestone tag
+# would otherwise trigger a spurious sign/attest/publish).
 #
 # Splits cleanly from ci.yml: ci.yml builds + Trivy-scans on PR WITHOUT pushing
 # (CICD-04); this file owns SBOM / sign / provenance / GHCR-publish and runs
@@ -30,6 +33,22 @@ on:
     tags: ["v[0-9]+.[0-9]+.[0-9]+"]
   release:
     types: [published]
+  # Manual escape hatch (ACC-06): a tag/release created by release-please's built-in
+  # GITHUB_TOKEN does NOT re-trigger this workflow (GitHub suppresses recursive Actions
+  # events), and the repo's immutable-releases + tag creation-restriction block a user
+  # re-push of that tag. So the signed publish is dispatched by hand against a version
+  # and ref. See release-please.yml for the root-cause note.
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Semver version to build, sign, and publish (e.g. 1.4.1). No leading v."
+        required: true
+        type: string
+      ref:
+        description: "Git ref or SHA to build from (default: main)."
+        required: false
+        default: main
+        type: string
 
 permissions:
   contents: read
@@ -80,6 +99,10 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          # Tag/release events check out github.ref; a manual dispatch checks out the
+          # requested ref (default main).
+          ref: ${{ github.event.inputs.ref || github.ref }}
 
       - name: Set up Buildx
         uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
@@ -110,17 +133,40 @@ jobs:
           IMAGE: ${{ matrix.image }}
         run: echo "base=ghcr.io/${OWNER,,}/${IMAGE}" >> "$GITHUB_OUTPUT"
 
+      # Resolve the semver version from EITHER the release tag (github.ref_name minus
+      # the leading v) OR the workflow_dispatch input, so the two trigger paths share
+      # one version source. Fails closed if the resolved value is not semver X.Y.Z.
+      - name: Resolve release version
+        id: ver
+        env:
+          EVENT: ${{ github.event_name }}
+          DISPATCH_VERSION: ${{ github.event.inputs.version }}
+          REF_NAME: ${{ github.ref_name }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            v="$DISPATCH_VERSION"
+          else
+            v="${REF_NAME#v}"
+          fi
+          if ! printf '%s' "$v" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::resolved version '$v' is not semver X.Y.Z"; exit 1
+          fi
+          echo "version=$v" >> "$GITHUB_OUTPUT"
+          echo "major_minor=${v%.*}" >> "$GITHUB_OUTPUT"
+
       # Compute the §2.4 release tags (X.Y.Z, X.Y, latest, sha-<short>) and the
-      # OCI source/revision/version labels for the fully-qualified GHCR image.
+      # OCI source/revision/version labels for the fully-qualified GHCR image. Tags
+      # are driven off the resolved version (steps.ver) so a manual dispatch tags
+      # identically to a real tag push.
       - name: Image metadata (tags + OCI labels)
         id: meta
         uses: docker/metadata-action@318604b99e75e41977312d83839a89be02ca4893 # v5.9.0
         with:
           images: ${{ steps.imgref.outputs.base }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+            type=raw,value=${{ steps.ver.outputs.version }}
+            type=raw,value=${{ steps.ver.outputs.major_minor }}
+            type=raw,value=latest
             type=sha,prefix=sha-,format=short
 
       # Build and PUSH by digest. push:true makes steps.build.outputs.digest the
