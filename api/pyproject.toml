@@ -15,7 +15,7 @@ dependencies = [
     "starlette>=1.3.1",
     "uvicorn[standard]==0.49.0",
     "pydantic==2.13.4",
-    "pydantic-settings==2.14.1",
+    "pydantic-settings==2.14.2",
     "aiosqlite==0.22.1",
     "proxmoxer==2.3.0",
     # proxmoxer's default https backend is requests-based but does NOT pull requests
