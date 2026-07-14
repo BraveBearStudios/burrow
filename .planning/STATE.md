@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: in-progress
-stopped_at: Autonomous run — Phases 16-19 + 21 complete; at Phase 20 checkpoint (pre-release merge feat/v1.4-harden -> main)
-last_updated: "2026-07-13T23:30:00.000Z"
-last_activity: 2026-07-13
+stopped_at: Autonomous run — Phases 16-19 + 21 complete; Phase 20 signed release DONE (v1.4.1), verify+block-flip operator-pending; Phase 22 is operator homelab UAT
+last_updated: "2026-07-14T18:30:00.000Z"
+last_activity: 2026-07-14
 progress:
   total_phases: 13
-  completed_phases: 11
-  total_plans: 9
-  completed_plans: 9
-  percent: 85
+  completed_phases: 12
+  total_plans: 10
+  completed_plans: 10
+  percent: 92
 ---
 
 <!--
@@ -26,11 +26,11 @@ SPDX-License-Identifier: AGPL-3.0-or-later
 See: .planning/PROJECT.md (updated 2026-07-13)
 
 **Core value:** One operator can create, watch, and manage many concurrent Claude Code sessions from a browser, each in an ephemeral, reproducible container that is gone when destroyed.
-**Current focus:** Phase 20 — Signed GHCR Release & Harden-Runner Block (at the pre-release-merge checkpoint)
+**Current focus:** Phase 20 wrap-up (operator verify + block-flip) → Phase 22 (operator homelab UAT)
 
 ## Current Position
 
-Phase: 20 (Signed GHCR Release) — CHECKPOINT. Phases 16-19 + 21 all PASSED and committed on `feat/v1.4-harden`. To cut a v1.4.0 that contains the credential GUI (18) + async-202 (19) + security hygiene (17), `feat/v1.4-harden` must merge to `main` first, then release PR #1 is merged to tag v1.4.0 -> release.yml. Phase 22 (live homelab UAT) is operator-run. Phase 19 PASSED (async-202: api 302 + ui 136 green).
+Phase: 20 (Signed GHCR Release) — signed release DELIVERED. Phases 16-19 + 21 merged to `main` (PR #4, rebase). Release train: `v1.4.0` git tag/release were BURNED by the `GITHUB_TOKEN` trigger-gap + immutable-releases policy (see ADR-0019); recovered via a `workflow_dispatch` escape hatch on `release.yml` (PR #10) → dispatched `v1.4.1` → run `29355954285` published signed+attested `ghcr.io/bravebearstudios/burrow-{api,ui}:1.4.1`. Operator-pending: independent cosign/attestation verify (needs registry read + cosign) + harden-runner egress `audit->block` (needs the run's Step-Security insights). Phase 22 (live homelab UAT, ACC-04/05) is operator-run.
 Branch: `feat/v1.4-harden` (off green `main` `f9b1868`; the merged `feat/gui-managed-secrets` was pruned locally, remote prune deferred to operator)
 Status: Autonomous /gsd-autonomous run. Phase 15 PASSED (RELX-03 ruleset applied live). Phase 16 PASSED (credential backend merged out-of-band `f9b1868`, main green, release PR #1 → v1.4.0, docs reconciled to ADR-0015). Phase 17 PASSED (Dependabot + CodeQL landed, automated-security-fixes enabled, ROB-01/02 fixed; 194 api tests green).
 Last activity: 2026-07-13
