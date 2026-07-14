@@ -41,6 +41,16 @@ precedence = "aggregate"
 SPDX-FileCopyrightText = "2026 Brave Bear Studios"
 SPDX-License-Identifier = "AGPL-3.0-or-later"
 
+# ── Generated release changelog ────────────────────────────────────────
+# release-please owns and regenerates CHANGELOG.md on every release, so it
+# cannot carry an inline SPDX header (it would be stripped on the next release).
+# Licensed here instead, alongside the release-please config/manifest above.
+[[annotations]]
+path = ["CHANGELOG.md"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Brave Bear Studios"
+SPDX-License-Identifier = "AGPL-3.0-or-later"
+
 # ── GSD planning artifacts (CICD-08) ───────────────────────────────────
 # Planning artifacts are licensed HERE, not via inline headers. This is the
 # reconciled convention: a `*-PLAN.md` must keep its YAML frontmatter on line 1
