@@ -1,48 +1,42 @@
 {
   "version": "1.0",
-  "timestamp": "2026-07-03T21:16:56.110Z",
-  "phase": "ACC-01",
-  "phase_name": "real-infra-acceptance (deploy on lintool03 + den01)",
-  "phase_dir": ".planning (default; v1.3 milestone archived)",
-  "plan": 1,
-  "task": 6,
-  "total_tasks": 9,
+  "timestamp": "2026-07-14T22:03:54.529Z",
+  "phase": "v1.4",
+  "phase_name": "Ship & Harden — milestone wrap (Phases 20 + 22 operator-gated)",
+  "phase_dir": ".planning (default; milestone-level pause)",
+  "plan": null,
+  "task": "operator-handoff",
+  "total_tasks": 3,
   "status": "paused",
   "completed_tasks": [
-    {"id": 1, "name": "Diagnose the :80 404 false-alarm -> burrow is on :8081 (ntfy owns :80 on lintool03)", "status": "done"},
-    {"id": 2, "name": "Switch deploy host main -> feat/gui-managed-secrets @ 9a9b197 (feat = main+11 additive; deps cryptography+argon2; 004 migration auto-applies at boot)", "status": "done"},
-    {"id": 3, "name": "Rebuild burrow-api (feat image) + --force-recreate stale burrow-web (dangling nginx upstream IP)", "status": "done"},
-    {"id": 4, "name": "Verify control plane healthy: db:ok, compute:ok (real Proxmox auth) at :8081", "status": "done"},
-    {"id": 5, "name": "Prove ADR-0015 store on real infra: admin-secret (argon2) set + proxmox token stored last4 7640 (redundant)", "status": "done"},
-    {"id": 6, "name": "Store gitToken last4 lg83 (the real worker-boot unblock) + bump TTYD_TIMEOUT=600 + recreate api", "status": "done"}
+    {"id": 1, "name": "Assessed /gsd-autonomous run: both open phases (20, 22) are status:human_needed, operator-gated", "status": "done"},
+    {"id": 2, "name": "Pulled exact verify + harden-runner commands from phase 20/22 artifacts (not invented)", "status": "done"},
+    {"id": 3, "name": "Delivered operator handoff sheet: cosign/attestation verify, harden-runner flip procedure (5 call sites), Phase 22 UAT pointer", "status": "done"}
   ],
   "remaining_tasks": [
-    {"id": 7, "name": "ACC-01 CREATE step: create workspace (thezoid/fable-test) in browser at :8081, watch den01 worker journal -> green (Listening on 7681) vs auth-fail", "status": "not_started"},
-    {"id": 8, "name": "Finish H9 gate: terminal (live claude) -> stop -> start -> destroy on the real worker", "status": "not_started"},
-    {"id": 9, "name": "Commit + deploy the H2 error-honesty fix (M workspaceService.py TransportError + test_wait_ttyd.py) so a mid-boot failure surfaces an honest 502 not a masked 500", "status": "not_started"}
+    {"id": "A", "name": "Phase 20 MH2 / Phase 22 UAT-5: cosign verify + gh attestation verify a homelab-pulled @sha256 digest of :1.4.1", "status": "not_started"},
+    {"id": "B", "name": "Phase 20 MH3: read run 29355954285 Step-Security insights -> fill allowed-endpoints + egress-policy:block at 5 call sites -> reviewed PR (ci.yml first)", "status": "not_started"},
+    {"id": "C", "name": "Phase 22: run 22-HUMAN-UAT.md on den01+lintool03 (Step 0 deploy + UAT-1..5), record evidence, flip checklist to [x]", "status": "not_started"}
   ],
   "blockers": [
-    {"description": "Worker boot green not yet confirmed (the ACC-01 gate itself)", "type": "external", "workaround": "TTYD_TIMEOUT=600 makes a failing worker linger ~10min for journal inspection on den01"},
-    {"description": "PAT (last4 lg83) must have clone rights on BOTH BraveBearStudios/burrow (CONFIG_REPO) AND thezoid/fable-test (project). Single global token reused for both clones", "type": "human_action", "workaround": "classic repo-scope PAT spans both owners; fine-grained (per-owner) cannot"}
+    {"description": "Independent verify (A) blocked in-session: token lacks read:packages, no local cosign, GHCR packages private", "type": "human_action", "workaround": "operator: install cosign+jq, gh auth with read:packages, docker login ghcr.io (or make packages public)"},
+    {"description": "Harden-runner block-flip (B) needs run 29355954285 Step-Security egress insights (not gh-readable)", "type": "human_action", "workaround": "read insights per-workflow; do NOT guess the allowlist (breaks cosign silently)"},
+    {"description": "Phase 22 UAT (C) needs the live Proxmox homelab; not CI-provable", "type": "external", "workaround": "operator runs the committed 22-HUMAN-UAT.md runbook on real hardware"}
   ],
   "human_actions_pending": [
-    {"action": "In the browser at http://10.0.1.38:8081/ create a workspace on thezoid/fable-test and click Create", "context": "ACC-01 create step; synchronous, waits up to TTYD_TIMEOUT=600", "blocking": true},
-    {"action": "If worker auth-fails: add the named repo to the lg83 PAT, re-POST {gitToken}, re-create", "context": "the journal 'cloning <config|project> repo' line names which repo the PAT lacked", "blocking": false}
+    {"action": "Run cosign verify + gh attestation verify on a pulled :1.4.1 @sha256 digest (verify by digest, assert on output)", "context": "Phase 20 MH2 / Phase 22 UAT-5 (ACC-03/ACC-06 rider)", "blocking": true},
+    {"action": "Read run 29355954285 Step-Security insights, fill allowed-endpoints, set egress-policy:block, land reviewed PR (ci.yml first)", "context": "Phase 20 MH3 (ACC-02 item 14); guessing the allowlist breaks future builds", "blocking": true},
+    {"action": "Run the 22-HUMAN-UAT.md runbook on den01+lintool03 and record evidence for all 5 criteria", "context": "Phase 22 capstone; closes v1.4", "blocking": true}
   ],
   "decisions": [
-    {"decision": "Deploy the feat/gui-managed-secrets branch on the host (not main)", "rationale": "only feat carries the ADR-0015 credential store + BURROW_SECRET_KEY reader; main ignores the key", "phase": "ACC-01"},
-    {"decision": "Store gitToken, not just proxmoxTokenValue", "rationale": "the proxmox token already worked via .env (compute:ok); the real worker-boot blocker is the private-repo git-clone 401", "phase": "ACC-01"},
-    {"decision": "Always --force-recreate burrow-web after recreating burrow-api", "rationale": "nginx resolves the upstream burrow-api IP once at startup; an api recreate can dangle it -> 502", "phase": "ACC-01"}
+    {"decision": "Stopped /gsd-autonomous — no phase has safe autonomous work", "rationale": "both open phases are human_needed acceptance/infra work; forcing execution fakes progress", "phase": "v1.4"},
+    {"decision": "Did NOT flip harden-runner with a guessed allowlist", "rationale": "verification forbids it — a missing egress endpoint silently breaks cosign and can burn a release tag", "phase": "20"},
+    {"decision": "Milestone stays OPEN (no audit/complete/cleanup yet)", "rationale": "Phase 22 live UAT is the capstone acceptance gate; completing before it passes would be premature", "phase": "v1.4"}
   ],
   "uncommitted_files": [
-    "M api/services/workspaceService.py (H2 _wait_ttyd -> httpx.TransportError)",
-    "?? api/tests/unit/test_wait_ttyd.py (H2 regression, 5 params green)",
-    "M .planning/ROADMAP.md",
-    "M .planning/STATE.md",
-    "M .planning/config.json",
-    "D .planning/v1.2-MILESTONE-AUDIT.md",
-    "?? .planning/ui-reviews/"
+    "M .planning/.continue-here.md (this handoff)",
+    "M .planning/HANDOFF.json (this handoff)"
   ],
-  "next_action": "Browser: create a workspace on thezoid/fable-test at http://10.0.1.38:8081/, then immediately on den01 run: W=$(pct list | awk 'NR>1 && $1>=969 && $1<=1022 {print $1; exit}'); pct exec \"$W\" -- journalctl -u burrow-worker -b -f",
-  "context_notes": "Base deploy is fully healthy on feat @ 9a9b197 (api healthy, web recreated, compute:ok real Proxmox). ADR-0015 store proven end-to-end via the API (no GUI on feat). Both creds now in /data/burrow.db encrypted: proxmox 7640 (redundant), git lg83 (the unblock). We paused right before the payoff: creating a real workspace and confirming the worker clones both repos with the lg83 PAT and execs ttyd on :7681. Deep state lives in the burrow-deploy + burrow-secret-mgmt-feature auto-memories (updated this session)."
+  "next_action": "Operator runs A+B+C. Then resume with /gsd-autonomous --from 20 to trigger the milestone lifecycle (audit -> complete -> cleanup).",
+  "context_notes": "v1.4 is code-complete and green; the signed+attested :1.4.1 release is real (run 29355954285, ADR-0019 workflow_dispatch hatch after v1.4.0 was burned by the GITHUB_TOKEN trigger gap). The remaining ring is human acceptance only: prove signatures independently (needs read:packages+cosign), flip CI egress to block from real Step-Security insights (never guessed), and exercise the whole system on the live Proxmox homelab per 22-HUMAN-UAT.md. Do not merge release-please PR #11. Deep state in auto-memories burrow-deploy + burrow-v14-milestone."
 }
