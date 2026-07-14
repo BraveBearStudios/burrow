@@ -51,6 +51,13 @@ LABEL org.opencontainers.image.source="https://github.com/BraveBearStudios/burro
       org.opencontainers.image.title="burrow-api" \
       org.opencontainers.image.version="${IMAGE_VERSION}"
 
+# Upgrade the base image's system pip to clear the one FIXABLE high Trivy CVE
+# (CVE-2026-8643, fixed in pip 26.1.2). The app runs from the uv-managed venv and
+# never uses this pip at runtime, but Trivy scans the image's site-packages, so an
+# unpatched base pip would otherwise ship in the signed release. ignore-unfixed does
+# NOT skip a fixable CVE, so this must be patched here rather than allowlisted.
+RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2"
+
 # Non-root runtime user (UID/GID 10001). The create widens no capabilities; the
 # image is meant to run with a read-only root FS and all caps dropped (§2.2).
 RUN groupadd --gid 10001 burrow \
