@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: in-progress
-stopped_at: Autonomous run — Phases 16-19 + 21 complete; Phase 20 signed release DONE (v1.4.1), verify+block-flip operator-pending; Phase 22 is operator homelab UAT
-last_updated: "2026-07-14T18:30:00.000Z"
-last_activity: 2026-07-14
+stopped_at: Operator handoff — Phases 15-19 + 21 verified passed; Phase 20 signed release DONE (v1.4.1) with verify + harden-runner block-flip operator-pending; Phase 22 is operator homelab UAT
+last_updated: "2026-08-04T13:20:00.000Z"
+last_activity: 2026-08-04
 progress:
   total_phases: 13
   completed_phases: 12
@@ -31,7 +31,7 @@ See: .planning/PROJECT.md (updated 2026-07-13)
 ## Current Position
 
 Phase: 20 (Signed GHCR Release) — signed release DELIVERED. Phases 16-19 + 21 merged to `main` (PR #4, rebase). Release train: `v1.4.0` git tag/release were BURNED by the `GITHUB_TOKEN` trigger-gap + immutable-releases policy (see ADR-0019); recovered via a `workflow_dispatch` escape hatch on `release.yml` (PR #10) → dispatched `v1.4.1` → run `29355954285` published signed+attested `ghcr.io/bravebearstudios/burrow-{api,ui}:1.4.1`. Operator-pending: independent cosign/attestation verify (needs registry read + cosign) + harden-runner egress `audit->block` (needs the run's Step-Security insights). Phase 22 (live homelab UAT, ACC-04/05) is operator-run.
-Branch: `feat/v1.4-harden` (off green `main` `f9b1868`; the merged `feat/gui-managed-secrets` was pruned locally, remote prune deferred to operator)
+Branch: `main` (clean; all v1.4 code phases merged. The merged `feat/gui-managed-secrets` was pruned locally, remote prune deferred to operator)
 Status: Autonomous /gsd-autonomous run. Phase 15 PASSED (RELX-03 ruleset applied live). Phase 16 PASSED (credential backend merged out-of-band `f9b1868`, main green, release PR #1 → v1.4.0, docs reconciled to ADR-0015). Phase 17 PASSED (Dependabot + CodeQL landed, automated-security-fixes enabled, ROB-01/02 fixed; 194 api tests green).
 Last activity: 2026-07-13
 
@@ -236,11 +236,14 @@ are now claimed by v1.4 Phases 20 + 22.
 
 ## Session Continuity
 
-Last session: 2026-07-13T18:51:43.000Z
-Stopped at: 15-03 PAUSED at a blocking human-action checkpoint (RELX-03). Task 1 (runbook) authored + committed (17b5707); Task 2 (the live oss-ruleset exclusion) is an operator GitHub-admin action.
-Resume file: .planning/phases/15-pipeline-unblock-green-main/15-RELX-03-RULESET-RUNBOOK.md
-Next plan: OPERATOR ACTION to resume 15-03 (RELX-03). Follow 15-RELX-03-RULESET-RUNBOOK.md with an admin-scoped gh: fetch ruleset 18189353, `jq`-append `refs/heads/release-please--**` to `conditions.ref_name.exclude` (deduped, body projected to name/target/enforcement/bypass_actors/conditions/rules), `gh api --method PUT ... --input ruleset.new.json` (or the Settings -> Rules -> Rulesets UI fallback). Then push a commit to main / re-run the failed release-please run and confirm NO `Error updating ref heads/release-please--branches--main`. Reply `applied` once live. Only then does Phase 15 close (2/3 -> 3/3) so Phase 16 can merge PR #3 onto a green main. NOTE: the reuse hard gate will red on PR CI until D-15-02-01 (the 15-02-PLAN.md invalid SPDX expression, see deferred-items.md) is fixed by the green-main sequencing.
+Last session: 2026-08-04 (resume-work; no code change)
+Stopped at: v1.4 milestone-level operator handoff. Phase 15 RELX-03 is CLOSED (Phase 15 verification `passed`) — the stale "resume 15-03" note below it is superseded. Verification roll-call: Phases 15, 16, 17, 18, 19, 21 `passed`; Phases 20 + 22 `human_needed`.
+Resume file: `.planning/.continue-here.md` (+ machine-readable `.planning/HANDOFF.json`, kept until the operator ring closes)
+Next plan: NO agent-executable work remains in v1.4. Three operator actions gate the milestone (A verify, B harden-runner block-flip, C Phase 22 live UAT) — see `.planning/.continue-here.md`. Once all three are evidenced, resume with `/gsd-autonomous --from 20` to run audit -> complete -> cleanup.
 
 ## Operator Next Steps
 
-- **RESUME 15-03 (RELX-03):** apply the `oss`-ruleset release-please exclusion per `.planning/phases/15-pipeline-unblock-green-main/15-RELX-03-RULESET-RUNBOOK.md` with your admin-scoped `gh` (the session token lacks repo-admin), then confirm a clean release-please run and reply `applied`. This closes Phase 15's pipeline-unblock critical path.
+- **A (Phase 20 MH2 / Phase 22 UAT-5):** `cosign verify` + `gh attestation verify` a homelab-pulled `@sha256:` digest of `:1.4.1`. Needs cosign + jq + `gh` with `read:packages` + `docker login ghcr.io`. Verify by digest, assert on printed output (not exit code).
+- **B (Phase 20 MH3):** read run `29355954285` Step-Security egress insights, fill the real `allowed-endpoints`, set `egress-policy: block` at the 5 call sites, land as a reviewed PR — `ci.yml` first, proven green, before `release.yml`. **Never guess the allowlist.**
+- **C (Phase 22):** run `.planning/phases/22-live-homelab-acceptance-capstone/22-HUMAN-UAT.md` on den01 + lintool03 (Step 0 deploy `:1.4.1`, then UAT-1..5), record evidence, flip each `[ ]` to `[x]`.
+- **Standing:** do NOT merge release-please PR #11.
