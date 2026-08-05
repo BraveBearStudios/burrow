@@ -51,12 +51,26 @@ LABEL org.opencontainers.image.source="https://github.com/BraveBearStudios/burro
       org.opencontainers.image.title="burrow-api" \
       org.opencontainers.image.version="${IMAGE_VERSION}"
 
-# Upgrade the base image's system pip to clear the one FIXABLE high Trivy CVE
-# (CVE-2026-8643, fixed in pip 26.1.2). The app runs from the uv-managed venv and
-# never uses this pip at runtime, but Trivy scans the image's site-packages, so an
-# unpatched base pip would otherwise ship in the signed release. ignore-unfixed does
-# NOT skip a fixable CVE, so this must be patched here rather than allowlisted.
-RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2"
+# Upgrade the base image's system Python packages to clear the FIXABLE high Trivy
+# CVEs they carry. The app runs from the uv-managed venv and never uses these at
+# runtime, but Trivy scans the image's site-packages, so unpatched base packages
+# would otherwise ship in the signed release. ignore-unfixed does NOT skip a fixable
+# CVE, so these must be patched here rather than allowlisted.
+#
+#   pip        >=26.1.2  — CVE-2026-8643 (HIGH)
+#   setuptools >=83.0.0  — CVE-2025-47273 (HIGH, path traversal in PackageIndex);
+#                          83.0.0 rather than the 78.1.1 minimum also clears
+#                          CVE-2026-59890 (MEDIUM) so the SARIF stays quiet.
+#   msgpack    >=1.2.1   — GHSA-6v7p-g79w-8964 (HIGH, out-of-bounds read)
+#
+# These three are reported by Trivy against the bare `Python` target (the base
+# image's system site-packages), NOT against `app/.venv/...` — they are absent from
+# api/uv.lock, so a lockfile bump cannot reach them. Verified via the CI SARIF for
+# run 30910698379.
+RUN python -m pip install --no-cache-dir --upgrade \
+      "pip>=26.1.2" \
+      "setuptools>=83.0.0" \
+      "msgpack>=1.2.1"
 
 # Non-root runtime user (UID/GID 10001). The create widens no capabilities; the
 # image is meant to run with a read-only root FS and all caps dropped (§2.2).
