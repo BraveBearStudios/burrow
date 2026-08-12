@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: in-progress
-stopped_at: Operator handoff — Phases 15-19 + 21 verified passed; Phase 20 signed release DONE (v1.4.1) with verify + harden-runner block-flip operator-pending; Phase 22 is operator homelab UAT
-last_updated: "2026-08-04T13:20:00.000Z"
-last_activity: 2026-08-04
+stopped_at: Three PRs open and awaiting review (#24 base-image CVEs, #25 ruff rule-set pin, #26 verification frontmatter order). Phases 15-19 + 21 verified passed; Phase 20 signed release DONE (v1.4.1) with verify + harden-runner block-flip operator-pending; Phase 22 is operator homelab UAT
+last_updated: "2026-08-12T06:00:00.000Z"
+last_activity: 2026-08-12
 progress:
   total_phases: 13
   completed_phases: 12
@@ -236,14 +236,44 @@ are now claimed by v1.4 Phases 20 + 22.
 
 ## Session Continuity
 
-Last session: 2026-08-04 (resume-work; no code change)
-Stopped at: v1.4 milestone-level operator handoff. Phase 15 RELX-03 is CLOSED (Phase 15 verification `passed`) — the stale "resume 15-03" note below it is superseded. Verification roll-call: Phases 15, 16, 17, 18, 19, 21 `passed`; Phases 20 + 22 `human_needed`.
+Last session: 2026-08-12 (resume-work; three PRs opened)
+Stopped at: Three PRs open, none merged. Verification roll-call unchanged: Phases 15, 16, 17, 18, 19, 21 `passed`; Phases 20 + 22 `human_needed`.
 Resume file: `.planning/.continue-here.md` (+ machine-readable `.planning/HANDOFF.json`, kept until the operator ring closes)
-Next plan: NO agent-executable work remains in v1.4. Three operator actions gate the milestone (A verify, B harden-runner block-flip, C Phase 22 live UAT) — see `.planning/.continue-here.md`. Once all three are evidenced, resume with `/gsd-autonomous --from 20` to run audit -> complete -> cleanup.
+Next plan: review + merge the three open PRs, then the operator ring (A verify, C live UAT), then B. Once all are evidenced, `/gsd-autonomous --from 20` runs audit -> complete -> cleanup — but only AFTER #26 merges, or discovery still misreads every phase.
+
+### Correction to the CI-is-red record (2026-08-12)
+
+Earlier sessions recorded "CI red since 2026-07-27" without qualification. Measured:
+`ci.yml` triggers on `pull_request` AND `push: branches: [main]`. Filtering to push
+events, `origin/main`'s last run is **`29364341164` at `03ecb3b` — success**, as are the
+four before it. The red runs are all `pull_request` runs on dependabot branches, red for
+**two different reasons**: run `30910698379` (PR #21) failed `Build + scan burrow-api` on
+the Trivy CVEs; run `31403711958` (PR #23) failed `Tier-0 static gates` on `ruff check`
+and never reached the scan. Caveat that keeps the work necessary: main's green record is
+from 2026-07-14 and PREDATES the CVE advisories, so main is green only because nothing has
+been pushed to re-scan it.
+
+### Open PRs (all three fail ONLY `Build + scan burrow-api`, for the same shared reason)
+
+- **#24 `fix/trivy-high-cves`** — base-image `setuptools`/`msgpack`. Reduced to
+  Dockerfile-only because dependabot **#23 already carries the identical
+  `cryptography==50.0.0` bump**; duplicating it would only conflict. Run `31567559416`
+  proved the upgrade works (`setuptools-84.0.0`, `msgpack-1.2.1` both scan 0 vulns) but a
+  pathless `Python` target still reports the OLD versions, so a stale copy survives where
+  `pip install --upgrade` cannot reach. A follow-up commit prunes `ensurepip/_bundled` and
+  adds build-log probes to pin the provenance. **Result unread — check it first.**
+- **#25 `fix/pin-ruff-ruleset`** — pins `select = ["E4","E7","E9","F"]`. Ruff changed its
+  DEFAULT rule set between 0.15.16 and 0.16.2: same tree, 0.15.16 clean, 0.16.2 = 115
+  errors. Unblocks #23. Verified clean under both versions; mypy clean; 302 tests pass.
+- **#26 `fix/verification-frontmatter-order`** — moves the SPDX block below the frontmatter
+  in 9 files so `gsd-tools` can parse them. Before: all 8 phases read `missing`. After:
+  matches this file exactly. `reuse lint` compliant, 502/502.
+
+**Green main needs all three plus #23.** No single PR can go green on its own — do not wait for one.
 
 ## Operator Next Steps
 
-- **A (Phase 20 MH2 / Phase 22 UAT-5):** `cosign verify` + `gh attestation verify` a homelab-pulled `@sha256:` digest of `:1.4.1`. Needs cosign + jq + `gh` with `read:packages` + `docker login ghcr.io`. Verify by digest, assert on printed output (not exit code).
-- **B (Phase 20 MH3):** read run `29355954285` Step-Security egress insights, fill the real `allowed-endpoints`, set `egress-policy: block` at the 5 call sites, land as a reviewed PR — `ci.yml` first, proven green, before `release.yml`. **Never guess the allowlist.**
-- **C (Phase 22):** run `.planning/phases/22-live-homelab-acceptance-capstone/22-HUMAN-UAT.md` on den01 + lintool03 (Step 0 deploy `:1.4.1`, then UAT-1..5), record evidence, flip each `[ ]` to `[x]`.
+- **A (Phase 20 MH2 / Phase 22 UAT-5):** `cosign verify` + `gh attestation verify` a homelab-pulled `@sha256:` digest of `:1.4.1`. Run it **on lintool03**, not the dev box: UAT-5 requires a LAN-pulled image, and Docker is not installed on Windows. Verify by digest, assert on printed output (not exit code).
+- **B (Phase 20 MH3):** read a **green `ci.yml` run's** Step-Security egress insights (not the release run's), fill the real `allowed-endpoints`, set `egress-policy: block` at the **6** call sites, land as a reviewed PR — `ci.yml` first, proven green, before `release.yml`. **Never guess the allowlist.**
+- **C (Phase 22):** run `.planning/phases/22-live-homelab-acceptance-capstone/22-HUMAN-UAT.md` on den01 + lintool03 (Step 0 deploy `:1.4.1`, then UAT-1..5), record evidence, flip each `[ ]` to `[x]` — there are **eight** `result: [pending]` markers, not the six the Summary claims.
 - **Standing:** do NOT merge release-please PR #11.
