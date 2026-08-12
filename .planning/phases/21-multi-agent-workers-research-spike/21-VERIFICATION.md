@@ -1,12 +1,13 @@
-<!--
-SPDX-FileCopyrightText: 2026 Brave Bear Studios
-SPDX-License-Identifier: AGPL-3.0-or-later
--->
 ---
 status: passed
 phase: 21
 verified: 2026-07-13
 ---
+
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 
 # Phase 21: Multi-Agent Workers Research Spike - Verification
 
