@@ -63,14 +63,38 @@ LABEL org.opencontainers.image.source="https://github.com/BraveBearStudios/burro
 #                          CVE-2026-59890 (MEDIUM) so the SARIF stays quiet.
 #   msgpack    >=1.2.1   — GHSA-6v7p-g79w-8964 (HIGH, out-of-bounds read)
 #
-# These three are reported by Trivy against the bare `Python` target (the base
-# image's system site-packages), NOT against `app/.venv/...` — they are absent from
-# api/uv.lock, so a lockfile bump cannot reach them. Verified via the CI SARIF for
-# run 30910698379.
+# These are reported by Trivy against a bare, PATHLESS `Python` target, NOT against
+# `app/.venv/...` — they are absent from api/uv.lock, so a lockfile bump cannot
+# reach them. Verified via the CI SARIF for run 30910698379.
 RUN python -m pip install --no-cache-dir --upgrade \
       "pip>=26.1.2" \
       "setuptools>=83.0.0" \
       "msgpack>=1.2.1"
+
+# The upgrade above is necessary but NOT sufficient. Measured on run 31567559416:
+# afterwards the real on-disk copies scan clean
+# (`usr/local/.../setuptools-84.0.0` and `.../msgpack-1.2.1` both report 0 vulns),
+# yet Trivy still reports setuptools 70.3.0 and msgpack 1.1.2 against the pathless
+# `Python` target. So a second, stale copy of each survives somewhere that
+# `pip install --upgrade` does not reach.
+#
+# The candidates are wheels bundled INSIDE the Python installation rather than
+# installed into site-packages: ensurepip ships `setuptools-*.whl` and `pip-*.whl`
+# under `ensurepip/_bundled/`, and pip carries a vendored tree under `pip/_vendor/`.
+# Trivy detects bundled wheels as packages with no dist-info path, which is exactly
+# the pathless target signature.
+#
+# Neither is needed at runtime: the app runs from /app/.venv and never invokes
+# ensurepip. The `ls`/`find` lines are deliberate build-log probes that pin down the
+# provenance of whatever survives, so the next iteration is evidence-driven rather
+# than another guess. The trailing `true` keeps the layer non-fatal if a path is
+# already absent.
+RUN set -x; \
+    ls -la /usr/local/lib/python3.12/ensurepip/_bundled/ 2>/dev/null; \
+    find /usr/local/lib/python3.12 -maxdepth 6 -iname 'msgpack*' 2>/dev/null | head -20; \
+    find /usr/local/lib/python3.12 -maxdepth 6 -iname 'setuptools*' 2>/dev/null | head -20; \
+    rm -rf /usr/local/lib/python3.12/ensurepip/_bundled; \
+    true
 
 # Non-root runtime user (UID/GID 10001). The create widens no capabilities; the
 # image is meant to run with a read-only root FS and all caps dropped (§2.2).
