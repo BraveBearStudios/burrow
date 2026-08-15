@@ -1,11 +1,11 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-05T00:05:18.898Z",
+  "timestamp": "2026-08-15T05:31:09.219Z",
   "phase": "v1.4",
   "phase_name": "Ship & Harden — milestone wrap (Phases 20 + 22 operator-gated, plus a NEW red-CI blocker)",
   "phase_dir": ".planning (default; milestone-level pause)",
   "plan": null,
-  "task": "review-and-merge-open-prs",
+  "task": "merge-open-prs",
   "total_tasks": 4,
   "status": "paused",
   "completed_tasks": [
@@ -58,29 +58,34 @@
   ],
   "blockers": [
     {
-      "description": "PR #24 unresolved: run 31567559416 proved the pip upgrade works (setuptools-84.0.0 and msgpack-1.2.1 both scan 0 vulns) but Trivy still reports setuptools 70.3.0 / msgpack 1.1.2 against a PATHLESS Python target, so a stale copy survives where pip install --upgrade cannot reach",
-      "type": "technical",
-      "workaround": "Commit 6c82c12 prunes ensurepip/_bundled and adds ls/find build-log probes. Read run 31568098155. Do NOT allowlist — RELX-05 forbids it for a fixable CVE."
+      "description": "Agent CANNOT merge these PRs. gh pr merge --admin is denied by the Claude Code auto-mode classifier, and --admin exists to bypass branch protection, so working around the denial defeats its intent",
+      "type": "human_action",
+      "workaround": "Operator runs the merge commands with a ! prefix. Do not substitute an API call that achieves the same mutation."
     },
     {
-      "description": "All three open PRs fail ONLY Build + scan burrow-api, for the same shared reason inherited from main. #26 is docs-only and touches no Python, which proves it is not theirs",
-      "type": "technical",
-      "workaround": "Do not wait for any single PR to go green. Green main needs #24 + #25 + #26 + #23."
+      "description": "A human review is required regardless of permissions: #25 reports reviewDecision REVIEW_REQUIRED, the PRs are authored under the operator identity, and GitHub blocks self-approval",
+      "type": "human_action",
+      "workaround": "No permission grant removes the human from this loop."
     },
     {
-      "description": "CORRECTION: origin/main is GREEN. Its last push-event ci.yml run is 29364341164 at 03ecb3b, success. The red runs are pull_request runs on dependabot branches, red for two different reasons. But main green record is from 2026-07-14 and predates the CVE advisories, so it is green only because nothing has been re-scanned",
-      "type": "informational",
-      "workaround": "Push to main only after the CVE fixes merge."
+      "description": "Wrong gh account active. The merge failed with: bcurry-arrow does not have the correct permissions to execute MergePullRequest. thezoid has admin:true on the repo. A gh auth switch to thezoid was performed and REVERTED on its own (hosts.yml reads user: bcurry-arrow again)",
+      "type": "technical",
+      "workaround": "Run gh auth status and re-switch immediately before merging; do not assume it stuck."
+    },
+    {
+      "description": "No PR in this set can go green alone: each reds on a CVE another PR owns. All are MERGEABLE with no conflicts; it is the ruleset requiring green checks",
+      "type": "technical",
+      "workaround": "First merge needs --admin; the rest cascade green. Alternative: fold the cryptography pin into #24 so it goes green unaided (reverses an explicit operator decision, so not done unilaterally)."
     },
     {
       "description": "Independent verify (A) needs cosign + gh with read:packages on lintool03, not the Windows dev box: UAT-5 requires a LAN-pulled image and Docker is not installed locally",
       "type": "human_action",
-      "workaround": "gh auth login -h github.com -s read:packages -w. A bare gh auth refresh WITHOUT -s is a silent no-op that prints success. Verify: gh auth status | grep -i \"token scopes\""
+      "workaround": "gh auth login -h github.com -s read:packages -w. A bare gh auth refresh WITHOUT -s is a silent no-op that prints success AND can flip the active account."
     },
     {
-      "description": "Harden-runner block-flip (B) needs a GREEN ci.yml run Step-Security insights; the only insights URL on file is the release path, which is the wrong workflow. Six call sites, not five",
+      "description": "Harden-runner block-flip (B) needs a GREEN ci.yml run Step-Security insights; the only URL on file is the release path, the wrong workflow. Six call sites, not five",
       "type": "human_action",
-      "workaround": "Land the CVE fixes first, then read the green ci.yml run insights. Never guess the allowlist."
+      "workaround": "Land the merges first. Never guess the allowlist."
     },
     {
       "description": "Phase 22 UAT (C) needs the live Proxmox homelab; not CI-provable",
@@ -90,18 +95,23 @@
   ],
   "human_actions_pending": [
     {
-      "action": "Approve (or reject) the Track D commit on branch fix/trivy-high-cves. Three files: api/pyproject.toml, api/uv.lock, Dockerfile.api. Full commit message was presented in-session",
-      "context": "Blocks Phase 20 MH3. Nothing is committed or pushed",
+      "action": "Merge PRs 25, 26, 24 with --admin --rebase, then rebase and merge dependabot 23",
+      "context": "Blocks green main, Track B, and /gsd-autonomous. Verify gh active account is thezoid first",
       "blocking": true
     },
     {
-      "action": "Run cosign verify + gh attestation verify on both :1.4.1 digests",
+      "action": "Decide: --admin override, or have the agent fold the cryptography pin into #24 so it goes green unaided",
+      "context": "The deadlock was discovered after the Dockerfile-only decision was made",
+      "blocking": false
+    },
+    {
+      "action": "Run cosign verify + gh attestation verify on both :1.4.1 digests from lintool03",
       "context": "Phase 20 MH2 / Phase 22 UAT-5",
       "blocking": true
     },
     {
-      "action": "Read Step-Security insights, fill allowed-endpoints, flip egress to block, land a reviewed PR (ci.yml first)",
-      "context": "Phase 20 MH3; guessing the allowlist breaks future builds",
+      "action": "Read a green ci.yml run Step-Security insights, fill allowed-endpoints, flip egress to block at six sites, ci.yml first",
+      "context": "Phase 20 MH3",
       "blocking": true
     },
     {
@@ -148,30 +158,31 @@
     }
   ],
   "uncommitted_files": [],
-  "next_action": "Read run 31568098155 (the PR #24 provenance probe) FIRST — its build log decides whether #24 is done or needs one more targeted commit. Then review and merge in order: #25 (unblocks dependabot #23), #26 (unblocks /gsd-autonomous), then #24 + #23 together for green main. Tracks A and C are operator-run and independent.",
-  "context_notes": "Two things changed this session that are not in any prior handoff. FIRST: CI is red and has been since 2026-07-27, on three FIXABLE HIGH CVEs in burrow-api. That reorders the work — Track B (harden-runner block-flip) is gated on a green baseline, so the CVE fix is now the critical path, not the acceptance ring. The fix is written and locally verified but uncommitted. SECOND: the committed 22-HUMAN-UAT.md has real defects that would cost an operator a night, all now corrected in a published runbook artifact: WORKER_NODES must be a JSON array (a comma list is an import-time crash and a restart loop, measured against the repo venv); three docker compose lines omit -f compose.prod.yml and die with 'no configuration file provided'; the :8081 remap is an uncommitted local edit on lintool03, and losing it points health checks at ntfy on :80; there are SIX harden-runner call sites, not the five every planning doc claims (codeql.yml:39 is unlisted and has no seed block); <REL> is 1.4.1 and 1.4.0 is burned with no images; the release run published two digests per image and the attestation-manifest one is a decoy. Resolved values: burrow-api sha256:fc37afffd3cf8d2f81dd122ec4e0c4c4e80ca3f387614fd5ae7ebe5b9338467d, burrow-ui sha256:6d5f9f1e0810f7cce53cf3a542496e64aa50b122c1399fc796c63fc4f159fbe0. Do not merge release-please PR #11 (still open, still titled 'chore(main): release 1.4.0'). Deep state in auto-memories burrow-deploy + burrow-v14-milestone.",
-  "last_updated": "2026-08-12T06:00:00.000Z",
+  "next_action": "Confirm the gh identity FIRST (the last merge failed on identity, not on the merge): gh auth status; gh auth switch --hostname github.com --user thezoid; gh api repos/BraveBearStudios/burrow --jq .permissions (expect admin:true). Then the OPERATOR runs, prefixed with !: gh pr merge 25 --admin --rebase --delete-branch; then 26; then 24; then gh pr comment 23 --body \"@dependabot rebase\"; then gh pr merge 23 --rebase --delete-branch once green. The agent CANNOT run these — classifier-denied, and GitHub requires a human review regardless.",
+  "context_notes": "Three PRs authored and CI-verified but unmerged; the merge failed twice for unrelated reasons (classifier denial, then wrong gh account). No repo state changed. All three PRs fail ONLY Build + scan burrow-api; every other gate including all CodeQL analyses passes. #26 is docs-only and proves the failure is inherited from main. The Trivy fix took three CI runs and disproved two hypotheses before a build-log find located the packages inside pip/_vendor, where no upgrade can reach them.",
+  "last_updated": "2026-08-15T05:31:09.219Z",
   "open_prs": [
     {
       "number": 24,
       "branch": "fix/trivy-high-cves",
-      "title": "base-image setuptools + msgpack CVEs",
-      "state": "in_progress",
-      "note": "Reduced to Dockerfile-only; dependabot #23 already carries the identical cryptography==50.0.0 bump. Probe commit 6c82c12 pending result."
+      "title": "base-image CVEs, Trivy 3 HIGH -> 1",
+      "state": "ready",
+      "note": "Dockerfile-only by operator choice; cryptography lives in dependabot #23. Removing pip was the only remedy: the stale copies are in site-packages/pip/_vendor/ with no dist-info, and pip 26.2.1 still vendors msgpack 1.1.2. Safe because the uv venv has no pip; build log confirms runtime smoke ok /app/.venv/bin/python."
     },
     {
       "number": 25,
       "branch": "fix/pin-ruff-ruleset",
       "title": "pin the ruff rule set",
       "state": "ready",
-      "note": "Ruff changed its DEFAULT selection between 0.15.16 and 0.16.2 (same tree: clean vs 115 errors). Unblocks #23. mypy clean, 302 tests pass."
+      "note": "Ruff changed its DEFAULT selection between 0.15.16 and 0.16.2 (same tree: clean vs 115 errors). Unblocks #23. Clean under both versions, mypy clean, 302 tests pass."
     },
     {
       "number": 26,
       "branch": "fix/verification-frontmatter-order",
-      "title": "frontmatter above SPDX in 9 files",
+      "title": "frontmatter above SPDX, 9 files",
       "state": "ready",
-      "note": "gsd-tools needs --- on line 1; all 8 phases previously read missing. reuse lint 502/502."
+      "note": "gsd-tools needs --- on line 1; all 8 phases previously read missing. reuse lint 502/502. MUST merge before /gsd-autonomous is usable."
     }
-  ]
+  ],
+  "async_jobs": []
 }
