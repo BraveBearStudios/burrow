@@ -1,12 +1,13 @@
-<!--
-SPDX-FileCopyrightText: 2026 Brave Bear Studios
-SPDX-License-Identifier: AGPL-3.0-or-later
--->
 ---
 status: passed
 phase: 19
 verified: 2026-07-13
 ---
+
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 
 # Phase 19: Create-UX Async-202 - Verification
 

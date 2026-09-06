@@ -1,12 +1,13 @@
-<!--
-SPDX-FileCopyrightText: 2026 Brave Bear Studios
-SPDX-License-Identifier: AGPL-3.0-or-later
--->
 ---
 status: human_needed
 phase: 22
 verified: pending
 ---
+
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 
 # Phase 22: Live Homelab Acceptance Capstone - Verification
 

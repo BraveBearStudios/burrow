@@ -1,12 +1,13 @@
-<!--
-SPDX-FileCopyrightText: 2026 Brave Bear Studios
-SPDX-License-Identifier: AGPL-3.0-or-later
--->
 ---
 status: human_needed
 phase: 20
 verified: 2026-07-14
 ---
+
+<!--
+SPDX-FileCopyrightText: 2026 Brave Bear Studios
+SPDX-License-Identifier: AGPL-3.0-or-later
+-->
 
 # Phase 20: Signed GHCR Release & Harden-Runner Block - Verification
 
