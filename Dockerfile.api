@@ -51,12 +51,55 @@ LABEL org.opencontainers.image.source="https://github.com/BraveBearStudios/burro
       org.opencontainers.image.title="burrow-api" \
       org.opencontainers.image.version="${IMAGE_VERSION}"
 
-# Upgrade the base image's system pip to clear the one FIXABLE high Trivy CVE
-# (CVE-2026-8643, fixed in pip 26.1.2). The app runs from the uv-managed venv and
-# never uses this pip at runtime, but Trivy scans the image's site-packages, so an
-# unpatched base pip would otherwise ship in the signed release. ignore-unfixed does
-# NOT skip a fixable CVE, so this must be patched here rather than allowlisted.
-RUN python -m pip install --no-cache-dir --upgrade "pip>=26.1.2"
+# Upgrade the base image's system Python packages to clear the FIXABLE high Trivy
+# CVEs they carry. The app runs from the uv-managed venv and never uses these at
+# runtime, but Trivy scans the image's site-packages, so unpatched base packages
+# would otherwise ship in the signed release. ignore-unfixed does NOT skip a fixable
+# CVE, so these must be patched here rather than allowlisted.
+#
+#   pip        >=26.1.2  — CVE-2026-8643 (HIGH)
+#   setuptools >=83.0.0  — CVE-2025-47273 (HIGH, path traversal in PackageIndex);
+#                          83.0.0 rather than the 78.1.1 minimum also clears
+#                          CVE-2026-59890 (MEDIUM) so the SARIF stays quiet.
+#   msgpack    >=1.2.1   — GHSA-6v7p-g79w-8964 (HIGH, out-of-bounds read)
+#
+# These are reported by Trivy against a bare, PATHLESS `Python` target, NOT against
+# `app/.venv/...` — they are absent from api/uv.lock, so a lockfile bump cannot
+# reach them. Verified via the CI SARIF for run 30910698379.
+RUN python -m pip install --no-cache-dir --upgrade \
+      "pip>=26.1.2" \
+      "setuptools>=83.0.0" \
+      "msgpack>=1.2.1"
+
+# The upgrade above is necessary but NOT sufficient, and the residue is NOT
+# upgradable. Measured across runs 31567559416 and 31568098155:
+#
+#   usr/local/.../setuptools-84.0.0.dist-info   0 vulns   (upgrade worked)
+#   usr/local/.../msgpack-1.2.1.dist-info       0 vulns   (upgrade worked)
+#   Python  (pathless target)                   2 vulns   (setuptools 70.3.0,
+#                                                          msgpack 1.1.2)
+#
+# A build-log probe on 31568098155 located the survivors: they live inside pip's
+# own vendored tree at `site-packages/pip/_vendor/`. pip vendors msgpack and a
+# pkg_resources copy from setuptools, neither of which carries a dist-info — which
+# is exactly why Trivy attributes them to a pathless `Python` target. (The same
+# probe disproved the ensurepip theory: `ensurepip/_bundled` does not exist in this
+# image.)
+#
+# `pip install --upgrade` cannot reach a vendored tree, and there is no newer pip to
+# escape to: 26.2.1 is current and still vendors msgpack 1.1.2. So the finding is
+# only clearable by REMOVING pip, not by upgrading it. RELX-05 forbids allowlisting
+# a fixable CVE, and removal is the stronger remedy anyway.
+#
+# Removing pip from the runtime stage is safe here: the application runs entirely
+# from the uv-built /app/.venv (which PATH puts first), nothing is installed at
+# runtime, and the HEALTHCHECK resolves `python` to /app/.venv/bin/python. The build
+# stage keeps its own pip and is unaffected. This also shrinks the runtime attack
+# surface, which is the direction §2.2 already points.
+RUN python -m pip uninstall -y pip \
+    && rm -rf /usr/local/lib/python3.12/site-packages/pip \
+              /usr/local/lib/python3.12/site-packages/pip-*.dist-info \
+    && rm -rf /usr/local/lib/python3.12/ensurepip
 
 # Non-root runtime user (UID/GID 10001). The create widens no capabilities; the
 # image is meant to run with a read-only root FS and all caps dropped (§2.2).
@@ -73,6 +116,17 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 # files stay readable after the USER switch (Pitfall 8: COPY --chown).
 COPY --from=build --chown=10001:10001 /app/.venv /app/.venv
 COPY --from=build --chown=10001:10001 /app /app
+
+# Build-time smoke test. CI builds and scans this image but never STARTS a
+# container, so a runtime import break would otherwise ship undetected. This asserts
+# the venv survived the pip removal above — the one change in this file that could
+# plausibly break the runtime. It resolves `python` to /app/.venv/bin/python via
+# PATH, exactly as the CMD and HEALTHCHECK do.
+#
+# Deliberately does NOT `import main`: Settings() runs at module scope and would
+# make this layer fail on missing env vars rather than on a real breakage. Importing
+# the server stack proves the venv is intact, which is what this guards.
+RUN python -c "import sys, uvicorn, fastapi, urllib.request; print('runtime smoke ok', sys.executable)"
 
 USER 10001:10001
 
