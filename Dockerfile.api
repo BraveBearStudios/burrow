@@ -10,8 +10,10 @@
 # user with a HEALTHCHECK against the VERIFIED health path /api/v1/health.
 
 # ── Build stage ────────────────────────────────────────────────────────
-# python:3.12-slim — digest resolved 2026-07-13 (multi-arch index).
-FROM python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf5855151dc2c3141699a1bfc852199fbf AS build
+# python:3.12-slim — digest resolved 2026-09-06 (multi-arch index). Debian 13.6:
+# carries util-linux 2.41.5-0+deb13u1 and openssl 3.5.7-1~deb13u2, which clear the
+# 30 HIGH findings the previous 13.5 pin failed the Trivy gate on.
+FROM python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea AS build
 
 # uv installs into a project-local .venv from the committed lockfile only.
 ENV UV_PROJECT_ENVIRONMENT=/app/.venv \
@@ -36,7 +38,7 @@ RUN uv sync --frozen --no-dev
 
 # ── Runtime stage ──────────────────────────────────────────────────────
 # python:3.12-slim (slim NOT distroless — debuggable v1, ci-cd §9 Open Q1).
-FROM python:3.12-slim@sha256:423ed6ab25b1921a477529254bfeeabf5855151dc2c3141699a1bfc852199fbf AS runtime
+FROM python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea AS runtime
 
 # OCI provenance + AGPL §13 source-availability labels. The dynamic values
 # (revision/created/version) are supplied by the CI metadata action at build time
