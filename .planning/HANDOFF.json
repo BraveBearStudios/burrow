@@ -2,7 +2,7 @@
   "version": "1.0",
   "timestamp": "2026-08-15T05:31:09.219Z",
   "phase": "v1.4",
-  "phase_name": "Ship & Harden — milestone wrap; #33 is the last agent-executable item, then the operator ring (A verify, B egress, C homelab UAT)",
+  "phase_name": "Ship & Harden — gate passed, main green; only the operator ring (A verify, B egress, C homelab UAT) remains",
   "phase_dir": ".planning (default; milestone-level pause)",
   "plan": null,
   "task": "merge-open-prs",
@@ -44,19 +44,15 @@
       "status": "done",
       "commit": "n/a (artifact)",
       "name": "Republished the operator runbook artifact restructured into two concurrent lanes with yours/ursa ownership per step"
+    },
+    {
+      "id": 7,
+      "status": "done",
+      "commit": "4528849",
+      "name": "Gate passed: #33 merged, main green (34281449849), Track B unblocked, dependabot queue asked to rebase"
     }
   ],
   "remaining_tasks": [
-    {
-      "id": "GATE",
-      "status": "awaiting_operator",
-      "name": "Operator merges #33: gh pr merge 33 --admin --rebase --delete-branch"
-    },
-    {
-      "id": "INPUT",
-      "status": "awaiting_operator",
-      "name": "Operator supplies <NODE2> and <IDLE_S>"
-    },
     {
       "id": "A",
       "status": "awaiting_operator",
@@ -64,8 +60,8 @@
     },
     {
       "id": "B",
-      "status": "blocked_on_GATE",
-      "name": "harden-runner audit -> block; harvest from run 34081313100, agent makes the edits"
+      "status": "ready",
+      "name": "harden-runner audit -> block. Harvest static-gates + both build-scan legs from GREEN push run 34281449849; harvest pr-title from 34081313100 (skipped on push, so that PR run is its only observation). Agent makes the edits once the operator supplies the lists."
     },
     {
       "id": "C",
@@ -80,14 +76,9 @@
   ],
   "blockers": [
     {
-      "type": "human_action",
-      "description": "#33 needs a human approver: reviewDecision REVIEW_REQUIRED and GitHub blocks self-approval. Agent is classifier-denied on gh pr merge --admin.",
-      "workaround": "Operator runs the merge with a ! prefix."
-    },
-    {
-      "type": "missing_input",
-      "description": "<NODE2> is named nowhere in the repo. Gates UAT-1A injection, UAT-2, both cleanup checks and the final teardown.",
-      "workaround": "ssh root@10.0.0.6 \"pvecm nodes\". Do not guess den02."
+      "type": "operator_only",
+      "description": "All remaining work is operator-run: A (cosign + attestation on lintool03), B (egress flip), C (the homelab UAT). No agent can produce the evidence.",
+      "workaround": "Per-machine command lists live in the operator runbook artifact."
     },
     {
       "type": "correction",
@@ -165,17 +156,10 @@
     }
   ],
   "uncommitted_files": [],
-  "next_action": "Operator merges #33 (--admin --rebase) and supplies <NODE2>. Tracks A and C do not wait on the merge; Track B does. Per-machine command lists live in the operator runbook artifact.",
+  "next_action": "main is green. Operator runs tracks A and C on the homelab and hands over the harvested egress lists for B; agent opens both Lane D PRs and records all evidence.",
   "context_notes": "Three PRs authored and CI-verified but unmerged; the merge failed twice for unrelated reasons (classifier denial, then wrong gh account). No repo state changed. All three PRs fail ONLY Build + scan burrow-api; every other gate including all CodeQL analyses passes. #26 is docs-only and proves the failure is inherited from main. The Trivy fix took three CI runs and disproved two hypotheses before a build-log find located the packages inside pip/_vendor, where no upgrade can reach them.",
-  "last_updated": "2026-09-08T13:04:00.000Z",
+  "last_updated": "2026-09-08T21:40:00.000Z",
   "open_prs": [
-    {
-      "number": 33,
-      "branch": "fix/base-image-refresh",
-      "title": "refresh the api base image digest to Debian 13.6",
-      "state": "green 11/11, MERGEABLE, BLOCKED on required review",
-      "note": "Two FROM digests 423ed6ab -> 78387bc3. Verified by parsing var/lib/dpkg/status out of the layer blobs: new digest is Debian 13.6 with util-linux 2.41.5-0+deb13u1 and openssl 3.5.7-1~deb13u2. Merge with --admin --rebase; ruleset 18189353 allows rebase only."
-    },
     {
       "number": 11,
       "branch": "release-please--branches--main",
@@ -235,6 +219,12 @@
       "title": "dependabot uv group, cryptography 50.0.1",
       "method": "rebase --admin",
       "note": "Superseded the closed #23."
+    },
+    {
+      "number": 33,
+      "title": "refresh the api base image digest to Debian 13.6",
+      "method": "rebase --admin",
+      "note": "Merged as 4528849. Push run 34281449849 GREEN — first green push run on main since 2026-07-14."
     }
   ],
   "false_pass_corrections": [

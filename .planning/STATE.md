@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: in-progress
-stopped_at: PR #33 (api base image -> Debian 13.6) open, green 11/11, awaiting operator merge — the last agent-executable item. #24/#25/#26/#29 merged; phase discovery now reads completed_phases 6 with only 20 and 22 outstanding, both human_needed. Tracks A (cosign verify) and C (homelab UAT) are operator-run and do not wait on #33; Track B does.
-last_updated: "2026-09-08T13:04:00.000Z"
+stopped_at: GATE PASSED. #33 merged (4528849) and ci.yml push run 34281449849 is GREEN — the first green push run on main since 2026-07-14. Track B (Phase 20 MH3) is unblocked and its egress harvest splits across two runs. Phases 20 and 22 remain human_needed pending operator evidence from tracks A, B and C.
+last_updated: "2026-09-08T21:40:00.000Z"
 last_activity: 2026-09-08
 progress:
   total_phases: 13
@@ -297,6 +297,25 @@ audit → complete → cleanup.
   carries three markers. Both numbers are right about different things.
 - **The harden-runner grep returns seven, not six.** `release-please.yml:11` is a prose comment
   matching the pattern. Six real sites; `codeql.yml:39` is the one every doc omits.
+
+### Gate passed (2026-09-08)
+
+- **#33 merged as `4528849`**, `--admin --rebase`. Push run **`34281449849` is GREEN**: static-gates,
+  build-scan api and build-scan ui all success. First green push run on main since 2026-07-14.
+- **Track B's egress harvest splits across two runs, and this is now measured rather than inferred.**
+  `pr-title` shows `skipped` in `34281449849` — it does not run on push events. So static-gates and
+  both build-scan legs harvest from `34281449849` (the canonical green push run on main), while
+  `pr-title` harvests from `34081313100` (a pull_request run), which remains its only observation
+  before the flip.
+- **A correction carried from the previous entry:** run `34081313100` was briefly recorded as
+  satisfying the Track B gate. It does not — it is a `pull_request` run on `fix/base-image-refresh`.
+  It is the correct *harvest source* for pr-title, not the gate. `34281449849` is the gate.
+- **Dependabot #16, #28, #22, #21** were asked to rebase onto the fixed base; they should go green
+  unaided. Take #16 before Track B — it bumps action pins and can move the harden-runner SHA that B
+  hand-edits.
+- **`<NODE2>` is resolved out-of-repo.** Read live from `pvecm nodes`. Per the CLAUDE.md rule that
+  deployment topology stays out of the tree, the real name lives in the operator runbook artifact and
+  in session memory, not here. `<IDLE_S>` is still read from the live `.env` during the UAT.
 
 ## Operator Next Steps
 
