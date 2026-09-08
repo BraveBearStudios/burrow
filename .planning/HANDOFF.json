@@ -2,7 +2,7 @@
   "version": "1.0",
   "timestamp": "2026-08-15T05:31:09.219Z",
   "phase": "v1.4",
-  "phase_name": "Ship & Harden — milestone wrap (Phases 20 + 22 operator-gated, plus a NEW red-CI blocker)",
+  "phase_name": "Ship & Harden — milestone wrap; #33 is the last agent-executable item, then the operator ring (A verify, B egress, C homelab UAT)",
   "phase_dir": ".planning (default; milestone-level pause)",
   "plan": null,
   "task": "merge-open-prs",
@@ -11,86 +11,93 @@
   "completed_tasks": [
     {
       "id": 1,
-      "name": "Resume + reconcile STATE.md (was ~3 weeks stale: still said 'resume 15-03' though Phase 15 verification reads passed; branch field said feat/v1.4-harden, actual is main)",
       "status": "done",
-      "commit": "uncommitted"
+      "commit": "dbe8fd8 / 4f7ded1 replayed",
+      "name": "Rebased local main onto origin; the two duplicate wip: commits dropped by patch-id"
     },
     {
       "id": 2,
-      "name": "Verified every operator command against source (10 agents, 169 claims, 8 refuted). Resolved <REL>=1.4.1 + both image digests + the Step-Security insights URL from release run 29355954285",
       "status": "done",
-      "commit": "n/a (analysis)"
+      "commit": "8cdff0d, 072ed6e",
+      "name": "Merged four PRs; diagnosed why rebase-merge refused #24 and #26 — their branches carried already-applied commits, so a replay would produce empty commits"
     },
     {
       "id": 3,
-      "name": "Published the operator runbook artifact (checklists, copy-ready commands, per-step 'which box' badges, 8 landmines)",
       "status": "done",
-      "commit": "n/a (artifact)"
+      "commit": "n/a (analysis)",
+      "name": "Diagnosed the new red CI as an OS-layer failure, not a regression; Python layer scans 0"
     },
     {
       "id": 4,
-      "name": "Track D: fixed the three fixable HIGH CVEs failing the Trivy gate. cryptography 49.0.0->50.0.0 (pyproject+lock); setuptools>=83.0.0 + msgpack>=1.2.1 (Dockerfile runtime stage). 280 api tests pass, ruff clean, mypy strict clean over 90 files",
-      "status": "in_progress",
-      "progress": "code complete and locally verified on branch fix/trivy-high-cves; UNCOMMITTED — the approval gate was never answered"
+      "status": "done",
+      "commit": "c0cdf9a",
+      "name": "Opened PR #33, then corrected it: dropped a proven no-op apt layer whose comment asserted something false"
+    },
+    {
+      "id": 5,
+      "status": "done",
+      "commit": "n/a (artifact)",
+      "name": "Re-verified 90 operator commands against source with adversarial refuters: 24 corrections, 6 refutations, 3 false-pass checks found"
+    },
+    {
+      "id": 6,
+      "status": "done",
+      "commit": "n/a (artifact)",
+      "name": "Republished the operator runbook artifact restructured into two concurrent lanes with yours/ursa ownership per step"
     }
   ],
   "remaining_tasks": [
     {
-      "id": "D",
-      "name": "Commit + push fix/trivy-high-cves, open PR, confirm ci.yml goes green. If msgpack persists in the SARIF, locate it inside the image and either strip it or repin the base",
-      "status": "awaiting_approval"
+      "id": "GATE",
+      "status": "awaiting_operator",
+      "name": "Operator merges #33: gh pr merge 33 --admin --rebase --delete-branch"
+    },
+    {
+      "id": "INPUT",
+      "status": "awaiting_operator",
+      "name": "Operator supplies <NODE2> and <IDLE_S>"
     },
     {
       "id": "A",
-      "name": "Phase 20 MH2 / Phase 22 UAT-5: cosign verify + gh attestation verify both :1.4.1 digests from a homelab pull",
-      "status": "not_started"
+      "status": "awaiting_operator",
+      "name": "cosign + gh attestation verify both :1.4.1 digests on lintool03; record in THREE places"
     },
     {
       "id": "B",
-      "name": "Phase 20 MH3: harden-runner egress audit->block. BLOCKED until D lands and ci.yml is green under audit",
-      "status": "blocked_on_D"
+      "status": "blocked_on_GATE",
+      "name": "harden-runner audit -> block; harvest from run 34081313100, agent makes the edits"
     },
     {
       "id": "C",
-      "name": "Phase 22: run 22-HUMAN-UAT.md on den01+lintool03 (Step 0 deploy + UAT-1..5), record evidence, flip 8 result markers",
-      "status": "not_started"
+      "status": "awaiting_operator",
+      "name": "22-HUMAN-UAT.md on den01 + lintool03; eight markers at 141,180,240,270,298,356,424,465"
+    },
+    {
+      "id": "RECORD",
+      "status": "blocked_on_A_and_C",
+      "name": "Agent records evidence into 20-VERIFICATION.md, 22-HUMAN-UAT.md and 22-VERIFICATION.md, then opens the PR those edits require (main forbids direct pushes)"
     }
   ],
   "blockers": [
     {
-      "description": "Agent CANNOT merge these PRs. gh pr merge --admin is denied by the Claude Code auto-mode classifier, and --admin exists to bypass branch protection, so working around the denial defeats its intent",
       "type": "human_action",
-      "workaround": "Operator runs the merge commands with a ! prefix. Do not substitute an API call that achieves the same mutation."
+      "description": "#33 needs a human approver: reviewDecision REVIEW_REQUIRED and GitHub blocks self-approval. Agent is classifier-denied on gh pr merge --admin.",
+      "workaround": "Operator runs the merge with a ! prefix."
     },
     {
-      "description": "A human review is required regardless of permissions: #25 reports reviewDecision REVIEW_REQUIRED, the PRs are authored under the operator identity, and GitHub blocks self-approval",
-      "type": "human_action",
-      "workaround": "No permission grant removes the human from this loop."
+      "type": "missing_input",
+      "description": "<NODE2> is named nowhere in the repo. Gates UAT-1A injection, UAT-2, both cleanup checks and the final teardown.",
+      "workaround": "ssh root@10.0.0.6 \"pvecm nodes\". Do not guess den02."
     },
     {
-      "description": "Wrong gh account active. The merge failed with: bcurry-arrow does not have the correct permissions to execute MergePullRequest. thezoid has admin:true on the repo. A gh auth switch to thezoid was performed and REVERTED on its own (hosts.yml reads user: bcurry-arrow again)",
-      "type": "technical",
-      "workaround": "Run gh auth status and re-switch immediately before merging; do not assume it stuck."
+      "type": "correction",
+      "description": "Run 34081313100 does NOT satisfy the Track B gate: it is a pull_request run on fix/base-image-refresh, not a push run on main. It IS the correct harvest source, and the only place pr-title egress will ever be observable pre-flip.",
+      "workaround": "Merge #33, then use its push run as the gate."
     },
     {
-      "description": "No PR in this set can go green alone: each reds on a CVE another PR owns. All are MERGEABLE with no conflicts; it is the ruleset requiring green checks",
-      "type": "technical",
-      "workaround": "First merge needs --admin; the rest cascade green. Alternative: fold the cryptography pin into #24 so it goes green unaided (reverses an explicit operator decision, so not done unilaterally)."
-    },
-    {
-      "description": "Independent verify (A) needs cosign + gh with read:packages on lintool03, not the Windows dev box: UAT-5 requires a LAN-pulled image and Docker is not installed locally",
-      "type": "human_action",
-      "workaround": "gh auth login -h github.com -s read:packages -w. A bare gh auth refresh WITHOUT -s is a silent no-op that prints success AND can flip the active account."
-    },
-    {
-      "description": "Harden-runner block-flip (B) needs a GREEN ci.yml run Step-Security insights; the only URL on file is the release path, the wrong workflow. Six call sites, not five",
-      "type": "human_action",
-      "workaround": "Land the merges first. Never guess the allowlist."
-    },
-    {
-      "description": "Phase 22 UAT (C) needs the live Proxmox homelab; not CI-provable",
       "type": "external",
-      "workaround": "Operator runs 22-HUMAN-UAT.md, corrected by the published artifact. Eight result:[pending] markers, not six."
+      "description": "Track C needs the live Proxmox homelab.",
+      "workaround": "none"
     }
   ],
   "human_actions_pending": [
@@ -158,31 +165,90 @@
     }
   ],
   "uncommitted_files": [],
-  "next_action": "Confirm the gh identity FIRST (the last merge failed on identity, not on the merge): gh auth status; gh auth switch --hostname github.com --user thezoid; gh api repos/BraveBearStudios/burrow --jq .permissions (expect admin:true). Then the OPERATOR runs, prefixed with !: gh pr merge 25 --admin --rebase --delete-branch; then 26; then 24; then gh pr comment 23 --body \"@dependabot rebase\"; then gh pr merge 23 --rebase --delete-branch once green. The agent CANNOT run these — classifier-denied, and GitHub requires a human review regardless.",
+  "next_action": "Operator merges #33 (--admin --rebase) and supplies <NODE2>. Tracks A and C do not wait on the merge; Track B does. Per-machine command lists live in the operator runbook artifact.",
   "context_notes": "Three PRs authored and CI-verified but unmerged; the merge failed twice for unrelated reasons (classifier denial, then wrong gh account). No repo state changed. All three PRs fail ONLY Build + scan burrow-api; every other gate including all CodeQL analyses passes. #26 is docs-only and proves the failure is inherited from main. The Trivy fix took three CI runs and disproved two hypotheses before a build-log find located the packages inside pip/_vendor, where no upgrade can reach them.",
-  "last_updated": "2026-08-15T05:31:09.219Z",
+  "last_updated": "2026-09-08T13:04:00.000Z",
   "open_prs": [
     {
-      "number": 24,
-      "branch": "fix/trivy-high-cves",
-      "title": "base-image CVEs, Trivy 3 HIGH -> 1",
-      "state": "ready",
-      "note": "Dockerfile-only by operator choice; cryptography lives in dependabot #23. Removing pip was the only remedy: the stale copies are in site-packages/pip/_vendor/ with no dist-info, and pip 26.2.1 still vendors msgpack 1.1.2. Safe because the uv venv has no pip; build log confirms runtime smoke ok /app/.venv/bin/python."
+      "number": 33,
+      "branch": "fix/base-image-refresh",
+      "title": "refresh the api base image digest to Debian 13.6",
+      "state": "green 11/11, MERGEABLE, BLOCKED on required review",
+      "note": "Two FROM digests 423ed6ab -> 78387bc3. Verified by parsing var/lib/dpkg/status out of the layer blobs: new digest is Debian 13.6 with util-linux 2.41.5-0+deb13u1 and openssl 3.5.7-1~deb13u2. Merge with --admin --rebase; ruleset 18189353 allows rebase only."
     },
     {
+      "number": 11,
+      "branch": "release-please--branches--main",
+      "title": "chore(main): release 1.4.0",
+      "state": "OPEN, do NOT merge",
+      "note": "Burned version. Disposition unowned."
+    },
+    {
+      "number": 16,
+      "branch": "dependabot github-actions",
+      "title": "bump the github-actions group, 16 updates",
+      "state": "OPEN",
+      "note": "Take BEFORE Track B — it can move the harden-runner SHA that B hand-edits."
+    },
+    {
+      "number": 28,
+      "branch": "dependabot npm",
+      "title": "bump the npm group, 15 updates",
+      "state": "OPEN",
+      "note": "ui only; goes green once #33 lands."
+    },
+    {
+      "number": 22,
+      "branch": "dependabot postcss",
+      "title": "bump postcss",
+      "state": "OPEN",
+      "note": "ui only."
+    },
+    {
+      "number": 21,
+      "branch": "dependabot undici",
+      "title": "bump undici",
+      "state": "OPEN",
+      "note": "ui only."
+    }
+  ],
+  "async_jobs": [],
+  "merged_this_session": [
+    {
       "number": 25,
-      "branch": "fix/pin-ruff-ruleset",
       "title": "pin the ruff rule set",
-      "state": "ready",
-      "note": "Ruff changed its DEFAULT selection between 0.15.16 and 0.16.2 (same tree: clean vs 115 errors). Unblocks #23. Clean under both versions, mypy clean, 302 tests pass."
+      "method": "squash --admin"
     },
     {
       "number": 26,
-      "branch": "fix/verification-frontmatter-order",
       "title": "frontmatter above SPDX, 9 files",
-      "state": "ready",
-      "note": "gsd-tools needs --- on line 1; all 8 phases previously read missing. reuse lint 502/502. MUST merge before /gsd-autonomous is usable."
+      "method": "squash --admin",
+      "note": "The discovery unblock. completed_phases went 0 -> 6."
+    },
+    {
+      "number": 24,
+      "title": "base-image Python CVEs",
+      "method": "squash --admin"
+    },
+    {
+      "number": 29,
+      "title": "dependabot uv group, cryptography 50.0.1",
+      "method": "rebase --admin",
+      "note": "Superseded the closed #23."
     }
   ],
-  "async_jobs": []
+  "false_pass_corrections": [
+    "UAT-1A reap check ran pct list on den01 for a CT living on NODE2; the || branch printed GONE unconditionally. Check on NODE2 and assert positively on reaper.destroyed.",
+    "UAT-1A injection used pct create --node <NODE2>; pct has no --node option and $DEN executes on den01, so the CT would land on the default node, inverting the test. Hop through den01 to NODE2.",
+    "UAT-4d used last4 before == after, which holds even when decryption failed because last4 is plaintext, while compute:ok is satisfied by the .env fallback. The real discriminator is the absence of the fallback log lines."
+  ],
+  "key_corrections": [
+    "Squash is not ruleset-legal: ruleset 18189353 allows rebase only. The squash merges worked because --admin bypasses the ruleset. require_code_owner_review is vacuous (no CODEOWNERS file in the repo); the real blocker is required_approving_review_count: 1.",
+    "gh attestation verify piped to tee suppresses the success banner (TTY-gated). Use script -qec.",
+    "The cosign transparency-log line has two mutually exclusive forms; requiring both produces a false FAIL.",
+    "Deploy Path B not Path A: main has moved past the commit that built :1.4.1, so a local build makes UAT-5 verify a different artifact than the one running. Delete the build: blocks rather than only overriding image:.",
+    "WORKER_NODES gates UAT-2 only, not UAT-1A; the reaper discovers orphans cluster-wide by VMID range.",
+    "Eight result: [pending] markers at 141,180,240,270,298,356,424,465. A raw grep finds 10; two are prose. The Summary says 6 because it counts items and UAT-1 carries three markers.",
+    "The harden-runner grep returns seven, not six: release-please.yml:11 is a prose comment matching the pattern."
+  ]
 }

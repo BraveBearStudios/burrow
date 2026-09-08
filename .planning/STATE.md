@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: in-progress
-stopped_at: Three PRs open and UNMERGED (#24 base-image CVEs, #25 ruff rule-set pin, #26 verification frontmatter order) — merge blocked on operator: the agent is classifier-denied on `gh pr merge --admin` and GitHub requires a human review regardless. Phases 15-19 + 21 verified passed; Phase 20 signed release DONE (v1.4.1) with verify + harden-runner block-flip operator-pending; Phase 22 is operator homelab UAT
-last_updated: "2026-08-15T05:31:09.219Z"
-last_activity: 2026-08-15
+stopped_at: PR #33 (api base image -> Debian 13.6) open, green 11/11, awaiting operator merge — the last agent-executable item. #24/#25/#26/#29 merged; phase discovery now reads completed_phases 6 with only 20 and 22 outstanding, both human_needed. Tracks A (cosign verify) and C (homelab UAT) are operator-run and do not wait on #33; Track B does.
+last_updated: "2026-09-08T13:04:00.000Z"
+last_activity: 2026-09-08
 progress:
   total_phases: 13
   completed_phases: 12
@@ -236,44 +236,81 @@ are now claimed by v1.4 Phases 20 + 22.
 
 ## Session Continuity
 
-Last session: 2026-08-12 (resume-work; three PRs opened)
-Stopped at: Three PRs open, none merged. Verification roll-call unchanged: Phases 15, 16, 17, 18, 19, 21 `passed`; Phases 20 + 22 `human_needed`.
-Resume file: `.planning/.continue-here.md` (+ machine-readable `.planning/HANDOFF.json`, kept until the operator ring closes)
-Next plan: review + merge the three open PRs, then the operator ring (A verify, C live UAT), then B. Once all are evidenced, `/gsd-autonomous --from 20` runs audit -> complete -> cleanup — but only AFTER #26 merges, or discovery still misreads every phase.
+Last session: 2026-09-08 (resume-work; four PRs merged, #33 opened, full command re-verification)
+Stopped at: Four PRs merged (#25, #26, #24, #29). PR #33 open and green, awaiting operator merge —
+it is the last agent-executable item before the operator ring. Phase discovery now reads TRUE:
+`completed_phases: 6`, only 20 and 22 outstanding, both correctly `human_needed`.
+Resume file: `.planning/.continue-here.md` (+ `.planning/HANDOFF.json`)
+Next plan: operator merges #33 → green push run on main → Track B becomes possible. Tracks A and C
+are operator-run and independent of #33. Once all are evidenced, `/gsd-autonomous --from 20` runs
+audit → complete → cleanup.
 
-### Correction to the CI-is-red record (2026-08-12)
+### What changed this session
 
-Earlier sessions recorded "CI red since 2026-07-27" without qualification. Measured:
-`ci.yml` triggers on `pull_request` AND `push: branches: [main]`. Filtering to push
-events, `origin/main`'s last run is **`29364341164` at `03ecb3b` — success**, as are the
-four before it. The red runs are all `pull_request` runs on dependabot branches, red for
-**two different reasons**: run `30910698379` (PR #21) failed `Build + scan burrow-api` on
-the Trivy CVEs; run `31403711958` (PR #23) failed `Tier-0 static gates` on `ruff check`
-and never reached the scan. Caveat that keeps the work necessary: main's green record is
-from 2026-07-14 and PREDATES the CVE advisories, so main is green only because nothing has
-been pushed to re-scan it.
+- **#25, #26, #24, #29 merged.** #26 was the discovery unblock: with the SPDX block above the
+  frontmatter, `gsd-tools` read all 8 phases as `missing` and `completed_phases: 0`. It now reads 6.
+- **Rebase-merge fails on branches carrying already-applied commits.** #25's rebase replayed its two
+  `wip:` planning commits onto main as new hashes; #24 and #26 still carried the originals, so
+  GitHub refused with `This branch can't be rebased` (it would produce empty commits). Squash merge
+  sidestepped it. Both were `MERGEABLE` throughout — not a conflict.
+- **Squash is not ruleset-legal.** Ruleset `18189353` sets `allowed_merge_methods: ["rebase"]`.
+  The squash merges succeeded only because `--admin` bypasses the ruleset wholesale.
+  `require_code_owner_review: true` is vacuous — there is no CODEOWNERS file in the repo. The real
+  blocker is `required_approving_review_count: 1` plus GitHub's self-approval ban.
+- **CI on main went red on a NEW layer.** Runs `34067647284` / `34067652003` failed
+  `Build + scan burrow-api` with 30 HIGH on the `debian 13.5` OS target. Not a regression: the
+  Python layer scans 0 across every package, so #24 and #29 worked. The advisories postdate main's
+  last green run (`29364341164`, 2026-07-14), which is exactly the "green only because nothing was
+  pushed" caveat coming true.
+- **PR #33 fixes it in five lines.** Both `FROM` digests move `423ed6ab` → `78387bc3`. Verified by
+  parsing `var/lib/dpkg/status` out of the layer blobs: the new digest is Debian **13.6** carrying
+  `util-linux 2.41.5-0+deb13u1` and `openssl 3.5.7-1~deb13u2`. An earlier revision also carried an
+  `apt-get --only-upgrade` floor, reasoned from the *suite* (`trixie-proposed-updates`); measuring
+  the *image* proved it a no-op whose comment asserted something false. Removed.
+- **90 operator commands re-verified against source**, each extracted then handed to an adversarial
+  refuter. 24 corrections, 6 refutations. Three commands in the previous runbook produced a **false
+  pass** — see the landmine list below.
 
-### Open PRs (all three fail ONLY `Build + scan burrow-api`, for the same shared reason)
+### Command corrections that change operator behaviour
 
-- **#24 `fix/trivy-high-cves`** — base-image `setuptools`/`msgpack`. Reduced to
-  Dockerfile-only because dependabot **#23 already carries the identical
-  `cryptography==50.0.0` bump**; duplicating it would only conflict. Run `31567559416`
-  proved the upgrade works (`setuptools-84.0.0`, `msgpack-1.2.1` both scan 0 vulns) but a
-  pathless `Python` target still reports the OLD versions, so a stale copy survives where
-  `pip install --upgrade` cannot reach. A follow-up commit prunes `ensurepip/_bundled` and
-  adds build-log probes to pin the provenance. **Result unread — check it first.**
-- **#25 `fix/pin-ruff-ruleset`** — pins `select = ["E4","E7","E9","F"]`. Ruff changed its
-  DEFAULT rule set between 0.15.16 and 0.16.2: same tree, 0.15.16 clean, 0.16.2 = 115
-  errors. Unblocks #23. Verified clean under both versions; mypy clean; 302 tests pass.
-- **#26 `fix/verification-frontmatter-order`** — moves the SPDX block below the frontmatter
-  in 9 files so `gsd-tools` can parse them. Before: all 8 phases read `missing`. After:
-  matches this file exactly. `reuse lint` compliant, 502/502.
-
-**Green main needs all three plus #23.** No single PR can go green on its own — do not wait for one.
+- **UAT-1A orphan check was a false pass.** `$DEN "pct list | grep 1020 || echo GONE"` runs on
+  den01 looking for a CT that lives on `<NODE2>`; the `||` branch fires unconditionally. Check on
+  NODE2, and assert positively on the `reaper.destroyed` log line.
+- **UAT-1A injection cannot run.** `pct` has no `--node` option, and `$DEN` executes on den01, so
+  the CT would land on the default node — inverting the test. Hop:
+  `ssh root@10.0.0.6 "ssh <NODE2> '...'"`.
+- **UAT-4d cannot fail.** `last4` is plaintext so BEFORE == AFTER holds even when decryption
+  failed, and `compute: ok` is satisfied by the `.env` fallback. Real discriminator: absence of the
+  fallback log lines, with a GUI token whose last4 differs.
+- **Deploy Path B, not Path A.** `origin/main` has moved past the commit that built `:1.4.1`, so a
+  local build makes UAT-5 verify something other than what is running. Delete the `build:` blocks
+  rather than only overriding `image:`.
+- **`gh attestation verify | tee` suppresses the success banner** (gh gates it on stdout being a
+  TTY). Use `script -qec`. Combined with the known exit-0 trap, a piped run yields no signal at all.
+- **cosign's transparency-log line has two mutually exclusive forms.** Asserting both as required
+  produces a false FAIL.
+- **`WORKER_NODES` gates UAT-2 only, not UAT-1A** — the reaper discovers orphans cluster-wide by
+  VMID range and never reads `worker_nodes`. It is absent from `.env` (`40-control-plane.sh` never
+  writes it) and must be JSON array form.
+- **Eight `result: [pending]` markers at lines 141, 180, 240, 270, 298, 356, 424, 465.** A raw grep
+  finds 10; two are prose (:16, :489). The file's Summary says 6 because it counts items, and UAT-1
+  carries three markers. Both numbers are right about different things.
+- **The harden-runner grep returns seven, not six.** `release-please.yml:11` is a prose comment
+  matching the pattern. Six real sites; `codeql.yml:39` is the one every doc omits.
 
 ## Operator Next Steps
 
-- **A (Phase 20 MH2 / Phase 22 UAT-5):** `cosign verify` + `gh attestation verify` a homelab-pulled `@sha256:` digest of `:1.4.1`. Run it **on lintool03**, not the dev box: UAT-5 requires a LAN-pulled image, and Docker is not installed on Windows. Verify by digest, assert on printed output (not exit code).
-- **B (Phase 20 MH3):** read a **green `ci.yml` run's** Step-Security egress insights (not the release run's), fill the real `allowed-endpoints`, set `egress-policy: block` at the **6** call sites, land as a reviewed PR — `ci.yml` first, proven green, before `release.yml`. **Never guess the allowlist.**
-- **C (Phase 22):** run `.planning/phases/22-live-homelab-acceptance-capstone/22-HUMAN-UAT.md` on den01 + lintool03 (Step 0 deploy `:1.4.1`, then UAT-1..5), record evidence, flip each `[ ]` to `[x]` — there are **eight** `result: [pending]` markers, not the six the Summary claims.
-- **Standing:** do NOT merge release-please PR #11.
+- **Gate:** `gh pr merge 33 --admin --rebase --delete-branch`. Rebase, not squash — ruleset.
+- **Unresolved and blocking:** `<NODE2>` is named nowhere in the repo. It gates UAT-1A injection,
+  UAT-2, both cleanup checks, and the final teardown. `<IDLE_S>` must be read from the live `.env`.
+- **A (Phase 20 MH2 / Phase 22 UAT-5):** cosign + attestation verify both `:1.4.1` digests from
+  lintool03. One job, recorded in three places: `20-VERIFICATION.md` MH2, `22-HUMAN-UAT.md:465`,
+  and `22-VERIFICATION.md`'s UAT-5 bullet.
+- **B (Phase 20 MH3):** harden-runner `audit → block`. Harvest egress from run `34081313100` — that
+  is a `pull_request` run, so it is the harvest source, NOT the green-main gate. `pr-title` is
+  skipped on push events, making it the only observation of that job that will exist pre-flip.
+- **C (Phase 22):** the den01 + lintool03 UAT, eight markers.
+- **Standing:** do NOT merge release-please PR #11. Take dependabot #16 before Track B — it bumps
+  action pins including potentially the harden-runner SHA that B hand-edits.
+- **Unowned until decided:** PR #11's disposition, and the 16 pre-close audit items (flipping
+  phases 20 and 22 clears only 3).
