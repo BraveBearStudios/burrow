@@ -1,244 +1,171 @@
 {
   "version": "1.0",
-  "timestamp": "2026-08-15T05:31:09.219Z",
+  "timestamp": "2026-09-10T23:24:00.000Z",
   "phase": "v1.4",
-  "phase_name": "Ship & Harden — gate passed, main green; only the operator ring (A verify, B egress, C homelab UAT) remains",
+  "phase_name": "Ship & Harden — main green; Track A cosign half closed; only the operator ring remains",
   "phase_dir": ".planning (default; milestone-level pause)",
   "plan": null,
-  "task": "merge-open-prs",
-  "total_tasks": 4,
+  "task": null,
+  "total_tasks": 3,
   "status": "paused",
   "completed_tasks": [
     {
       "id": 1,
       "status": "done",
-      "commit": "dbe8fd8 / 4f7ded1 replayed",
-      "name": "Rebased local main onto origin; the two duplicate wip: commits dropped by patch-id"
+      "commit": "4528849",
+      "name": "Gate cleared: #33 merged, ci.yml push run 34281449849 GREEN — first green push run on main since 2026-07-14"
     },
     {
       "id": 2,
       "status": "done",
-      "commit": "8cdff0d, 072ed6e",
-      "name": "Merged four PRs; diagnosed why rebase-merge refused #24 and #26 — their branches carried already-applied commits, so a replay would produce empty commits"
+      "commit": "n/a (verification)",
+      "name": "Track A cosign half PASSED for both images on lintool03 against LAN-pulled digests. cosign v2.6.0, exit 0 both, transparency log verified OFFLINE branch, signer = release.yml@refs/heads/main via token.actions.githubusercontent.com"
     },
     {
       "id": 3,
       "status": "done",
       "commit": "n/a (analysis)",
-      "name": "Diagnosed the new red CI as an OS-layer failure, not a regression; Python layer scans 0"
+      "name": "90 operator commands re-verified against source by adversarial refuters: 24 corrections, 6 refutations, 3 false-pass checks found"
     },
     {
       "id": 4,
       "status": "done",
-      "commit": "c0cdf9a",
-      "name": "Opened PR #33, then corrected it: dropped a proven no-op apt layer whose comment asserted something false"
+      "commit": "n/a (artifact)",
+      "name": "Operator runbook rewritten into two concurrent lanes, 32 checkboxed steps, operator-vs-agent badged, second node resolved"
     },
     {
       "id": 5,
       "status": "done",
-      "commit": "n/a (artifact)",
-      "name": "Re-verified 90 operator commands against source with adversarial refuters: 24 corrections, 6 refutations, 3 false-pass checks found"
-    },
-    {
-      "id": 6,
-      "status": "done",
-      "commit": "n/a (artifact)",
-      "name": "Republished the operator runbook artifact restructured into two concurrent lanes with yours/ursa ownership per step"
-    },
-    {
-      "id": 7,
-      "status": "done",
-      "commit": "4528849",
-      "name": "Gate passed: #33 merged, main green (34281449849), Track B unblocked, dependabot queue asked to rebase"
+      "commit": "100cf16, 7fa098f",
+      "name": "Planning docs reconciled twice and pushed"
     }
   ],
   "remaining_tasks": [
     {
-      "id": "A",
-      "status": "awaiting_operator",
-      "name": "cosign + gh attestation verify both :1.4.1 digests on lintool03; record in THREE places"
+      "id": "A2",
+      "status": "blocked_on_scope",
+      "name": "Track A attestation half: both gh attestation verify calls via script -qec. Agent runs it once read:packages lands."
     },
     {
       "id": "B",
       "status": "ready",
-      "name": "harden-runner audit -> block. Harvest static-gates + both build-scan legs from GREEN push run 34281449849; harvest pr-title from 34081313100 (skipped on push, so that PR run is its only observation). Agent makes the edits once the operator supplies the lists."
+      "name": "Track B egress audit -> block. Harvest static-gates + both build-scan legs from GREEN push run 34281449849; harvest pr-title from 34081313100 (skipped on push, its only observation). Six real call sites; codeql.yml:39 needs an include-or-record decision. Agent edits once lists arrive."
     },
     {
       "id": "C",
       "status": "awaiting_operator",
-      "name": "22-HUMAN-UAT.md on den01 + lintool03; eight markers at 141,180,240,270,298,356,424,465"
+      "name": "Track C homelab UAT on den01 + second node. Eight result: [pending] markers at 141,180,240,270,298,356,424,465."
     },
     {
       "id": "RECORD",
-      "status": "blocked_on_A_and_C",
-      "name": "Agent records evidence into 20-VERIFICATION.md, 22-HUMAN-UAT.md and 22-VERIFICATION.md, then opens the PR those edits require (main forbids direct pushes)"
+      "status": "blocked_on_A2_and_C",
+      "name": "Record evidence into 20-VERIFICATION.md, 22-HUMAN-UAT.md, 22-VERIFICATION.md, then open the PR those edits need (main forbids direct pushes)."
+    },
+    {
+      "id": "CLOSE",
+      "status": "blocked_on_RECORD",
+      "name": "/gsd-audit-milestone -> /gsd-complete-milestone v1.4 -> /gsd-cleanup"
     }
   ],
   "blockers": [
     {
-      "type": "operator_only",
-      "description": "All remaining work is operator-run: A (cosign + attestation on lintool03), B (egress flip), C (the homelab UAT). No agent can produce the evidence.",
-      "workaround": "Per-machine command lists live in the operator runbook artifact."
+      "type": "human_action",
+      "description": "Track A attestation blocked on a missing scope. Both gh accounts carry only gist/read:org/repo/workflow (thezoid, active) and admin:org/gist/repo/workflow (bcurry-arrow). gh attestation verify oci://... fails with \"remote registry authorization failed\".",
+      "workaround": "gh auth refresh -h github.com -s read:packages — the -s flag IS the command. A bare refresh completes the browser flow, prints success, changes nothing, and can flip the active account. Verify with gh auth status afterwards."
     },
     {
-      "type": "correction",
-      "description": "Run 34081313100 does NOT satisfy the Track B gate: it is a pull_request run on fix/base-image-refresh, not a push run on main. It IS the correct harvest source, and the only place pr-title egress will ever be observable pre-flip.",
-      "workaround": "Merge #33, then use its push run as the gate."
+      "type": "technical",
+      "description": "Deploy checkout ~/burrow on lintool03 is at f705415, behind main (7fa098f), carrying M compose.prod.yml — the :8081 remap, which is NOT in git.",
+      "workaround": "stash / pull --ff-only / stash pop, then confirm 8081:8080 before any up -d. Host :80 is ntfy."
     },
     {
       "type": "external",
-      "description": "Track C needs the live Proxmox homelab.",
+      "description": "Track C needs the live Proxmox homelab and a human operator.",
       "workaround": "none"
+    },
+    {
+      "type": "technical",
+      "description": "UNVERIFIED: whether the second node's pool-scoped Proxmox token holds the /pool/burrow-workers ACL. Nothing readable proves it was granted beyond den01.",
+      "workaround": "A 403 on destroy is an ACL gap, not a code defect. Distinguish before recording a UAT failure."
     }
   ],
+  "async_jobs": [],
   "human_actions_pending": [
     {
-      "action": "Merge PRs 25, 26, 24 with --admin --rebase, then rebase and merge dependabot 23",
-      "context": "Blocks green main, Track B, and /gsd-autonomous. Verify gh active account is thezoid first",
-      "blocking": true
+      "action": "gh auth refresh -h github.com -s read:packages",
+      "blocking": true,
+      "context": "Unblocks the Track A attestation half; Phase 20 MH2 then closes on evidence already captured."
     },
     {
-      "action": "Decide: --admin override, or have the agent fold the cryptography pin into #24 so it goes green unaided",
-      "context": "The deadlock was discovered after the Dockerfile-only decision was made",
-      "blocking": false
+      "action": "Approve the L.8 deploy before the agent touches the running stack",
+      "blocking": true,
+      "context": "It edits compose.prod.yml, removes the build: blocks and recreates both containers on live infra."
     },
     {
-      "action": "Run cosign verify + gh attestation verify on both :1.4.1 digests from lintool03",
-      "context": "Phase 20 MH2 / Phase 22 UAT-5",
-      "blocking": true
+      "action": "Hand over the harvested egress endpoint lists",
+      "blocking": true,
+      "context": "Track B; agent makes the edits and opens both PRs."
     },
     {
-      "action": "Read a green ci.yml run Step-Security insights, fill allowed-endpoints, flip egress to block at six sites, ci.yml first",
-      "context": "Phase 20 MH3",
-      "blocking": true
+      "action": "Run the homelab UAT (Track C)",
+      "blocking": true,
+      "context": "Phase 22 capstone; closes v1.4."
     },
     {
-      "action": "Run 22-HUMAN-UAT.md on den01+lintool03 and record evidence for all 5 criteria",
-      "context": "Phase 22 capstone; closes v1.4",
-      "blocking": true
+      "action": "Decide PR #11 disposition and the 13 outstanding pre-close audit items",
+      "blocking": false,
+      "context": "Flipping phases 20 and 22 clears only 3 of 16."
     }
   ],
   "decisions": [
     {
-      "decision": "Halted /gsd-autonomous at the blocker gate instead of running discuss/plan/execute on Phases 20/22",
-      "rationale": "Both are status:human_needed with context already gathered, so the workflow would have gone straight to plan->execute and written plans/summaries for work no agent can perform. Recorded anti-pattern.",
-      "phase": "v1.4"
+      "phase": "v1.4",
+      "decision": "Ship #33 as a digest re-pin only; drop the apt --only-upgrade floor.",
+      "rationale": "Reasoned from the suite, the floor looked necessary; measuring the image (manifest indexes + var/lib/dpkg/status from the layer blobs) showed the new digest is Debian 13.6 and already carries both fixes. The layer was a no-op whose comment asserted something false."
     },
     {
-      "decision": "Track D (the Trivy fix) is the only agent-executable work left in v1.4, and it is a prerequisite for Track B, not a side quest",
-      "rationale": "A block-flip cannot be validated against a red baseline",
-      "phase": "20"
+      "phase": "v1.4",
+      "decision": "Track B's egress harvest splits across two runs.",
+      "rationale": "pr-title reports skipped in 34281449849 because it does not run on push events, making the pull_request run 34081313100 its only observation before the flip. Measured, not inferred."
     },
     {
-      "decision": "Fixed the CVEs by upgrade in two places rather than one",
-      "rationale": "The SARIF shows two distinct targets: cryptography lives in app/.venv (lockfile-reachable), setuptools+msgpack live in the base image's system site-packages (only reachable from the Dockerfile). A lockfile bump alone cannot clear the latter two.",
-      "phase": "20"
+      "phase": "v1.4",
+      "decision": "Keep the resolved second-node name out of the repo.",
+      "rationale": "CLAUDE.md keeps deployment topology out of the tree; it lives in the runbook artifact and session memory."
     },
     {
-      "decision": "setuptools pinned >=83.0.0 rather than the 78.1.1 gate minimum",
-      "rationale": "Clears CVE-2026-59890 (MEDIUM) in the same move so the SARIF stays quiet. Zero risk: the app runs from /app/.venv and never uses system setuptools.",
-      "phase": "20"
+      "phase": "v1.4",
+      "decision": "Install lintool03 tooling user-local rather than with sudo.",
+      "rationale": "No passwordless sudo. cosign v2.6.0 + jq in ~/bin; no system changes, removable with rm -rf ~/bin."
     },
     {
-      "decision": "Did NOT repin the python:3.12-slim base digest",
-      "rationale": "Checked the registry: the latest 3.12-slim index (sha256:57cd7c3a...) carries the same PYTHON_VERSION 3.12.13 as the current pin and declares no setuptools version, so a repin would not predictably clear the finding. Explicit upgrade is the targeted lever.",
-      "phase": "20"
-    },
-    {
-      "decision": "Held .planning/STATE.md out of the Track D commit",
-      "rationale": "Unrelated doc sync from the resume; keeps the PR diff to the three files CI actually cares about",
-      "phase": "v1.4"
-    },
-    {
-      "decision": "Milestone stays OPEN",
-      "rationale": "Phase 22 live UAT is the capstone acceptance gate",
-      "phase": "v1.4"
+      "phase": "v1.4",
+      "decision": "Stop before the deploy despite having SSH.",
+      "rationale": "L.8 mutates a live homelab. Explicit approval and a watching operator are warranted."
     }
   ],
-  "uncommitted_files": [],
-  "next_action": "main is green. Operator runs tracks A and C on the homelab and hands over the harvested egress lists for B; agent opens both Lane D PRs and records all evidence.",
-  "context_notes": "Three PRs authored and CI-verified but unmerged; the merge failed twice for unrelated reasons (classifier denial, then wrong gh account). No repo state changed. All three PRs fail ONLY Build + scan burrow-api; every other gate including all CodeQL analyses passes. #26 is docs-only and proves the failure is inherited from main. The Trivy fix took three CI runs and disproved two hypotheses before a build-log find located the packages inside pip/_vendor, where no upgrade can reach them.",
-  "last_updated": "2026-09-08T21:40:00.000Z",
-  "open_prs": [
-    {
-      "number": 11,
-      "branch": "release-please--branches--main",
-      "title": "chore(main): release 1.4.0",
-      "state": "OPEN, do NOT merge",
-      "note": "Burned version. Disposition unowned."
-    },
-    {
-      "number": 16,
-      "branch": "dependabot github-actions",
-      "title": "bump the github-actions group, 16 updates",
-      "state": "OPEN",
-      "note": "Take BEFORE Track B — it can move the harden-runner SHA that B hand-edits."
-    },
-    {
-      "number": 28,
-      "branch": "dependabot npm",
-      "title": "bump the npm group, 15 updates",
-      "state": "OPEN",
-      "note": "ui only; goes green once #33 lands."
-    },
-    {
-      "number": 22,
-      "branch": "dependabot postcss",
-      "title": "bump postcss",
-      "state": "OPEN",
-      "note": "ui only."
-    },
-    {
-      "number": 21,
-      "branch": "dependabot undici",
-      "title": "bump undici",
-      "state": "OPEN",
-      "note": "ui only."
-    }
+  "uncommitted_files": [
+    " M .planning/.continue-here.md"
   ],
-  "async_jobs": [],
-  "merged_this_session": [
-    {
-      "number": 25,
-      "title": "pin the ruff rule set",
-      "method": "squash --admin"
-    },
-    {
-      "number": 26,
-      "title": "frontmatter above SPDX, 9 files",
-      "method": "squash --admin",
-      "note": "The discovery unblock. completed_phases went 0 -> 6."
-    },
-    {
-      "number": 24,
-      "title": "base-image Python CVEs",
-      "method": "squash --admin"
-    },
-    {
-      "number": 29,
-      "title": "dependabot uv group, cryptography 50.0.1",
-      "method": "rebase --admin",
-      "note": "Superseded the closed #23."
-    },
-    {
-      "number": 33,
-      "title": "refresh the api base image digest to Debian 13.6",
-      "method": "rebase --admin",
-      "note": "Merged as 4528849. Push run 34281449849 GREEN — first green push run on main since 2026-07-14."
-    }
-  ],
-  "false_pass_corrections": [
-    "UAT-1A reap check ran pct list on den01 for a CT living on NODE2; the || branch printed GONE unconditionally. Check on NODE2 and assert positively on reaper.destroyed.",
-    "UAT-1A injection used pct create --node <NODE2>; pct has no --node option and $DEN executes on den01, so the CT would land on the default node, inverting the test. Hop through den01 to NODE2.",
-    "UAT-4d used last4 before == after, which holds even when decryption failed because last4 is plaintext, while compute:ok is satisfied by the .env fallback. The real discriminator is the absence of the fallback log lines."
-  ],
-  "key_corrections": [
-    "Squash is not ruleset-legal: ruleset 18189353 allows rebase only. The squash merges worked because --admin bypasses the ruleset. require_code_owner_review is vacuous (no CODEOWNERS file in the repo); the real blocker is required_approving_review_count: 1.",
-    "gh attestation verify piped to tee suppresses the success banner (TTY-gated). Use script -qec.",
-    "The cosign transparency-log line has two mutually exclusive forms; requiring both produces a false FAIL.",
-    "Deploy Path B not Path A: main has moved past the commit that built :1.4.1, so a local build makes UAT-5 verify a different artifact than the one running. Delete the build: blocks rather than only overriding image:.",
-    "WORKER_NODES gates UAT-2 only, not UAT-1A; the reaper discovers orphans cluster-wide by VMID range.",
-    "Eight result: [pending] markers at 141,180,240,270,298,356,424,465. A raw grep finds 10; two are prose. The Summary says 6 because it counts items and UAT-1 carries three markers.",
-    "The harden-runner grep returns seven, not six: release-please.yml:11 is a prose comment matching the pattern."
-  ]
+  "uncommitted_elided": 0,
+  "next_action": "Operator runs: gh auth refresh -h github.com -s read:packages (the -s flag IS the command), then gh auth status to confirm the scope AND the active account. Agent then runs both attestation verifies with script -qec (never tee — it suppresses the TTY-gated success banner) and Phase 20 MH2 closes on the cosign evidence already captured.",
+  "context_notes": "Several confident, plausible answers were wrong this session and only measurement caught them: rtk reported two branches as having no changes when each had four files; a digest refresh looked insufficient from the package suite and was sufficient once the image was opened; a UAT check that reads like proof printed identical output pass or fail. Track A cosign passing is the real result — it is the gate that fails loudly, and it now passes on both images against LAN-pulled digests with the signer bound to release.yml on main. Everything remaining is operator-gated.",
+  "infrastructure": {
+    "lintool03": "bravebear@10.0.1.38, agent has SSH. No passwordless sudo. ~/bin/cosign v2.6.0 and ~/bin/jq installed by the agent. Docker present with a working ghcr.io credential (no PAT needed). gh NOT installed. Both signed images pulled and resident at the verified digests.",
+    "evidence_paths": [
+      "/tmp/cosign-api.txt",
+      "/tmp/cosign-api.json",
+      "/tmp/cosign-ui.txt",
+      "/tmp/cosign-ui.json"
+    ],
+    "main_ci": "GREEN twice: 34281449849 @ 4528849, 34282062185 @ 7fa098f",
+    "open_prs": "#32 postcss, #31 undici, #30 ruff, #28 npm group, #16 github-actions, #11 release-please (DO NOT MERGE)",
+    "pr_16_note": "Take #16 before Track B — it bumps action pins and can move the harden-runner SHA that B hand-edits."
+  },
+  "verified_digests": {
+    "burrow-api": "sha256:fc37afffd3cf8d2f81dd122ec4e0c4c4e80ca3f387614fd5ae7ebe5b9338467d",
+    "burrow-ui": "sha256:6d5f9f1e0810f7cce53cf3a542496e64aa50b122c1399fc796c63fc4f159fbe0",
+    "signer_subject": "https://github.com/BraveBearStudios/burrow/.github/workflows/release.yml@refs/heads/main",
+    "signer_issuer": "https://token.actions.githubusercontent.com"
+  }
 }

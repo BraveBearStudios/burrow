@@ -3,8 +3,8 @@ gsd_state_version: 1.0
 milestone: v1.4
 milestone_name: Ship & Harden
 status: in-progress
-stopped_at: GATE PASSED. #33 merged (4528849) and ci.yml push run 34281449849 is GREEN — the first green push run on main since 2026-07-14. Track B (Phase 20 MH3) is unblocked and its egress harvest splits across two runs. Phases 20 and 22 remain human_needed pending operator evidence from tracks A, B and C.
-last_updated: "2026-09-08T21:40:00.000Z"
+stopped_at: PAUSED. Track A cosign half PASSED for both images on lintool03 against LAN-pulled digests (exit 0, signer = release.yml@refs/heads/main). Attestation half blocked on a missing read:packages scope — one browser command. main GREEN twice (34281449849 @ 4528849, 34282062185 @ 7fa098f). Tracks B and C remain operator-run; the L.8 deploy is deliberately not started.
+last_updated: "2026-09-10T23:24:00.000Z"
 last_activity: 2026-09-08
 progress:
   total_phases: 13
@@ -316,6 +316,28 @@ audit → complete → cleanup.
 - **`<NODE2>` is resolved out-of-repo.** Read live from `pvecm nodes`. Per the CLAUDE.md rule that
   deployment topology stays out of the tree, the real name lives in the operator runbook artifact and
   in session memory, not here. `<IDLE_S>` is still read from the live `.env` during the UAT.
+
+### Paused 2026-09-10 — Track A half closed
+
+- **SSH to the control plane was granted** (`bravebear@10.0.1.38`), so the agent ran Lane L's
+  read-only steps itself. No passwordless sudo there, so cosign v2.6.0 and jq went into `~/bin`
+  rather than the system. The running stack was not touched.
+- **cosign verify PASSED on both images**, against digests pulled over the LAN on lintool03:
+  `burrow-api@sha256:fc37afff…9338467d` and `burrow-ui@sha256:6d5f9f1e…f159fbe0`, both exit 0, both
+  reporting claims validated, transparency log verified **offline**, and certificate verified against
+  trusted CAs. Signer on both:
+  `https://github.com/BraveBearStudios/burrow/.github/workflows/release.yml@refs/heads/main`.
+  That is Phase 20 MH2's cosign half and Phase 22 UAT-5's, evidenced.
+- **The "offline" branch is worth noting:** the previous runbook asserted all four cosign banner
+  lines as required, and the transparency-log line has two mutually exclusive forms. The live run
+  printed the offline one, so the old assertion would have produced a false FAIL on a good
+  verification.
+- **Attestation half blocked on scope, nothing else.** Both gh accounts carry only
+  `gist/read:org/repo/workflow` and `admin:org/gist/repo/workflow`;
+  `gh attestation verify oci://...` returns `remote registry authorization failed`. One command
+  fixes it: `gh auth refresh -h github.com -s read:packages`.
+- **Dependabot churn since the gate:** #22 and #21 closed, replaced by #32 and #31; #30 (ruff) is
+  new. #28 and #16 still open.
 
 ## Operator Next Steps
 
